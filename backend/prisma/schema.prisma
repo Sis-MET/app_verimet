@@ -1,0 +1,22 @@
+// IvMET - esquema Prisma contra SQL Server de Metrica.
+//
+// La base ya existe: el flujo recomendado es introspeccionar en vez de
+// escribir los modelos a mano:
+//
+//   npm run prisma:pull      -> `prisma db pull`, rellena este archivo
+//   npm run prisma:generate  -> genera el cliente tipado
+//
+// Para stored procedures legados que Prisma no modela bien, usar el pool
+// `mssql` de src/core/database/sql-server-pool.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// TODO(IvMET): modelos generados por `prisma db pull` (Empresa, Usuario,
+// Instrumento, VerificacionIntermedia, PruebaExcentricidad, ...).
