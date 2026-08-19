@@ -4,27 +4,29 @@
   "private": true,
   "description": "IvMET - Verificaciones intermedias de instrumentos de pesaje. Monorepo (Flutter app + Node.js API) de Metrica Ltda.",
   "license": "UNLICENSED",
-  "workspaces": [
-    "backend",
-    "packages/*"
-  ],
   "engines": {
     "node": ">=20.0.0",
-    "npm": ">=10.0.0"
+    "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "backend:dev": "npm run dev --workspace backend",
-    "backend:build": "npm run build --workspace backend",
-    "backend:start": "npm run start --workspace backend",
-    "backend:lint": "npm run lint --workspace backend",
-    "backend:test": "npm run test --workspace backend",
-    "contracts:build": "npm run build --workspace @ivmet/shared-contracts",
+    "preinstall": "only-allow pnpm",
+    "backend:dev": "pnpm --filter @ivmet/backend dev",
+    "backend:build": "pnpm --filter @ivmet/backend build",
+    "backend:start": "pnpm --filter @ivmet/backend start",
+    "backend:lint": "pnpm --filter @ivmet/backend lint",
+    "backend:test": "pnpm --filter @ivmet/backend test",
+    "contracts:build": "pnpm --filter @ivmet/shared-contracts build",
     "app:get": "cd app && flutter pub get",
     "app:gen": "cd app && dart run build_runner build --delete-conflicting-outputs",
     "app:run": "cd app && flutter run",
     "app:test": "cd app && flutter test",
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "devDependencies": {
+    "only-allow": "^1.2.2"
   }
 }

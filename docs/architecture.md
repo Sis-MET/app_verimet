@@ -26,15 +26,17 @@ de todos los clientes para decidir a quien ofrecerle soporte o calibracion.
 
 ```
 IvMET/
-├── app/                       Flutter (NO es workspace npm, tiene su pubspec)
+├── app/                       Flutter (fuera del workspace pnpm, tiene su pubspec)
 ├── backend/                   API Node.js + TypeScript + SQL Server
 ├── packages/shared-contracts/ Enums/DTOs + OpenAPI compartidos
 ├── docs/
-└── package.json               npm workspaces: ["backend", "packages/*"]
+├── pnpm-workspace.yaml        packages: backend, packages/*
+└── package.json               scripts puente para operar ambos lados
 ```
 
-`app/` queda deliberadamente **fuera** de los workspaces npm: su gestor de
-paquetes es `pub`, no `npm`. La unica relacion entre app y backend es el
+`app/` queda deliberadamente **fuera** del workspace de pnpm: su gestor de
+paquetes es `pub`. Del lado JS el gestor es **pnpm** (fijado con el campo
+`packageManager`), nunca npm ni yarn. La unica relacion entre app y backend es el
 contrato HTTP (y, cuando exista, el OpenAPI de `packages/shared-contracts`).
 
 ## 3. Screaming Architecture

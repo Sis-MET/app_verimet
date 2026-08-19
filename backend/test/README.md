@@ -5,4 +5,4 @@ se testean sus capas (casos de uso de `application/` con repositorios en
 memoria, validadores zod de `presentation/dto/`, y los repositorios de
 `infrastructure/` contra una base de pruebas).
 
-Runner: `node --test` (`npm run test --workspace backend`).
+Runner: `node --test` (`pnpm --filter @ivmet/backend test`).

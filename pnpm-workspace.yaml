@@ -1,0 +1,16 @@
+# Workspace de pnpm para IvMET.
+#
+# app/ NO aparece aca a proposito: es un proyecto Flutter con su propio
+# pubspec.yaml y su gestor de paquetes es pub, no pnpm.
+packages:
+  - backend
+  - packages/*
+
+# pnpm bloquea los scripts de instalacion por defecto. Estos cuatro si los
+# necesitan: prisma descarga y ubica sus engines, y bcrypt compila su binding
+# nativo. Sin esto, `prisma generate` y el hashing de contraseñas no funcionan.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  bcrypt: true
+  prisma: true

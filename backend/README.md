@@ -15,7 +15,7 @@ Completar `.env` con las credenciales de SQL Server y los secretos JWT. La base
 esta detras de la VPN corporativa: hay que estar conectado antes de levantar.
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ```bash
@@ -26,14 +26,14 @@ curl http://localhost:3000/health
 
 | Script | Que hace |
 | --- | --- |
-| `npm run dev` | `ts-node-dev` con recarga en caliente. |
-| `npm run build` | Compila a `dist/` y resuelve los alias de `tsconfig`. |
-| `npm start` | Corre `dist/server.js`. |
-| `npm run typecheck` | `tsc --noEmit`. |
-| `npm run lint` | ESLint sobre `src/`. |
-| `npm test` | Tests con el runner de Node. |
-| `npm run prisma:pull` | Introspecciona la base existente hacia `schema.prisma`. |
-| `npm run prisma:generate` | Genera el cliente tipado de Prisma. |
+| `pnpm dev` | `ts-node-dev` con recarga en caliente. |
+| `pnpm build` | Compila a `dist/` y resuelve los alias de `tsconfig`. |
+| `pnpm start` | Corre `dist/server.js`. |
+| `pnpm typecheck` | `tsc --noEmit`. |
+| `pnpm lint` | ESLint sobre `src/`. |
+| `pnpm test` | Tests con el runner de Node. |
+| `pnpm prisma:pull` | Introspecciona la base existente hacia `schema.prisma`. |
+| `pnpm prisma:generate` | Genera el cliente tipado de Prisma. |
 
 ## Mapa de `src/`
 

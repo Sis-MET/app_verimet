@@ -27,12 +27,19 @@ IvMET/
 │   ├── architecture.md         Screaming + Clean Architecture (leer primero)
 │   ├── vpn-install-guide.md    Instalar y conectar la VPN corporativa
 │   └── app-install-guide.md    Instalar/compilar la app
-├── package.json                npm workspaces: backend + packages/*
+├── pnpm-workspace.yaml         packages: backend + packages/*
+├── package.json                scripts puente para ambos lados
 └── .gitignore
 ```
 
-`app/` **no** forma parte de los workspaces npm: su gestor de paquetes es `pub`.
-Solo `backend` y `packages/*` se instalan con `npm install` desde la raiz.
+`app/` **no** forma parte del workspace de pnpm: su gestor de paquetes es `pub`.
+Solo `backend` y `packages/*` se instalan con `pnpm install` desde la raiz.
+
+> El gestor de paquetes del lado JS es **pnpm**, no npm ni yarn. Esto no es una
+> convencion, esta forzado: el script `preinstall` corre `only-allow pnpm` y
+> aborta cualquier `npm install` o `yarn install`. El campo `packageManager`
+> fija ademas la version, asi que con Corepack activo (`corepack enable`)
+> todos usan la misma.
 
 Antes de tocar codigo, leer [docs/architecture.md](docs/architecture.md): explica
 por que las carpetas se llaman como se llaman y donde va cada archivo nuevo.
@@ -44,7 +51,7 @@ por que las carpetas se llaman como se llaman y donde va cada archivo nuevo.
 | Herramienta | Version |
 | --- | --- |
 | Node.js | >= 20 (probado con 24.x) |
-| npm | >= 10 |
+| pnpm | >= 10 (probado con 11.x) |
 | Flutter | 3.44.x stable (Dart 3.12.x) |
 | SQL Server | instancia de Metrica, alcanzable por VPN |
 
@@ -55,8 +62,14 @@ por que las carpetas se llaman como se llaman y donde va cada archivo nuevo.
 Instalar dependencias de todo el workspace (desde la raiz):
 
 ```bash
-npm install
+pnpm install
 ```
+
+pnpm bloquea los scripts de instalacion por defecto. Los de `prisma`,
+`@prisma/engines`, `@prisma/client` y `bcrypt` estan habilitados en
+`pnpm-workspace.yaml` (`allowBuilds`) porque descargan engines y el binding
+nativo. Si alguna vez ves `ERR_PNPM_IGNORED_BUILDS`, es que aparecio una
+dependencia nueva que necesita permiso: revisala antes de agregarla a esa lista.
 
 Configurar el entorno:
 
@@ -70,27 +83,27 @@ Completar `backend/.env` con las credenciales de SQL Server y los secretos JWT.
 Generar el cliente de Prisma (la base ya existe, se introspecciona):
 
 ```bash
-npm run prisma:pull --workspace backend
+pnpm --filter @ivmet/backend prisma:pull
 ```
 
 ```bash
-npm run prisma:generate --workspace backend
+pnpm --filter @ivmet/backend prisma:generate
 ```
 
 Levantar en desarrollo (recarga en caliente con `ts-node-dev`):
 
 ```bash
-npm run backend:dev
+pnpm backend:dev
 ```
 
 Compilar y correr en produccion:
 
 ```bash
-npm run backend:build
+pnpm backend:build
 ```
 
 ```bash
-npm run backend:start
+pnpm backend:start
 ```
 
 Verificar que responde:
@@ -99,7 +112,7 @@ Verificar que responde:
 curl http://localhost:3000/health
 ```
 
-Otros scripts: `npm run backend:lint`, `npm run backend:test`.
+Otros scripts: `pnpm backend:lint`, `pnpm backend:test`.
 
 ---
 
@@ -108,14 +121,14 @@ Otros scripts: `npm run backend:lint`, `npm run backend:test`.
 Instalar dependencias:
 
 ```bash
-npm run app:get
+pnpm app:get
 ```
 
 Generar el codigo de `freezed`, `json_serializable`, `riverpod_generator` y
 `drift_dev` (los `*.g.dart` no se commitean):
 
 ```bash
-npm run app:gen
+pnpm app:gen
 ```
 
 Correr en un dispositivo con la VPN activa:
@@ -131,7 +144,7 @@ cd app && flutter analyze
 ```
 
 ```bash
-npm run app:test
+pnpm app:test
 ```
 
 El detalle de firma y build para Play Store esta en

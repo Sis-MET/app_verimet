@@ -30,10 +30,17 @@ build/
 coverage/
 *.tsbuildinfo
 .eslintcache
+.pnpm-store/
+.pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+
+# El gestor de paquetes del monorepo es pnpm: pnpm-lock.yaml SI se commitea,
+# y los lockfiles de otros gestores se ignoran para que nadie los introduzca
+# sin querer.
+package-lock.json
+yarn.lock
 
 # Variables de entorno (nunca commitear credenciales de SQL Server ni JWT)
 .env
