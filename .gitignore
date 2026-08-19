@@ -1,0 +1,99 @@
+# ===========================================================================
+# IvMET - monorepo (Flutter app + Node.js API)
+# ===========================================================================
+
+# --- Sistema operativo -----------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# --- Editores / IDEs -------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*~
+.history/
+
+# ===========================================================================
+# Node.js / TypeScript (backend, packages/*)
+# ===========================================================================
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Variables de entorno (nunca commitear credenciales de SQL Server ni JWT)
+.env
+.env.*
+!.env.example
+
+# Prisma
+packages/*/generated/
+backend/src/generated/
+backend/prisma/migrations/**/migration_lock.toml.local
+
+# ===========================================================================
+# Flutter / Dart (app/)
+# ===========================================================================
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/.pub-cache/
+app/.pub/
+app/build/
+app/coverage/
+app/doc/api/
+
+# Codigo generado por build_runner (freezed / json_serializable / riverpod / drift)
+*.g.dart
+*.freezed.dart
+*.config.dart
+*.mocks.dart
+
+# Android
+app/android/.gradle/
+app/android/captures/
+app/android/local.properties
+app/android/key.properties
+app/android/app/upload-keystore.jks
+app/android/app/*.jks
+app/android/app/*.keystore
+app/android/**/GeneratedPluginRegistrant.java
+app/android/.cxx/
+
+# iOS
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Flutter.podspec
+app/ios/Flutter/App.framework
+app/ios/Flutter/flutter_export_environment.sh
+app/ios/Flutter/Generated.xcconfig
+app/ios/Flutter/ephemeral/
+app/ios/**/xcuserdata/
+app/ios/ServiceDefinitions.json
+*.ipa
+*.aab
+*.apk
+
+# ===========================================================================
+# Varios
+# ===========================================================================
+*.log
+tmp/
+temp/
+legacy-api/
