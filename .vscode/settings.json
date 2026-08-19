@@ -1,0 +1,16 @@
+{
+  // El editor debe usar el TypeScript del repo (5.9.x), no el que trae VS Code.
+  // Sin esto, VS Code analiza con su version propia y reporta errores que el
+  // `tsc` del proyecto no reporta (o al reves).
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // pnpm es el unico gestor de paquetes del monorepo.
+  "npm.packageManager": "pnpm",
+
+  "editor.formatOnSave": false,
+  "files.eol": "\n",
+  "[typescript]": {
+    "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" }
+  }
+}

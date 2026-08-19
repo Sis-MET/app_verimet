@@ -27,6 +27,7 @@
   },
   "packageManager": "pnpm@11.21.0",
   "devDependencies": {
-    "only-allow": "^1.2.2"
+    "only-allow": "^1.2.2",
+    "typescript": "5.9.3"
   }
 }

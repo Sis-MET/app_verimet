@@ -55,6 +55,11 @@ curl http://localhost:3000/health
 resuelve `tsconfig-paths`; en el build, `tsc-alias`. Usar los alias para lo
 transversal y rutas relativas dentro de una misma feature.
 
+Los `paths` se declaran relativos al `tsconfig.json` (`./src/core/*`) y **sin
+`baseUrl`**: esa opcion quedo deprecada y deja de funcionar en TypeScript 7.
+Por la misma razon el proyecto usa `module`/`moduleResolution` en `node16` y no
+el viejo `node` (node10).
+
 ## Multi-tenant
 
 `empresa_id` sale **siempre** del JWT (`req.user.empresaId`, helper

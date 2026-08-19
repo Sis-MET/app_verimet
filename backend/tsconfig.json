@@ -1,16 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "lib": ["ES2022"],
     "rootDir": "src",
     "outDir": "dist",
-    "baseUrl": "src",
     "paths": {
-      "@core/*": ["core/*"],
-      "@shared/*": ["shared/*"],
-      "@features/*": ["features/*"]
+      "@core/*": ["./src/core/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@features/*": ["./src/features/*"]
     },
     "strict": true,
     "noImplicitOverride": true,
