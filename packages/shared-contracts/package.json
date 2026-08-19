@@ -1,0 +1,20 @@
+{
+  "name": "@ivmet/shared-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contratos compartidos de IvMET: DTOs, enums de dominio y especificacion OpenAPI usada por la API y por la app Flutter.",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "openapi"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
