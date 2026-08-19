@@ -6,7 +6,11 @@ plugins {
 
 android {
     namespace = "bo.com.metrica.ivmet"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage 11 exige compilar contra la API 37, y Flutter
+    // todavia propone 36 en flutter.compileSdkVersion. compileSdk solo habilita
+    // APIs nuevas en tiempo de compilacion: no cambia en que dispositivos se
+    // instala (minSdk) ni a que comportamientos se adhiere (targetSdk).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
