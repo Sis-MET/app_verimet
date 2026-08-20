@@ -32,6 +32,7 @@ curl http://localhost:3000/health
 | `pnpm typecheck` | `tsc --noEmit`. |
 | `pnpm lint` | ESLint sobre `src/`. |
 | `pnpm test` | Tests con el runner de Node. |
+| `pnpm ivmet:create-admin` | Crea interactivamente el primer `metrica_admin`. |
 | `pnpm prisma:pull` | Introspecciona la base existente hacia `schema.prisma`. |
 | `pnpm prisma:generate` | Genera el cliente tipado de Prisma. |
 
@@ -62,7 +63,19 @@ el viejo `node` (node10).
 
 ## Multi-tenant
 
-`empresa_id` sale **siempre** del JWT (`req.user.empresaId`, helper
-`requireTenant(req)`), nunca del body, query o params. Toda query que devuelva
-instrumentos, pruebas o reportes debe filtrar por ese valor. La excepcion es el
-personal interno de Metrica, y solo en rutas protegidas con `requireMetricaStaff`.
+El cliente sale **siempre** del usuario autenticado y cada consulta comprueba
+ademas `ivmet.usuario_plantas`. Los IDs enviados por el móvil nunca amplían el
+alcance. El personal de Métrica solo ve evidencia asociada a alertas que el
+`cliente_jefe_calidad` haya compartido.
+
+## Integración y despliegue
+
+Las rutas públicas viven bajo `/api/ivmet/v1`. Para montar el módulo dentro del
+proceso corporativo e inyectar su pool SQL Server existente se exporta
+`createIvmetRouter` desde `src/ivmet.ts`. El procedimiento completo, migraciones,
+banderas y rollback está en
+[backend-ivmet-deployment.md](../docs/backend-ivmet-deployment.md).
+
+La API completa se activa con `IVMET_ENABLED=true`. La ingesta se controla por
+separado con `IVMET_SYNC_ENABLED=true` y debe permanecer apagada hasta que
+Métrica apruebe el procedimiento y los casos dorados de cálculo.

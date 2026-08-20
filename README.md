@@ -9,8 +9,8 @@ calibraciones formales.
 
 - Funciona **offline-first**: se captura en planta sin señal y se sincroniza despues.
 - Es **multi-tenant**: cada cliente ve solo sus instrumentos y reportes.
-- El personal de Metrica tiene un **dashboard global** con el estado de todas
-  las balanzas de todos los clientes.
+- El personal de Métrica solo recibe las **alertas que el jefe de calidad
+  comparte expresamente**, junto con su verificación y PDF.
 - El trafico va por la **VPN corporativa**; la app no gestiona el tunel.
 
 ---
@@ -173,16 +173,12 @@ Las mismas features existen en la app y en la API (`snake_case` en Dart,
 
 ## Estado actual
 
-Scaffold de estructura y configuracion base. **Todavia no hay logica de
-negocio**: sin calculos de las pruebas, sin endpoints reales y sin pantallas
-definitivas. Lo que si esta listo y compila:
+El backend IvMET incluye autenticación con refresh rotativo, aislamiento por
+cliente/planta, bootstrap offline, catálogos y planes versionados, sincronización
+idempotente, evidencia inmutable, alertas privadas/compartidas, anulación y PDF.
+Las migraciones son aditivas y viven en `backend/sql/`.
 
-- Cliente Dio con interceptores de auth (placeholder de refresh), logging con
-  redaccion de credenciales, y traduccion de errores.
-- Jerarquia de `Failure` / `Result` en la app y de `ApiError` en la API.
-- Middleware JWT con extraccion de `empresa_id` para el aislamiento multi-tenant.
-- Router `go_router`, tema, almacenamiento seguro de tokens e inyeccion Riverpod.
-- Express con helmet/cors/error handler, conexion Prisma + pool `mssql`.
-
-Siguiente paso sugerido: implementar la feature `auth` completa (login +
-refresh token) en ambos lados antes de tocar las features de calculo.
+Por seguridad las rutas y la sincronización se despliegan apagadas. No se debe
+activar `IVMET_SYNC_ENABLED` hasta cargar el procedimiento oficial de Métrica y
+aprobar sus pruebas doradas. El frontend conserva pantallas demo que deben pasar
+a consumir los planes dinámicos entregados por `/api/ivmet/v1/bootstrap`.
