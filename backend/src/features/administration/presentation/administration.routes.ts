@@ -1,0 +1,32 @@
+import { Router } from 'express';
+import { authenticate, requirePasswordChanged, requireRole, validate } from '@core/middlewares';
+import { asyncHandler } from '@shared/utils/async-handler';
+import * as controller from './administration.controller';
+import * as dto from './dto/administration.dto';
+
+export const administrationRouter = Router();
+administrationRouter.use(authenticate, requirePasswordChanged, requireRole('metrica_admin'));
+
+administrationRouter.get('/clients', asyncHandler(controller.listClients));
+administrationRouter.get('/clients/:clientId/plants', validate(dto.clientIdParamsDto, 'params'), asyncHandler(controller.listPlants));
+administrationRouter.get('/users', validate(dto.listUsersQueryDto, 'query'), asyncHandler(controller.listUsers));
+administrationRouter.post('/users', validate(dto.createUserDto), asyncHandler(controller.createUser));
+administrationRouter.patch('/users/:userId/status', validate(dto.userIdParamsDto, 'params'), validate(dto.updateUserStatusDto), asyncHandler(controller.updateUserStatus));
+administrationRouter.post('/users/:userId/reset-password', validate(dto.userIdParamsDto, 'params'), validate(dto.resetPasswordDto), asyncHandler(controller.resetPassword));
+administrationRouter.put('/users/:userId/plants', validate(dto.userIdParamsDto, 'params'), validate(dto.assignUserPlantsDto), asyncHandler(controller.assignUserPlants));
+administrationRouter.get('/areas', validate(dto.catalogScopeQueryDto, 'query'), asyncHandler(controller.listAreas));
+administrationRouter.post('/areas', validate(dto.createAreaDto), asyncHandler(controller.createArea));
+administrationRouter.get('/instruments', validate(dto.catalogScopeQueryDto, 'query'), asyncHandler(controller.listInstruments));
+administrationRouter.post('/instruments', validate(dto.enableInstrumentDto), asyncHandler(controller.enableInstrument));
+administrationRouter.patch('/instruments/:code', validate(dto.equipmentCodeParamsDto, 'params'), validate(dto.updateInstrumentDto), asyncHandler(controller.updateInstrument));
+administrationRouter.get('/patterns', validate(dto.catalogScopeQueryDto, 'query'), asyncHandler(controller.listPatterns));
+administrationRouter.post('/patterns', validate(dto.createPatternDto), asyncHandler(controller.createPattern));
+administrationRouter.post('/patterns/:patternId/certificates', validate(dto.patternIdParamsDto, 'params'), validate(dto.createCertificateDto), asyncHandler(controller.createCertificate));
+administrationRouter.get('/plans', asyncHandler(controller.listPlans));
+administrationRouter.post('/plans', validate(dto.createPlanDto), asyncHandler(controller.createPlan));
+administrationRouter.post('/plans/:planId/versions', validate(dto.planIdParamsDto, 'params'), validate(dto.createPlanVersionDto), asyncHandler(controller.createPlanVersion));
+administrationRouter.get('/plan-versions/:versionId', validate(dto.versionIdParamsDto, 'params'), asyncHandler(controller.getPlanVersion));
+administrationRouter.post('/plan-versions/:versionId/publish', validate(dto.versionIdParamsDto, 'params'), asyncHandler(controller.publishPlanVersion));
+administrationRouter.post('/plan-versions/:versionId/retire', validate(dto.versionIdParamsDto, 'params'), asyncHandler(controller.retirePlanVersion));
+administrationRouter.get('/equipment-plan-assignments', validate(dto.catalogScopeQueryDto, 'query'), asyncHandler(controller.listAssignments));
+administrationRouter.post('/equipment-plan-assignments', validate(dto.assignPlanDto), asyncHandler(controller.assignPlan));
