@@ -1,16 +1,14 @@
 import { Router } from 'express';
-import { authenticate } from '@core/middlewares';
+import { authenticate, requirePasswordChanged, requireRole, validate } from '@core/middlewares';
+import { asyncHandler } from '@shared/utils/async-handler';
+import { uploadVerifications } from './sync.controller';
+import { syncVerificationsDto } from './dto/sync.dto';
 
 /**
  * Sincronizacion offline-first: ingesta por lotes de lo capturado en el celular.
  *
- * Scaffold: aun no hay endpoints implementados.
- * Al implementar, el flujo por ruta es:
- *   router.<verbo>(path, validate(<Dto>), asyncHandler(<controller>))
- * y el controller delega en un caso de uso de application/.
  */
 export const syncRouter = Router();
 
-syncRouter.use(authenticate);
-
-// TODO(IvMET): registrar endpoints de "sync".
+syncRouter.post('/verifications', authenticate, requirePasswordChanged,
+  requireRole('cliente_operador', 'cliente_jefe_calidad'), validate(syncVerificationsDto), asyncHandler(uploadVerifications));
