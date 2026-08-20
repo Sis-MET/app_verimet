@@ -4,8 +4,8 @@ export type UserRole =
   | 'metrica_admin'
   /** Tecnico interno de Metrica. */
   | 'metrica_tecnico'
-  /** Administrador del lado del cliente (ej. Embol). */
-  | 'cliente_admin'
+  /** Jefe de calidad del cliente: comparte alertas y anula registros. */
+  | 'cliente_jefe_calidad'
   /** Operador del cliente que ejecuta las verificaciones intermedias. */
   | 'cliente_operador';
 
@@ -16,10 +16,13 @@ export type UserRole =
  */
 export interface AuthenticatedUser {
   readonly id: string;
-  readonly email: string;
+  readonly username: string;
+  readonly name: string;
   readonly role: UserRole;
   /** null solo para usuarios internos de Metrica con alcance global. */
   readonly empresaId: string | null;
+  readonly mustChangePassword: boolean;
+  readonly tokenVersion: number;
 }
 
 /** true si el usuario puede ver datos de todas las empresas. */

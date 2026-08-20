@@ -30,6 +30,18 @@ export class ConflictError extends ApiError {
   }
 }
 
+export class TooManyRequestsError extends ApiError {
+  constructor(message = 'Demasiados intentos; intente nuevamente mas tarde', details?: unknown) {
+    super(message, 429, 'TOO_MANY_REQUESTS', details);
+  }
+}
+
+export class ServiceUnavailableError extends ApiError {
+  constructor(message = 'Servicio temporalmente no disponible', details?: unknown) {
+    super(message, 503, 'SERVICE_UNAVAILABLE', details);
+  }
+}
+
 export class DatabaseError extends ApiError {
   constructor(message = 'Error de base de datos', details?: unknown) {
     super(message, 500, 'DATABASE_ERROR', details, false);

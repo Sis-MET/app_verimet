@@ -31,7 +31,7 @@ export class ApiError extends Error {
       error: {
         code: this.code,
         message: this.message,
-        ...(this.details !== undefined ? { details: this.details } : {}),
+        ...(this.isOperational && this.details !== undefined ? { details: this.details } : {}),
       },
     };
   }

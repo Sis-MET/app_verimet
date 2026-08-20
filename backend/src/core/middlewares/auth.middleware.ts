@@ -1,6 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '@core/config';
+import { getSqlPool, sql } from '@core/database/sql-server-pool';
 import { ForbiddenError, UnauthorizedError } from '@core/errors';
 import type { AccessTokenPayload, AuthenticatedUser, UserRole } from '@shared/types';
 import { isMetricaStaff } from '@shared/types';
@@ -22,15 +23,44 @@ function extractBearerToken(req: Request): string {
  * query o params. Los casos de uso deben leerlo de `req.user.empresaId`.
  */
 export const authenticate: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
+  void authenticateRequest(req, next);
+};
+
+async function authenticateRequest(req: Request, next: NextFunction): Promise<void> {
   try {
     const token = extractBearerToken(req);
-    const payload = jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
+    const payload = jwt.verify(token, env.JWT_SECRET, {
+      issuer: env.JWT_ISSUER,
+      audience: env.JWT_AUDIENCE,
+      algorithms: ['HS256'],
+    }) as AccessTokenPayload;
+
+    if (payload.type !== 'access') throw new UnauthorizedError('Tipo de token invalido');
+
+    const pool = await getSqlPool();
+    const result = await pool
+      .request()
+      .input('usuarioId', sql.UniqueIdentifier, payload.sub)
+      .input('tokenVersion', sql.Int, payload.token_version)
+      .query(`
+        SELECT TOP 1 usuario_id, usuario, nombre, rol, cliente_id,
+          debe_cambiar_password, token_version
+        FROM ivmet.usuarios
+        WHERE usuario_id = @usuarioId
+          AND token_version = @tokenVersion
+          AND estado = N'ACTIVO'
+      `);
+    const current = result.recordset[0] as Record<string, unknown> | undefined;
+    if (!current) throw new UnauthorizedError('La sesion fue revocada o el usuario esta inactivo');
 
     const user: AuthenticatedUser = {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      empresaId: payload.empresa_id ?? null,
+      id: String(current.usuario_id),
+      username: String(current.usuario),
+      name: String(current.nombre),
+      role: String(current.rol) as UserRole,
+      empresaId: current.cliente_id === null ? null : String(current.cliente_id),
+      mustChangePassword: Boolean(current.debe_cambiar_password),
+      tokenVersion: Number(current.token_version),
     };
 
     if (!isMetricaStaff(user) && !user.empresaId) {
@@ -50,7 +80,7 @@ export const authenticate: RequestHandler = (req: Request, _res: Response, next:
     }
     next(error);
   }
-};
+}
 
 /** Restringe una ruta a los roles indicados. Usar despues de `authenticate`. */
 export function requireRole(...roles: UserRole[]): RequestHandler {
@@ -75,6 +105,19 @@ export const requireMetricaStaff: RequestHandler = (req, _res, next) => {
   }
   if (!isMetricaStaff(req.user)) {
     next(new ForbiddenError('Recurso exclusivo de personal de Metrica'));
+    return;
+  }
+  next();
+};
+
+/** Bloquea el resto de la API hasta cambiar una clave temporal. */
+export const requirePasswordChanged: RequestHandler = (req, _res, next) => {
+  if (!req.user) {
+    next(new UnauthorizedError());
+    return;
+  }
+  if (req.user.mustChangePassword) {
+    next(new ForbiddenError('Debe cambiar la contrasena temporal antes de continuar'));
     return;
   }
   next();
