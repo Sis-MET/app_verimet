@@ -7,5 +7,5 @@ Flutter no se desincronicen en:
 - estados de la cola de sincronizacion,
 - veredictos de una prueba.
 
-`openapi/` guardara el contrato REST (`ivmet-api.yaml`) del que se puede
-generar cliente Dart cuando los endpoints existan.
+El contrato REST completo esta en `openapi/ivmet-v1.yaml` y es la fuente para
+generar o validar el cliente Dart.

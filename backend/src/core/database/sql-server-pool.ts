@@ -23,6 +23,17 @@ const poolConfig: sql.config = {
 };
 
 let pool: sql.ConnectionPool | undefined;
+let ownsPool = true;
+
+/** Permite que el proceso corporativo inyecte y reutilice su pool existente. */
+export function configureSqlPool(externalPool: sql.ConnectionPool): void {
+  if (!externalPool.connected) throw new Error('El pool SQL inyectado debe estar conectado');
+  if (pool?.connected && pool !== externalPool) {
+    throw new Error('El pool IvMET ya fue inicializado y no puede reemplazarse');
+  }
+  pool = externalPool;
+  ownsPool = false;
+}
 
 export async function getSqlPool(): Promise<sql.ConnectionPool> {
   if (pool?.connected) return pool;
@@ -36,7 +47,7 @@ export async function getSqlPool(): Promise<sql.ConnectionPool> {
 }
 
 export async function closeSqlPool(): Promise<void> {
-  if (pool?.connected) {
+  if (pool?.connected && ownsPool) {
     await pool.close();
     pool = undefined;
   }

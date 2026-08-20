@@ -3,7 +3,7 @@ export const TEST_TYPES = ['eccentricity', 'repeatability', 'linearity'] as cons
 export type TestType = (typeof TEST_TYPES)[number];
 
 /** Resultado de una prueba frente a la tolerancia definida para el instrumento. */
-export const TEST_VERDICTS = ['pass', 'fail', 'pending'] as const;
+export const TEST_VERDICTS = ['pass', 'fail'] as const;
 export type TestVerdict = (typeof TEST_VERDICTS)[number];
 
 /** Estado de un registro en la cola de sincronizacion offline-first. */

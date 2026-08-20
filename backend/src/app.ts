@@ -23,10 +23,12 @@ export function createApp(): Express {
   app.use(requestContext);
 
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'ivmet-api', env: env.NODE_ENV, timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', service: 'ivmet-api', env: env.NODE_ENV,
+      ivmetEnabled: env.IVMET_ENABLED, syncEnabled: env.IVMET_SYNC_ENABLED,
+      timestamp: new Date().toISOString() });
   });
 
-  app.use(env.API_PREFIX, apiRouter);
+  if (env.IVMET_ENABLED) app.use(env.API_PREFIX, apiRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

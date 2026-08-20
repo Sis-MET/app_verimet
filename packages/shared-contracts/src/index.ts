@@ -7,3 +7,4 @@
  * OpenAPI de `openapi/` y sus propios `models` en `data/`.
  */
 export * from './test-types';
+export * from './ivmet-contracts';

@@ -1,0 +1,855 @@
+openapi: 3.1.0
+info:
+  title: IvMET API
+  version: 1.0.0
+  description: >-
+    Contrato de IvMET integrado en la API corporativa. Todos los identificadores
+    de cliente y planta se resuelven desde el usuario autenticado; los enviados
+    por el móvil nunca amplían su alcance. Las cadenas decimales conservan hasta
+    nueve decimales.
+servers:
+  - url: /api/ivmet/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Offline
+  - name: Instruments
+  - name: Verifications
+  - name: Alerts
+  - name: Administration
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      security: []
+      summary: Inicia sesión y crea una sesión refresh vinculada al dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      security: []
+      summary: Rota el refresh token y devuelve un access token de 15 minutos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token rotado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tokens]
+                properties:
+                  tokens: { $ref: '#/components/schemas/Tokens' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      security: []
+      summary: Revoca una sesión refresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string, minLength: 32 }
+      responses:
+        '204': { description: Sesión revocada }
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Perfil, rol, cliente y plantas asignadas
+      responses:
+        '200':
+          description: Perfil vigente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/change-password:
+    post:
+      tags: [Authentication]
+      summary: Cambia la contraseña y revoca todas las sesiones existentes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { $ref: '#/components/schemas/StrongPassword' }
+      responses:
+        '204': { description: Contraseña cambiada; se requiere iniciar sesión nuevamente }
+  /bootstrap:
+    get:
+      tags: [Offline]
+      summary: Paquete offline con plantas, instrumentos, planes dinámicos y patrones vigentes
+      description: Solo devuelve plantas asignadas al usuario y sus recursos relacionados.
+      x-roles: [cliente_operador, cliente_jefe_calidad]
+      responses:
+        '200':
+          description: Snapshot de trabajo offline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bootstrap'
+  /dashboard:
+    get:
+      tags: [Offline]
+      summary: Resumen filtrado por alcance; Métrica recibe solo alertas compartidas
+      responses:
+        '200':
+          description: Dashboard
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /instruments:
+    get:
+      tags: [Instruments]
+      x-roles: [cliente_operador, cliente_jefe_calidad]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: plantId, in: query, schema: { type: string } }
+        - { name: areaId, in: query, schema: { type: string, format: uuid } }
+        - { name: search, in: query, schema: { type: string, maxLength: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/Paginated' }
+  /instruments/{code}:
+    get:
+      tags: [Instruments]
+      x-roles: [cliente_operador, cliente_jefe_calidad]
+      parameters:
+        - { $ref: '#/components/parameters/EquipmentCode' }
+      responses:
+        '200':
+          description: Equipo, características legadas, plan y vencimientos por prueba
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /instruments/{code}/history:
+    get:
+      tags: [Instruments]
+      parameters:
+        - { $ref: '#/components/parameters/EquipmentCode' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200': { $ref: '#/components/responses/Paginated' }
+  /sync/verifications:
+    post:
+      tags: [Offline]
+      summary: Sincroniza hasta 20 verificaciones, cada una en su propia transacción
+      description: >-
+        clientUuid es idempotente. El servidor ignora veredictos del cliente y
+        recalcula errores, métricas, trazabilidad, vencimientos y alertas con el
+        snapshot de la versión asignada en performedAt. Puede responder 207 si
+        algunos elementos fueron rechazados. En producción requiere
+        IVMET_SYNC_ENABLED=true después de aprobar el procedimiento metrológico.
+      x-roles: [cliente_operador, cliente_jefe_calidad]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: '#/components/schemas/VerificationUpload' }
+      responses:
+        '200': { $ref: '#/components/responses/SyncResult' }
+        '207': { $ref: '#/components/responses/SyncResult' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /verifications:
+    get:
+      tags: [Verifications]
+      description: El cliente ve su alcance. Métrica solo registros asociados a alertas compartidas.
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: equipmentCode, in: query, schema: { type: string } }
+        - { name: plantId, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200': { $ref: '#/components/responses/Paginated' }
+  /verifications/{id}:
+    get:
+      tags: [Verifications]
+      parameters:
+        - { $ref: '#/components/parameters/VerificationId' }
+      responses:
+        '200':
+          description: Evidencia completa e inmutable
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /verifications/{id}/annul:
+    post:
+      tags: [Verifications]
+      x-roles: [cliente_jefe_calidad]
+      parameters:
+        - { $ref: '#/components/parameters/VerificationId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 1000 }
+      responses:
+        '204': { description: Registro anulado sin eliminar evidencia }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /verifications/{id}/report.pdf:
+    get:
+      tags: [Verifications]
+      parameters:
+        - { $ref: '#/components/parameters/VerificationId' }
+      responses:
+        '200':
+          description: Informe PDF en español generado bajo demanda
+          content:
+            application/pdf:
+              schema: { type: string, contentEncoding: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /alerts:
+    get:
+      tags: [Alerts]
+      description: Cliente ve alertas privadas de su alcance; Métrica solo las compartidas.
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Paginated' }
+  /alerts/{alertId}/share:
+    post:
+      tags: [Alerts]
+      x-roles: [cliente_jefe_calidad]
+      parameters:
+        - { $ref: '#/components/parameters/AlertId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '204': { description: Alerta compartida con Métrica }
+  /alerts/{alertId}/archive:
+    post:
+      tags: [Alerts]
+      x-roles: [cliente_jefe_calidad]
+      parameters:
+        - { $ref: '#/components/parameters/AlertId' }
+      responses:
+        '204': { description: Estado del cliente archivado }
+  /alerts/{alertId}/acknowledge:
+    post:
+      tags: [Alerts]
+      x-roles: [metrica_tecnico, metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/AlertId' }
+      responses:
+        '204': { description: Alerta reconocida }
+  /alerts/{alertId}/attend:
+    post:
+      tags: [Alerts]
+      x-roles: [metrica_tecnico, metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/AlertId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '204': { description: Alerta atendida con comentario }
+  /admin/clients:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+  /admin/clients/{clientId}/plants:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: clientId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+  /admin/users:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUser' }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/users/{userId}/status:
+    patch:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { enum: [ACTIVO, INACTIVO] }
+      responses:
+        '204': { description: Estado actualizado y tokens revocados }
+  /admin/users/{userId}/reset-password:
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [temporaryPassword]
+              properties:
+                temporaryPassword: { $ref: '#/components/schemas/StrongPassword' }
+      responses:
+        '204': { description: Contraseña temporal asignada }
+  /admin/users/{userId}/plants:
+    put:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/UserId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plantIds]
+              properties:
+                plantIds: { type: array, minItems: 1, items: { type: string } }
+      responses:
+        '204': { description: Plantas reemplazadas }
+  /admin/areas:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [clientId, plantId, name], properties: { clientId: { type: string }, plantId: { type: string }, name: { type: string } } }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/instruments:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnableInstrument' }
+      responses:
+        '204': { description: Equipo legado habilitado en IvMET }
+  /admin/instruments/{code}:
+    patch:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { $ref: '#/components/parameters/EquipmentCode' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                areaId: { type: [string, 'null'], format: uuid }
+                enabled: { type: boolean }
+      responses:
+        '204': { description: Configuración actualizada }
+  /admin/patterns:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePattern' }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/patterns/{patternId}/certificates:
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: patternId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCertificate' }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/plans:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                description: { type: string, maxLength: 1000 }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/plans/{planId}/versions:
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: planId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePlanVersion' }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+  /admin/plan-versions/{versionId}/publish:
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Versión publicada e inmutable }
+  /admin/plan-versions/{versionId}:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Versión con pruebas y puntos dinámicos
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/plan-versions/{versionId}/retire:
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      parameters:
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Versión retirada; conserva validez histórica }
+  /admin/equipment-plan-assignments:
+    get:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      responses:
+        '200': { $ref: '#/components/responses/Items' }
+    post:
+      tags: [Administration]
+      x-roles: [metrica_admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipmentCode, planVersionId, effectiveFrom]
+              properties:
+                equipmentCode: { type: string }
+                planVersionId: { type: string, format: uuid }
+                effectiveFrom: { type: string, format: date-time }
+      responses:
+        '201': { $ref: '#/components/responses/CreatedId' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    EquipmentCode: { name: code, in: path, required: true, schema: { type: string, maxLength: 100 } }
+    VerificationId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    AlertId: { name: alertId, in: path, required: true, schema: { type: string, format: uuid } }
+    UserId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Unauthorized: { description: Credenciales inválidas, token vencido o sesión revocada }
+    TooManyRequests: { description: Cuenta bloqueada temporalmente }
+    NotFound: { description: Recurso inexistente o fuera del alcance autorizado }
+    Conflict: { description: UUID con contenido distinto o transición de estado inválida }
+    ServiceUnavailable: { description: Sincronización deshabilitada por bandera de seguridad }
+    Paginated:
+      description: Página filtrada por autorización
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items, total, page, pageSize]
+            properties:
+              items: { type: array, items: { type: object, additionalProperties: true } }
+              total: { type: integer }
+              page: { type: integer }
+              pageSize: { type: integer }
+    Items:
+      description: Colección
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items: { type: array, items: { type: object, additionalProperties: true } }
+    CreatedId:
+      description: Recurso creado
+      content:
+        application/json:
+          schema: { type: object, required: [id], properties: { id: { type: string, format: uuid } } }
+    SyncResult:
+      description: Resultado individual por elemento
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [results, accepted, rejected]
+            properties:
+              accepted: { type: integer }
+              rejected: { type: integer }
+              results:
+                type: array
+                items:
+                  type: object
+                  required: [clientUuid, status]
+                  properties:
+                    clientUuid: { type: string, format: uuid }
+                    status: { enum: [accepted, duplicate, rejected] }
+                    verificationId: { type: string, format: uuid }
+                    verdict: { enum: [pass, fail] }
+                    traceability: { enum: [traceable, non_traceable] }
+                    error: { type: object, additionalProperties: true }
+  schemas:
+    StrongPassword:
+      type: string
+      minLength: 12
+      maxLength: 128
+      description: Debe incluir mayúscula, minúscula y número.
+    UserRole:
+      enum: [cliente_operador, cliente_jefe_calidad, metrica_tecnico, metrica_admin]
+    LoginRequest:
+      type: object
+      required: [username, password, deviceId]
+      properties:
+        username: { type: string, maxLength: 100 }
+        password: { type: string, maxLength: 128 }
+        deviceId: { type: string, maxLength: 200 }
+        deviceName: { type: string, maxLength: 200 }
+    RefreshRequest:
+      type: object
+      required: [refreshToken, deviceId]
+      properties:
+        refreshToken: { type: string, minLength: 32 }
+        deviceId: { type: string, maxLength: 200 }
+        deviceName: { type: string, maxLength: 200 }
+    Tokens:
+      type: object
+      required: [accessToken, accessExpiresIn, refreshToken, refreshExpiresAt]
+      properties:
+        accessToken: { type: string }
+        accessExpiresIn: { type: integer, example: 900 }
+        refreshToken: { type: string }
+        refreshExpiresAt: { type: string, format: date-time }
+    UserProfile:
+      type: object
+      required: [id, username, name, role, mustChangePassword, plants]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        name: { type: string }
+        email: { type: [string, 'null'], format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+        mustChangePassword: { type: boolean }
+        empresa: { type: [object, 'null'], additionalProperties: true }
+        plants: { type: array, items: { type: object, additionalProperties: true } }
+    LoginResponse:
+      type: object
+      required: [user, tokens]
+      properties:
+        user: { $ref: '#/components/schemas/UserProfile' }
+        tokens: { $ref: '#/components/schemas/Tokens' }
+    DecimalString:
+      type: string
+      pattern: '^-?\d{1,10}(?:\.\d{1,9})?$'
+      examples: ['20.000000000']
+    NonNegativeDecimalString:
+      type: string
+      pattern: '^\d{1,10}(?:\.\d{1,9})?$'
+      examples: ['20.000000000']
+    EnvironmentalDecimalString:
+      type: string
+      pattern: '^-?\d{1,6}(?:\.\d{1,3})?$'
+      examples: ['23.400']
+    PlanPoint:
+      type: object
+      required: [id, group, order, code, label, nominalLoad, tolerance]
+      properties:
+        id: { type: string, format: uuid }
+        group: { type: integer, minimum: 1 }
+        order: { type: integer, minimum: 1 }
+        code: { type: string }
+        label: { type: string }
+        nominalLoad: { $ref: '#/components/schemas/NonNegativeDecimalString' }
+        tolerance: { $ref: '#/components/schemas/NonNegativeDecimalString' }
+        position: { type: [string, 'null'] }
+        direction: { type: [string, 'null'] }
+        metadata: { type: [object, 'null'], additionalProperties: true }
+    PlanTest:
+      type: object
+      required: [id, type, evaluationMethod, unit, frequencyDays, warningDays, points]
+      properties:
+        id: { type: string, format: uuid }
+        type: { enum: [eccentricity, repeatability, linearity] }
+        evaluationMethod: { enum: [absolute_error, range, sample_standard_deviation] }
+        unit: { type: string }
+        frequencyDays: { type: integer, minimum: 1 }
+        warningDays: { type: integer, minimum: 0 }
+        points: { type: array, items: { $ref: '#/components/schemas/PlanPoint' } }
+    Bootstrap:
+      type: object
+      required: [generatedAt, user, plants, instruments, plans, patterns]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        user: { type: object, additionalProperties: true }
+        plants: { type: array, items: { type: object, additionalProperties: true } }
+        instruments: { type: array, items: { type: object, additionalProperties: true } }
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              tests: { type: array, items: { $ref: '#/components/schemas/PlanTest' } }
+            additionalProperties: true
+        patterns: { type: array, items: { type: object, additionalProperties: true } }
+    VerificationUpload:
+      type: object
+      required: [clientUuid, equipmentCode, planVersionId, performedAt, deviceId, standards, tests]
+      properties:
+        clientUuid: { type: string, format: uuid }
+        equipmentCode: { type: string, maxLength: 100 }
+        planVersionId: { type: string, format: uuid }
+        capturedByUserId: { type: string, format: uuid }
+        performedAt: { type: string, format: date-time, description: ISO-8601 UTC terminado en Z }
+        temperatureC: { $ref: '#/components/schemas/EnvironmentalDecimalString' }
+        relativeHumidityPct: { $ref: '#/components/schemas/EnvironmentalDecimalString' }
+        observations: { type: string, maxLength: 2000 }
+        appVersion: { type: string, maxLength: 50 }
+        deviceId: { type: string, maxLength: 200 }
+        standards:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [patternId, certificateId, role]
+            properties:
+              patternId: { type: string, format: uuid }
+              certificateId: { type: string, format: uuid }
+              role: { type: string, maxLength: 30 }
+        tests:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PerformedTestUpload'
+              - $ref: '#/components/schemas/OmittedTestUpload'
+            discriminator: { propertyName: status }
+    PerformedTestUpload:
+      type: object
+      required: [type, status, readings]
+      properties:
+        type: { enum: [eccentricity, repeatability, linearity] }
+        status: { const: performed }
+        observations: { type: string, maxLength: 1000 }
+        readings:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [pointId, indication]
+            properties:
+              pointId: { type: string, format: uuid }
+              indication: { $ref: '#/components/schemas/DecimalString' }
+              zeroReturn: { $ref: '#/components/schemas/DecimalString' }
+              metadata: { type: object, additionalProperties: true }
+    OmittedTestUpload:
+      type: object
+      required: [type, status, omissionReason]
+      properties:
+        type: { enum: [eccentricity, repeatability, linearity] }
+        status: { const: omitted }
+        omissionReason: { type: string, minLength: 3, maxLength: 1000 }
+        observations: { type: string, maxLength: 1000 }
+    CreateUser:
+      type: object
+      required: [username, name, temporaryPassword, role, plantIds]
+      properties:
+        username: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        temporaryPassword: { $ref: '#/components/schemas/StrongPassword' }
+        role: { $ref: '#/components/schemas/UserRole' }
+        clientId: { type: string }
+        plantIds: { type: array, items: { type: string } }
+    CreatePlanVersion:
+      type: object
+      required: [procedureReference, tests]
+      properties:
+        procedureReference: { type: string, minLength: 1, maxLength: 300 }
+        notes: { type: string, maxLength: 1000 }
+        tests:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            type: object
+            required: [type, evaluationMethod, unit, frequencyDays, warningDays, points]
+            properties:
+              type: { enum: [eccentricity, repeatability, linearity] }
+              evaluationMethod: { enum: [absolute_error, range, sample_standard_deviation] }
+              unit: { type: string }
+              frequencyDays: { type: integer, minimum: 1 }
+              warningDays: { type: integer, minimum: 0 }
+              points: { type: array, minItems: 1, items: { $ref: '#/components/schemas/CreatePlanPoint' } }
+    CreatePlanPoint:
+      type: object
+      required: [group, order, code, label, nominalLoad, tolerance]
+      properties:
+        group: { type: integer, minimum: 1 }
+        order: { type: integer, minimum: 1 }
+        code: { type: string, minLength: 1, maxLength: 100 }
+        label: { type: string, minLength: 1, maxLength: 200 }
+        nominalLoad: { $ref: '#/components/schemas/NonNegativeDecimalString' }
+        tolerance: { $ref: '#/components/schemas/NonNegativeDecimalString' }
+        position: { type: string, maxLength: 100 }
+        direction: { type: string, maxLength: 30 }
+        metadata: { type: object, additionalProperties: true }
+    EnableInstrument:
+      type: object
+      required: [equipmentCode, clientId, plantId]
+      properties:
+        equipmentCode: { type: string, minLength: 1, maxLength: 100 }
+        clientId: { type: string, minLength: 1, maxLength: 50 }
+        plantId: { type: string, minLength: 1, maxLength: 50 }
+        areaId: { type: string, format: uuid }
+        enabled: { type: boolean, default: true }
+    CreatePattern:
+      type: object
+      required: [clientId, code, description, type, plantIds]
+      properties:
+        clientId: { type: string }
+        code: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 300 }
+        type: { type: string, maxLength: 50 }
+        class: { type: string, maxLength: 50 }
+        unit: { type: string, maxLength: 20 }
+        capacity: { $ref: '#/components/schemas/NonNegativeDecimalString' }
+        plantIds: { type: array, minItems: 1, items: { type: string } }
+    CreateCertificate:
+      type: object
+      required: [number, laboratory, calibratedOn, expiresOn]
+      properties:
+        number: { type: string, maxLength: 150 }
+        laboratory: { type: string, maxLength: 250 }
+        calibratedOn: { type: string, format: date }
+        expiresOn: { type: string, format: date }
+        documentReference: { type: string, maxLength: 500 }
