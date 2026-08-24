@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "bo.com.metrica.ivmet"
+    namespace = "bo.metrica.ivmet"
     // flutter_secure_storage 11 exige compilar contra la API 37, y Flutter
     // todavia propone 36 en flutter.compileSdkVersion. compileSdk solo habilita
     // APIs nuevas en tiempo de compilacion: no cambia en que dispositivos se
@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "bo.com.metrica.ivmet"
+        applicationId = "bo.metrica.ivmet"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

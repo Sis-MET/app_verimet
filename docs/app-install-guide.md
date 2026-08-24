@@ -146,5 +146,5 @@ El `.aab` queda en `app/build/app/outputs/bundle/release/`.
   entregadas por Metrica Ltda y acceso a la red del cliente por VPN.
 - Conviene publicarla como **prueba interna** o **distribucion privada** hasta
   tener el circuito de altas de usuarios resuelto.
-- El `applicationId` es `bo.com.metrica.ivmet` y no debe cambiarse una vez
+- El `applicationId` es `bo.metrica.ivmet` y no debe cambiarse una vez
   publicado.
