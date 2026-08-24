@@ -47,6 +47,12 @@ yarn.lock
 .env.*
 !.env.example
 
+# Supabase local (estado efimero; migraciones y funciones si se commitean)
+supabase/.branches/
+supabase/.temp/
+supabase/functions/.env
+supabase/functions/.env.local
+
 # Prisma
 packages/*/generated/
 backend/src/generated/

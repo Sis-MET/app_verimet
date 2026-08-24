@@ -2,16 +2,19 @@
 
 **Verificaciones intermedias de instrumentos de pesaje** — Metrica Ltda.
 
-Monorepo con la app movil (Flutter) y la API (Node.js + TypeScript + SQL Server)
-que permiten a los clientes de Metrica ejecutar y registrar pruebas de
+Monorepo con la app movil Flutter, el backend principal en Supabase y los
+componentes de integracion con los servidores de Metrica. Permite a los
+clientes ejecutar y registrar pruebas de
 **excentricidad**, **repetibilidad** y **linealidad** sobre sus balanzas, entre
 calibraciones formales.
 
-- Funciona **offline-first**: se captura en planta sin señal y se sincroniza despues.
+- Funciona **online-only**: la app requiere Internet y autoguarda borradores en
+  Supabase.
 - Es **multi-tenant**: cada cliente ve solo sus instrumentos y reportes.
 - El personal de Métrica solo recibe las **alertas que el jefe de calidad
   comparte expresamente**, junto con su verificación y PDF.
-- El trafico va por la **VPN corporativa**; la app no gestiona el tunel.
+- La app usa HTTPS hacia Supabase. Solo el worker corporativo accede a DataMET
+  y a la base SQL Server `IvMET` desde la red de Metrica.
 
 ---
 
@@ -20,12 +23,13 @@ calibraciones formales.
 ```
 IvMET/
 ├── app/                        App Flutter (proyecto Dart independiente)
-├── backend/                    API Node.js + TypeScript (Express)
+├── backend/                    Backend SQL Server anterior, en transicion
+├── supabase/                   Migraciones, RLS, tests y Edge Functions
 ├── packages/
 │   └── shared-contracts/       Enums/DTOs compartidos + OpenAPI
 ├── docs/
 │   ├── architecture.md         Screaming + Clean Architecture (leer primero)
-│   ├── vpn-install-guide.md    Instalar y conectar la VPN corporativa
+│   ├── backend-implementation-roadmap.md
 │   └── app-install-guide.md    Instalar/compilar la app
 ├── pnpm-workspace.yaml         packages: backend + packages/*
 ├── package.json                scripts puente para ambos lados
@@ -53,11 +57,32 @@ por que las carpetas se llaman como se llaman y donde va cada archivo nuevo.
 | Node.js | >= 20 (probado con 24.x) |
 | pnpm | >= 10 (probado con 11.x) |
 | Flutter | 3.44.x stable (Dart 3.12.x) |
-| SQL Server | instancia de Metrica, alcanzable por VPN |
+| Supabase CLI | 2.115.x o compatible |
+| Docker Desktop | requerido para la pila Supabase local |
+| SQL Server | DataMET (solo lectura) + base nueva IvMET |
 
 ---
 
-## Backend
+## Backend principal: Supabase
+
+El orden de implementacion y los limites de cada sistema estan documentados en
+[docs/backend-implementation-roadmap.md](docs/backend-implementation-roadmap.md).
+Las instrucciones para validar y desplegar las migraciones estan en
+[supabase/README.md](supabase/README.md).
+
+Validacion local, una vez instalado Docker Desktop:
+
+```bash
+pnpm dlx supabase start
+pnpm dlx supabase db reset
+pnpm dlx supabase test db
+```
+
+`backend/` conserva la implementacion SQL Server anterior durante la
+transicion. No es el backend productivo nuevo y no debe desplegarse como una
+segunda API movil.
+
+## Workspace Node existente
 
 Instalar dependencias de todo el workspace (desde la raiz):
 
@@ -77,8 +102,9 @@ Configurar el entorno:
 cp backend/.env.example backend/.env
 ```
 
-Completar `backend/.env` con las credenciales de SQL Server y los secretos JWT.
-**Requiere la VPN conectada** para llegar a la base.
+Completar `backend/.env` solo cuando se trabaje en las herramientas corporativas
+que requieren SQL Server. Nunca incluir esas credenciales en Flutter o
+Supabase.
 
 Generar el cliente de Prisma (la base ya existe, se introspecciona):
 
@@ -131,10 +157,11 @@ Generar el codigo de `freezed`, `json_serializable`, `riverpod_generator` y
 pnpm app:gen
 ```
 
-Correr en un dispositivo con la VPN activa:
+Correr en un dispositivo con la configuracion del proyecto Supabase de
+desarrollo:
 
 ```bash
-cd app && flutter run --dart-define=IVMET_API_BASE_URL=https://api.metrica.local
+cd app && flutter run --dart-define=SUPABASE_URL=https://PROJECT_REF.supabase.co --dart-define=SUPABASE_ANON_KEY=PUBLIC_KEY
 ```
 
 Analizar y testear:
@@ -159,26 +186,26 @@ Las mismas features existen en la app y en la API (`snake_case` en Dart,
 
 | Feature | Que resuelve |
 | --- | --- |
-| `auth` | Login, refresh token, sesion. |
+| `auth` | Supabase Auth, sesion y cambio obligatorio de contraseña. |
 | `instruments` | Balanzas del cliente: listado, detalle, estado. |
 | `eccentricity_test` | Prueba de excentricidad. |
 | `repeatability_test` | Prueba de repetibilidad. |
 | `linearity_test` | Prueba de linealidad. |
 | `verification_reports` | Reportes de verificacion intermedia y su PDF. |
 | `clients` | Empresas cliente (tenants), sucursales y areas. |
-| `dashboard` | Vista interna de Metrica sobre todos los clientes. |
-| `sync` | Cola offline-first e ingesta por lotes. |
+| `dashboard` | Resumen operativo del cliente. La gestion interna vive en RimMET. |
+| `sync` | Integracion servidor a servidor; no existe cola offline movil. |
 
 ---
 
 ## Estado actual
 
-El backend IvMET incluye autenticación con refresh rotativo, aislamiento por
-cliente/planta, bootstrap offline, catálogos y planes versionados, sincronización
-idempotente, evidencia inmutable, alertas privadas/compartidas, anulación y PDF.
-Las migraciones son aditivas y viven en `backend/sql/`.
+La primera base Supabase ya define catalogos selectivos, contratos, licencias,
+borradores online, planes versionados, evidencia inmutable, alertas privadas,
+RLS y una outbox idempotente para el espejo SQL Server. El login por usuario y
+el cambio obligatorio de contraseña estan implementados como Edge Functions.
 
-Por seguridad las rutas y la sincronización se despliegan apagadas. No se debe
-activar `IVMET_SYNC_ENABLED` hasta cargar el procedimiento oficial de Métrica y
-aprobar sus pruebas doradas. El frontend conserva pantallas demo que deben pasar
-a consumir los planes dinámicos entregados por `/api/ivmet/v1/bootstrap`.
+La finalizacion metrologica permanece deliberadamente bloqueada hasta recibir
+el procedimiento oficial de Metrica y aprobar sus pruebas doradas. Flutter aun
+contiene pantallas/datos demo y debe migrarse despues de estabilizar el contrato
+Supabase.
