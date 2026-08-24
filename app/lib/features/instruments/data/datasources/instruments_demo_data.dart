@@ -1,0 +1,263 @@
+import '../../../../core/domain/compliance_status.dart';
+import '../../domain/entities/area.dart';
+import '../../domain/entities/instrument.dart';
+import '../../domain/entities/verification_history_entry.dart';
+
+/// Parque de referencia usado mientras no exista el datasource remoto.
+///
+/// Son los mismos datos del prototipo de diseno (Embol S.A. — Planta Santa
+/// Cruz) y estan aqui, en `data/datasources/`, para que el dia que llegue
+/// `GET /api/v1/instruments` solo haya que cambiar de que fuente lee el
+/// repositorio: ni las entidades ni las pantallas se enteran.
+abstract final class InstrumentsDemoData {
+  static const List<Area> areas = <Area>[
+    Area(
+      nombre: 'Almacén',
+      resumen: '6 equipos · 1 alerta',
+      conformes: 4,
+      observados: 1,
+      noConformes: 1,
+    ),
+    Area(
+      nombre: 'Producción',
+      resumen: '9 equipos · 1 no conforme',
+      conformes: 7,
+      observados: 1,
+      noConformes: 1,
+    ),
+    Area(
+      nombre: 'Laboratorio',
+      resumen: '4 equipos · al día',
+      conformes: 4,
+      observados: 0,
+      noConformes: 0,
+    ),
+    Area(
+      nombre: 'Despacho',
+      resumen: '3 equipos · al día',
+      conformes: 3,
+      observados: 0,
+      noConformes: 0,
+    ),
+  ];
+
+  static const Map<String, List<Instrument>> porArea = <String, List<Instrument>>{
+    'Almacén': <Instrument>[
+      Instrument(
+        codigo: 'BAL-014',
+        tipo: 'Plataforma 60 kg',
+        detalle: 'Mettler ICS449 · verif. 14 may',
+        area: 'Almacén',
+        status: ComplianceStatus.noConforme,
+        estadoLabel: 'Vencida',
+        marcaModelo: 'Plataforma · Mettler Toledo ICS449',
+        alcanceMaximo: '60,00 kg',
+        division: '0,01 kg',
+        clase: 'III',
+        ultimaVerificacion: '14 may 2026',
+      ),
+      Instrument(
+        codigo: 'BAL-021',
+        tipo: 'Plataforma 300 kg',
+        detalle: 'Toledo 2098 · verif. 02 ago',
+        area: 'Almacén',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Plataforma · Toledo 2098',
+        alcanceMaximo: '300,00 kg',
+        division: '0,05 kg',
+        clase: 'III',
+        ultimaVerificacion: '02 ago 2026',
+      ),
+      Instrument(
+        codigo: 'BAL-033',
+        tipo: 'Colgante 150 kg',
+        detalle: 'Dini Argeo · verif. 28 jul',
+        area: 'Almacén',
+        status: ComplianceStatus.observado,
+        estadoLabel: 'Observado',
+        marcaModelo: 'Colgante · Dini Argeo MCW',
+        alcanceMaximo: '150,00 kg',
+        division: '0,05 kg',
+        clase: 'III',
+        ultimaVerificacion: '28 jul 2026',
+      ),
+      Instrument(
+        codigo: 'BAL-040',
+        tipo: 'Contadora 6 kg',
+        detalle: 'Ohaus R71 · verif. 05 ago',
+        area: 'Almacén',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Contadora · Ohaus R71',
+        alcanceMaximo: '6,000 kg',
+        division: '0,001 kg',
+        clase: 'II',
+        ultimaVerificacion: '05 ago 2026',
+      ),
+      Instrument(
+        codigo: 'ALM-002',
+        tipo: 'Termohigrómetro',
+        detalle: 'Testo 174H · verif. 01 ago',
+        area: 'Almacén',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Testo 174H',
+        ultimaVerificacion: '01 ago 2026',
+      ),
+      Instrument(
+        codigo: 'ALM-005',
+        tipo: 'Juego de pesas M1',
+        detalle: 'Cert. CAL-2412-08',
+        area: 'Almacén',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Juego de pesas patrón clase M1',
+      ),
+    ],
+    'Producción': <Instrument>[
+      Instrument(
+        codigo: 'PRO-007',
+        tipo: 'Plataforma 150 kg',
+        detalle: 'Línea 2 · verif. 11 ago',
+        area: 'Producción',
+        status: ComplianceStatus.noConforme,
+        estadoLabel: 'No conforme',
+        marcaModelo: 'Plataforma · Línea 2',
+        alcanceMaximo: '150,00 kg',
+        division: '0,05 kg',
+        clase: 'III',
+        ultimaVerificacion: '11 ago 2026',
+      ),
+      Instrument(
+        codigo: 'PRO-011',
+        tipo: 'Dosificadora 25 kg',
+        detalle: 'Línea 1 · verif. 09 ago',
+        area: 'Producción',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Dosificadora · Línea 1',
+        alcanceMaximo: '25,00 kg',
+        division: '0,01 kg',
+        clase: 'III',
+        ultimaVerificacion: '09 ago 2026',
+      ),
+      Instrument(
+        codigo: 'PRO-014',
+        tipo: 'Chequeadora en línea',
+        detalle: 'Línea 3 · verif. 09 ago',
+        area: 'Producción',
+        status: ComplianceStatus.observado,
+        estadoLabel: 'Observado',
+        marcaModelo: 'Chequeadora · Línea 3',
+        alcanceMaximo: '6,00 kg',
+        division: '0,01 kg',
+        clase: 'III',
+        ultimaVerificacion: '09 ago 2026',
+      ),
+    ],
+    'Laboratorio': <Instrument>[
+      Instrument(
+        codigo: 'LAB-002',
+        tipo: 'Analítica 220 g',
+        detalle: 'd = 0,1 mg · verif. 04 ago',
+        area: 'Laboratorio',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Balanza analítica',
+        alcanceMaximo: '220,0000 g',
+        division: '0,0001 g',
+        clase: 'I',
+        ultimaVerificacion: '04 ago 2026',
+      ),
+      Instrument(
+        codigo: 'LAB-006',
+        tipo: 'Precisión 4,2 kg',
+        detalle: 'd = 0,01 g · verif. 04 ago',
+        area: 'Laboratorio',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Balanza de precisión',
+        alcanceMaximo: '4,200 kg',
+        division: '0,01 g',
+        clase: 'II',
+        ultimaVerificacion: '04 ago 2026',
+      ),
+    ],
+    'Despacho': <Instrument>[
+      Instrument(
+        codigo: 'DES-001',
+        tipo: 'Báscula camionera 40 t',
+        detalle: 'verif. 20 jul',
+        area: 'Despacho',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Báscula camionera',
+        alcanceMaximo: '40 000 kg',
+        division: '20 kg',
+        clase: 'III',
+        ultimaVerificacion: '20 jul 2026',
+      ),
+      Instrument(
+        codigo: 'DES-004',
+        tipo: 'Plataforma 500 kg',
+        detalle: 'verif. 20 jul',
+        area: 'Despacho',
+        status: ComplianceStatus.conforme,
+        estadoLabel: 'Conforme',
+        marcaModelo: 'Plataforma',
+        alcanceMaximo: '500,0 kg',
+        division: '0,1 kg',
+        clase: 'III',
+        ultimaVerificacion: '20 jul 2026',
+      ),
+    ],
+  };
+
+  static const List<VerificationHistoryEntry> historico = <VerificationHistoryEntry>[
+    VerificationHistoryEntry(
+      fecha: '14 may 26',
+      responsable: 'J. Morales',
+      errorExcentricidad: '0,02',
+      desviacionRepetibilidad: '0,01',
+      errorLinealidad: '0,02',
+      veredicto: ComplianceStatus.conforme,
+    ),
+    VerificationHistoryEntry(
+      fecha: '12 abr 26',
+      responsable: 'R. Chávez',
+      errorExcentricidad: '0,02',
+      desviacionRepetibilidad: '0,02',
+      errorLinealidad: '0,03',
+      veredicto: ComplianceStatus.observado,
+    ),
+    VerificationHistoryEntry(
+      fecha: '10 mar 26',
+      responsable: 'J. Morales',
+      errorExcentricidad: '0,01',
+      desviacionRepetibilidad: '0,01',
+      errorLinealidad: '0,02',
+      veredicto: ComplianceStatus.conforme,
+    ),
+    VerificationHistoryEntry(
+      fecha: '08 feb 26',
+      responsable: 'Métrica · L. Peña',
+      errorExcentricidad: '0,01',
+      desviacionRepetibilidad: '0,01',
+      errorLinealidad: '0,01',
+      veredicto: ComplianceStatus.conforme,
+    ),
+    VerificationHistoryEntry(
+      fecha: '11 ene 26',
+      responsable: 'J. Morales',
+      errorExcentricidad: '0,03',
+      desviacionRepetibilidad: '0,02',
+      errorLinealidad: '0,04',
+      veredicto: ComplianceStatus.noConforme,
+    ),
+  ];
+
+  /// Todos los equipos del parque, sin agrupar.
+  static List<Instrument> get todos =>
+      porArea.values.expand((instruments) => instruments).toList(growable: false);
+}
