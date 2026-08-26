@@ -28,6 +28,22 @@ IF DATABASE_PRINCIPAL_ID(N'IvMETWorker') IS NULL
     CREATE USER [IvMETWorker] FOR LOGIN [IvMETWorker] WITH DEFAULT_SCHEMA = [dbo];
 
 GRANT CONNECT TO [IvMETWorker];
+
+/*
+  Las primeras versiones de este script denegaban CONTROL y ALTER sobre cada
+  tabla. DENY CONTROL tambien invalida SELECT, incluso si existe un GRANT SELECT
+  explicito. REVOKE retira solamente esas entradas heredadas y hace que el
+  script sea seguro al volver a ejecutarlo.
+*/
+REVOKE CONTROL, ALTER
+    ON OBJECT::[dbo].[DATA_CLIENTES] FROM [IvMETWorker];
+REVOKE CONTROL, ALTER
+    ON OBJECT::[dbo].[DATA_PLANTAS] FROM [IvMETWorker];
+REVOKE CONTROL, ALTER
+    ON OBJECT::[dbo].[DATA_EQUIPOS] FROM [IvMETWorker];
+REVOKE CONTROL, ALTER
+    ON OBJECT::[dbo].[DATA_EQUIPOS_BALANZAS] FROM [IvMETWorker];
+
 GRANT SELECT ON OBJECT::[dbo].[DATA_CLIENTES] TO [IvMETWorker];
 GRANT SELECT ON OBJECT::[dbo].[DATA_PLANTAS] TO [IvMETWorker];
 GRANT SELECT ON OBJECT::[dbo].[DATA_EQUIPOS] TO [IvMETWorker];
