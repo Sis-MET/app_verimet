@@ -1,0 +1,33 @@
+{
+  "name": "@ivmet/worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Worker corporativo DataMET -> Supabase -> SQL Server IvMET",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js daemon",
+    "health": "tsx src/index.ts health",
+    "sync:catalog": "tsx src/index.ts catalog",
+    "sync:outbox": "tsx src/index.ts outbox",
+    "sync:once": "tsx src/index.ts once",
+    "dev": "tsx watch src/index.ts daemon",
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.4",
+    "dotenv": "^16.4.7",
+    "mssql": "^12.7.0",
+    "pino": "^9.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.7",
+    "@types/node": "^22.10.6",
+    "tsx": "^4.23.12",
+    "typescript": "5.9.3"
+  }
+}

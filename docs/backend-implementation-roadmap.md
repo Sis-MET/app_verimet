@@ -65,6 +65,10 @@ Implementar un proceso saliente desde el servidor de Metrica:
 
 No se abren conexiones entrantes desde Internet hacia SQL Server.
 
+La implementacion vive en [`worker/`](../worker/README.md). Arranca deshabilitada
+por defecto, valida permisos antes de sincronizar y permite limitar el piloto a
+un unico `WORKER_SCOPE_ID`.
+
 ### 5. Gestion IvMET en RimMET
 
 Primero se endurece su autenticacion actual. Despues se agrega el tercer modulo

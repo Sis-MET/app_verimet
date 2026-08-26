@@ -4,6 +4,7 @@
 # pubspec.yaml y su gestor de paquetes es pub, no pnpm.
 packages:
   - backend
+  - worker
   - packages/*
 
 # pnpm bloquea los scripts de instalacion por defecto. Estos cuatro si los

@@ -25,19 +25,21 @@ IvMET/
 ├── app/                        App Flutter (proyecto Dart independiente)
 ├── backend/                    Backend SQL Server anterior, en transicion
 ├── supabase/                   Migraciones, RLS, tests y Edge Functions
+├── sqlserver/                  Base corporativa IvMET y espejo tipado
+├── worker/                     Sincronizacion corporativa bidireccional
 ├── packages/
 │   └── shared-contracts/       Enums/DTOs compartidos + OpenAPI
 ├── docs/
 │   ├── architecture.md         Screaming + Clean Architecture (leer primero)
 │   ├── backend-implementation-roadmap.md
 │   └── app-install-guide.md    Instalar/compilar la app
-├── pnpm-workspace.yaml         packages: backend + packages/*
+├── pnpm-workspace.yaml         packages: backend + worker + packages/*
 ├── package.json                scripts puente para ambos lados
 └── .gitignore
 ```
 
 `app/` **no** forma parte del workspace de pnpm: su gestor de paquetes es `pub`.
-Solo `backend` y `packages/*` se instalan con `pnpm install` desde la raiz.
+`backend`, `worker` y `packages/*` se instalan con `pnpm install` desde la raiz.
 
 > El gestor de paquetes del lado JS es **pnpm**, no npm ni yarn. Esto no es una
 > convencion, esta forzado: el script `preinstall` corre `only-allow pnpm` y
@@ -69,6 +71,10 @@ El orden de implementacion y los limites de cada sistema estan documentados en
 [docs/backend-implementation-roadmap.md](docs/backend-implementation-roadmap.md).
 Las instrucciones para validar y desplegar las migraciones estan en
 [supabase/README.md](supabase/README.md).
+
+La sincronizacion selectiva DataMET -> Supabase -> SQL Server `IvMET` se opera
+segun [worker/README.md](worker/README.md). Arranca bloqueada con
+`WORKER_ENABLED=false` y no abre conexiones entrantes hacia la red corporativa.
 
 Validacion local, una vez instalado Docker Desktop:
 
