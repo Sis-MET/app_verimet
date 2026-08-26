@@ -1,6 +1,6 @@
 begin;
 
-select plan(22);
+select plan(27);
 
 select has_schema('private', 'private schema exists');
 select has_table('public', 'clientes', 'client catalog exists');
@@ -69,6 +69,50 @@ select ok(
     'EXECUTE'
   ),
   'only the trusted mirror worker can claim outbox events'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.list_ivmet_catalog_sync_scopes(uuid)',
+    'EXECUTE'
+  ),
+  'mobile users cannot inspect corporate sync scopes'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.list_ivmet_catalog_sync_scopes(uuid)',
+    'EXECUTE'
+  ),
+  'service role can inspect corporate sync scopes'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.release_ivmet_sync_outbox(text,uuid[],integer)',
+    'EXECUTE'
+  ),
+  'mobile users cannot release corporate outbox events'
+);
+select is(
+  jsonb_typeof(
+    private.stringify_ivmet_outbox_numbers(
+      'public.lecturas',
+      '{"carga_nominal":123.450000000,"orden":1}'::jsonb
+    ) -> 'carga_nominal'
+  ),
+  'string',
+  'outbox preserves metrology decimals as strings'
+);
+select is(
+  jsonb_typeof(
+    private.stringify_ivmet_outbox_numbers(
+      'public.alertas',
+      '{"row_version":9007199254740993}'::jsonb
+    ) -> 'row_version'
+  ),
+  'string',
+  'outbox preserves bigint row versions as strings'
 );
 
 select * from finish();

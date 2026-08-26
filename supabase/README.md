@@ -21,6 +21,11 @@ por lotes desde el dispositivo.
    y transiciones protegidas.
 6. `202608240006_auth_contract.sql`: login por alias, estado de acceso y cierre
    seguro del cambio obligatorio de contraseña.
+7. `202608260001_worker_contract.sql`: funciones privadas para el worker,
+   recuperacion de claims abandonados y bloqueo estricto tras eventos muertos.
+
+La operacion y los secretos del worker se documentan en
+[`../worker/README.md`](../worker/README.md).
 
 ## Validacion local
 
