@@ -120,9 +120,9 @@ export class IvmetRepository {
   async tryAcquireLease(leaseName: string, ownerId: string, durationSeconds: number): Promise<boolean> {
     const result = await this.pool
       .request()
-      .input('leaseName', sql.NVarChar(100), leaseName)
-      .input('ownerId', sql.NVarChar(150), ownerId)
-      .input('durationSeconds', sql.Int, durationSeconds)
+      .input('lease_name', sql.NVarChar(100), leaseName)
+      .input('owner_id', sql.NVarChar(150), ownerId)
+      .input('duration_seconds', sql.Int, durationSeconds)
       .output('acquired', sql.Bit)
       .execute('sync.try_acquire_lease');
     return result.output.acquired === true;
@@ -131,17 +131,17 @@ export class IvmetRepository {
   async renewLease(leaseName: string, ownerId: string, durationSeconds: number): Promise<void> {
     await this.pool
       .request()
-      .input('leaseName', sql.NVarChar(100), leaseName)
-      .input('ownerId', sql.NVarChar(150), ownerId)
-      .input('durationSeconds', sql.Int, durationSeconds)
+      .input('lease_name', sql.NVarChar(100), leaseName)
+      .input('owner_id', sql.NVarChar(150), ownerId)
+      .input('duration_seconds', sql.Int, durationSeconds)
       .execute('sync.renew_lease');
   }
 
   async releaseLease(leaseName: string, ownerId: string): Promise<void> {
     await this.pool
       .request()
-      .input('leaseName', sql.NVarChar(100), leaseName)
-      .input('ownerId', sql.NVarChar(150), ownerId)
+      .input('lease_name', sql.NVarChar(100), leaseName)
+      .input('owner_id', sql.NVarChar(150), ownerId)
       .execute('sync.release_lease');
   }
 
@@ -149,11 +149,11 @@ export class IvmetRepository {
     const result = await this.pool
       .request()
       .input('direction', sql.VarChar(30), direction)
-      .input('workerId', sql.NVarChar(150), workerId)
-      .input('metadataJson', sql.NVarChar(sql.MAX), canonicalJson(metadata))
-      .output('runId', sql.UniqueIdentifier)
+      .input('worker_id', sql.NVarChar(150), workerId)
+      .input('metadata_json', sql.NVarChar(sql.MAX), canonicalJson(metadata))
+      .output('run_id', sql.UniqueIdentifier)
       .execute('sync.begin_run');
-    return String(result.output.runId);
+    return String(result.output.run_id);
   }
 
   async finishRun(
@@ -164,12 +164,12 @@ export class IvmetRepository {
   ): Promise<void> {
     await this.pool
       .request()
-      .input('runId', sql.UniqueIdentifier, runId)
+      .input('run_id', sql.UniqueIdentifier, runId)
       .input('status', sql.VarChar(20), status)
-      .input('scannedCount', sql.Int, counts.scanned)
-      .input('acceptedCount', sql.Int, counts.accepted)
-      .input('unchangedCount', sql.Int, counts.unchanged)
-      .input('rejectedCount', sql.Int, counts.rejected)
+      .input('scanned_count', sql.Int, counts.scanned)
+      .input('accepted_count', sql.Int, counts.accepted)
+      .input('unchanged_count', sql.Int, counts.unchanged)
+      .input('rejected_count', sql.Int, counts.rejected)
       .input('error', sql.NVarChar(4000), errorMessage)
       .execute('sync.finish_run');
   }
@@ -356,18 +356,18 @@ export class IvmetRepository {
   ): Promise<boolean> {
     const result = await transaction
       .request()
-      .input('eventId', sql.UniqueIdentifier, event.eventId)
-      .input('eventSequence', sql.BigInt, String(event.sequence))
-      .input('aggregateType', sql.NVarChar(128), event.aggregateType)
-      .input('aggregateKeyJson', sql.NVarChar(1000), canonicalJson(event.aggregateKey))
+      .input('event_id', sql.UniqueIdentifier, event.eventId)
+      .input('event_sequence', sql.BigInt, String(event.sequence))
+      .input('aggregate_type', sql.NVarChar(128), event.aggregateType)
+      .input('aggregate_key_json', sql.NVarChar(1000), canonicalJson(event.aggregateKey))
       .input('operation', sql.Char(1), event.operation)
-      .input('payloadHash', sql.Char(64), sha256(event.payload))
-      .input('sourceCreatedAt', sql.DateTime2(3), new Date(event.createdAt))
-      .input('workerId', sql.NVarChar(150), workerId)
-      .input('workerName', sql.NVarChar(100), 'supabase_to_sql_ivmet')
-      .output('alreadyApplied', sql.Bit)
+      .input('payload_hash', sql.Char(64), sha256(event.payload))
+      .input('source_created_at', sql.DateTime2(3), new Date(event.createdAt))
+      .input('worker_id', sql.NVarChar(150), workerId)
+      .input('worker_name', sql.NVarChar(100), 'supabase_to_sql_ivmet')
+      .output('already_applied', sql.Bit)
       .execute('sync.record_applied_event');
-    return result.output.alreadyApplied === true;
+    return result.output.already_applied === true;
   }
 
   async recordOutboxFailure(input: {
@@ -379,17 +379,17 @@ export class IvmetRepository {
   }): Promise<void> {
     await this.pool
       .request()
-      .input('runId', sql.UniqueIdentifier, input.runId)
-      .input('eventId', sql.UniqueIdentifier, input.event.eventId)
-      .input('eventSequence', sql.BigInt, String(input.event.sequence))
-      .input('aggregateType', sql.NVarChar(128), input.event.aggregateType)
-      .input('aggregateKeyJson', sql.NVarChar(1000), canonicalJson(input.event.aggregateKey))
-      .input('payloadJson', sql.NVarChar(sql.MAX), canonicalJson(input.event.payload))
-      .input('errorCode', sql.NVarChar(100), input.errorCode)
-      .input('errorDetail', sql.NVarChar(4000), input.errorDetail)
+      .input('run_id', sql.UniqueIdentifier, input.runId)
+      .input('event_id', sql.UniqueIdentifier, input.event.eventId)
+      .input('event_sequence', sql.BigInt, String(input.event.sequence))
+      .input('aggregate_type', sql.NVarChar(128), input.event.aggregateType)
+      .input('aggregate_key_json', sql.NVarChar(1000), canonicalJson(input.event.aggregateKey))
+      .input('payload_json', sql.NVarChar(sql.MAX), canonicalJson(input.event.payload))
+      .input('error_code', sql.NVarChar(100), input.errorCode)
+      .input('error_detail', sql.NVarChar(4000), input.errorDetail)
       .input('attempts', sql.Int, input.event.attempts)
-      .input('nextRetryAt', sql.DateTime2(3), input.nextRetryAt)
-      .output('failureId', sql.UniqueIdentifier)
+      .input('next_retry_at', sql.DateTime2(3), input.nextRetryAt)
+      .output('failure_id', sql.UniqueIdentifier)
       .execute('sync.record_failure');
   }
 }

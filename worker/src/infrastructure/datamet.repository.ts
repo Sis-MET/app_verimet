@@ -118,24 +118,33 @@ function rangeFromRow(
   equipmentCode: string,
   row: LegacyEquipmentRow,
   rangeNumber: 1 | 2 | 3,
-): CatalogEquipmentRange | null {
+): { range: CatalogEquipmentRange | null; warnings: string[] } {
   const capacity = decimalString(row[`cap_max${rangeNumber}`]);
   const division = decimalString(row[`d${rangeNumber}`]);
   const interval = decimalString(row[`e${rangeNumber}`]);
   const decimalPlaces = row[`dec${rangeNumber}`];
 
-  if (!capacity && !division && !interval && decimalPlaces === null) return null;
+  const isUnusedPlaceholder = [capacity, division, interval]
+    .every((value) => value === null || Number(value) === 0);
+  if (isUnusedPlaceholder) return { range: null, warnings: [] };
+
   if (!capacity || !division) {
     throw new Error(`Rango ${rangeNumber} incompleto para ${equipmentCode}`);
   }
   if (Number(capacity) <= 0 || Number(division) <= 0) {
     throw new Error(`Rango ${rangeNumber} no positivo para ${equipmentCode}`);
   }
-  if (interval !== null && Number(interval) <= 0) {
-    throw new Error(`Intervalo e${rangeNumber} no positivo para ${equipmentCode}`);
+  if (interval !== null && Number(interval) < 0) {
+    throw new Error(`Intervalo e${rangeNumber} negativo para ${equipmentCode}`);
   }
   if (decimalPlaces !== null && (decimalPlaces < 0 || decimalPlaces > 9)) {
     throw new Error(`Decimales fuera de rango para ${equipmentCode}`);
+  }
+
+  const warnings: string[] = [];
+  const normalizedInterval = interval !== null && Number(interval) === 0 ? null : interval;
+  if (interval !== null && normalizedInterval === null) {
+    warnings.push(`Intervalo e${rangeNumber} igual a cero para ${equipmentCode}`);
   }
 
   const base = {
@@ -144,18 +153,21 @@ function rangeFromRow(
     unit: requiredText(row.unidad, `unidad de ${equipmentCode}`),
     maximumCapacity: capacity,
     scaleDivision: division,
-    verificationInterval: interval,
+    verificationInterval: normalizedInterval,
     decimalPlaces,
   };
 
   return {
-    rangeNumber: base.rangeNumber,
-    unit: base.unit,
-    maximumCapacity: base.maximumCapacity,
-    scaleDivision: base.scaleDivision,
-    verificationInterval: base.verificationInterval,
-    decimalPlaces: base.decimalPlaces,
-    sourceHash: sha256(asHashable(base)),
+    range: {
+      rangeNumber: base.rangeNumber,
+      unit: base.unit,
+      maximumCapacity: base.maximumCapacity,
+      scaleDivision: base.scaleDivision,
+      verificationInterval: base.verificationInterval,
+      decimalPlaces: base.decimalPlaces,
+      sourceHash: sha256(asHashable(base)),
+    },
+    warnings,
   };
 }
 
@@ -169,8 +181,9 @@ function equipmentFromRow(row: LegacyEquipmentRow): CatalogEquipment {
   } else {
     for (const rangeNumber of [1, 2, 3] as const) {
       try {
-        const range = rangeFromRow(code, row, rangeNumber);
-        if (range) ranges.push(range);
+        const parsed = rangeFromRow(code, row, rangeNumber);
+        warnings.push(...parsed.warnings);
+        if (parsed.range) ranges.push(parsed.range);
       } catch (error) {
         warnings.push(error instanceof Error ? error.message : String(error));
       }
