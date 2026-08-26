@@ -44,6 +44,10 @@ Crear el esquema espejo con UUID de Supabase como claves, tabla de eventos
 aplicados e indices. El usuario del worker tendra lectura en DataMET y escritura
 solo en la base nueva `IvMET`.
 
+Los scripts ejecutables y su orden estan documentados en
+[`sqlserver/README.md`](../sqlserver/README.md). Los scripts historicos que
+creaban el esquema dentro de DataMET no se utilizan en esta arquitectura.
+
 Resultado de salida: DataMET permanece intacta y cada evento Supabase puede
 aplicarse de forma idempotente.
 

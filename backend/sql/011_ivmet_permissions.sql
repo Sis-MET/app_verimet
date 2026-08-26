@@ -1,3 +1,9 @@
+/*
+  OBSOLETO - NO EJECUTAR PARA LA ARQUITECTURA SUPABASE.
+  Este archivo concede permisos al API ServiceMET del diseno anterior.
+  Use /sqlserver/006_permissions_ivmet.sql y 007_datamet_read_permissions.sql.
+*/
+
 /* Permisos minimos del usuario SQL que ejecuta servicemet-api. */
 
 SET NOCOUNT ON;

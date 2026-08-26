@@ -1,4 +1,9 @@
-# Despliegue de IvMET en la API corporativa
+# Despliegue de IvMET en la API corporativa (documento historico)
+
+> **Obsoleto:** este documento describe la integracion anterior con ServiceMET.
+> La arquitectura vigente usa Supabase como backend principal y una base SQL
+> Server autonoma `IvMET`. Consulte
+> [`sqlserver/README.md`](../sqlserver/README.md).
 
 El código fuente de IvMET se mantiene en `IvMET/backend`. No requiere editar una
 copia local de ServiceMET. En el servidor de la empresa se monta su router en el

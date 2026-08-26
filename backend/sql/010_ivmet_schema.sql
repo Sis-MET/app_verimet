@@ -1,4 +1,8 @@
 /*
+  OBSOLETO - NO EJECUTAR PARA LA ARQUITECTURA SUPABASE.
+  Este archivo pertenece al diseno anterior que creaba [ivmet] dentro de
+  DataMET. Use los scripts de /sqlserver para crear la base autonoma [IvMET].
+
   Esquema aditivo de IvMET para SQL Server/DataMET.
 
   - No modifica tablas legadas.
