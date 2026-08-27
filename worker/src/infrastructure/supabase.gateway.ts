@@ -7,6 +7,7 @@ import type {
   CatalogEquipment,
   CatalogPlant,
   CatalogScope,
+  CatalogJob,
   LegacyEntityType,
   OutboxEvent,
   QuarantineRecord,
@@ -58,18 +59,26 @@ export type EquipmentUpsertOutcome = UpsertOutcome & {
   ranges: Array<{ id: string; rangeNumber: number; sourceHash: string }>;
 };
 
-function ensureNoError(error: { message: string } | null, operation: string): void {
+function ensureNoError(
+  error: { message: string } | null,
+  operation: string,
+): void {
   if (error) throw new Error(`${operation}: ${error.message}`);
 }
 
-function asJsonRecord(value: Record<string, unknown>): Record<string, JsonValue> {
+function asJsonRecord(
+  value: Record<string, unknown>,
+): Record<string, JsonValue> {
   return value as Record<string, JsonValue>;
 }
 
 export class SupabaseGateway {
   private readonly client: SupabaseClient;
 
-  constructor(url = env.SUPABASE_URL, serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY) {
+  constructor(
+    url = env.SUPABASE_URL,
+    serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY,
+  ) {
     this.client = createClient(url, serviceRoleKey, {
       auth: {
         persistSession: false,
@@ -77,6 +86,8 @@ export class SupabaseGateway {
         detectSessionInUrl: false,
       },
       global: {
+        fetch: (input, init) =>
+          fetch(input, { ...init, signal: AbortSignal.timeout(20_000) }),
         headers: {
           'X-IvMET-Worker': env.WORKER_ID,
         },
@@ -84,26 +95,117 @@ export class SupabaseGateway {
     });
   }
 
-  async healthCheck(): Promise<{ reachable: boolean; scopes: number }> {
+  async healthCheck(): Promise<{
+    reachable: boolean;
+    scopes: number;
+    contractVersion: number;
+  }> {
+    const { data, error } = await this.client.rpc('ivmet_worker_contract');
+    ensureNoError(
+      error,
+      'Falta la migracion 202608270004_onboarding_queue o no se pudo comprobar el contrato',
+    );
+    if (data !== 2) throw new Error('WORKER_CONTRACT_MISMATCH');
     const scopes = await this.listScopes(env.WORKER_SCOPE_ID);
-    return { reachable: true, scopes: scopes.length };
+    return { reachable: true, scopes: scopes.length, contractVersion: data };
   }
 
-  async listScopes(scopeId?: string): Promise<CatalogScope[]> {
-    const { data, error } = await this.client.rpc('list_ivmet_catalog_sync_scopes', {
-      target_scope_id: scopeId ?? null,
+  async reportWorker(
+    instanceId: string,
+    mode: string,
+    state: string,
+  ): Promise<void> {
+    const { error } = await this.client.rpc('report_ivmet_worker', {
+      worker_id: env.WORKER_ID,
+      instance_id: instanceId,
+      mode,
+      state,
+      target_scope_id: env.WORKER_SCOPE_ID ?? null,
+      poll_seconds: env.WORKER_OUTBOX_POLL_SECONDS,
     });
-    ensureNoError(error, 'No se pudieron leer los alcances de sincronizacion');
+    ensureNoError(error, 'No se pudo publicar disponibilidad del worker');
+  }
 
-    return z.array(scopeRowSchema).parse(data ?? []).map((row) => ({
+  async claimCatalogJob(): Promise<CatalogJob | null> {
+    const { data, error } = await this.client.rpc('claim_ivmet_catalog_job', {
+      worker_id: env.WORKER_ID,
+      target_scope_id: env.WORKER_SCOPE_ID ?? null,
+      lease_seconds: env.WORKER_LEASE_SECONDS,
+    });
+    ensureNoError(error, 'No se pudo reclamar una incorporacion');
+    if (!data) return null;
+    const row = scopeRowSchema
+      .extend({
+        run_id: z.string().uuid(),
+        generation: z.string().regex(/^\d+$/),
+      })
+      .parse(data);
+    return {
       scopeId: row.scope_id,
       legacyClientId: row.legacy_cliente_id,
       legacyClientCode: row.legacy_codigo_cliente.trim(),
       supabaseClientId: row.supabase_cliente_id,
       status: row.scope_status,
-      plantCodes: row.plant_codes.map((code) => code.trim()),
-      equipmentCodes: row.equipment_codes.map((code) => code.trim()),
-    }));
+      plantCodes: row.plant_codes,
+      equipmentCodes: row.equipment_codes,
+      runId: row.run_id,
+      generation: row.generation,
+    };
+  }
+
+  async renewCatalogJob(runId: string): Promise<void> {
+    const { data, error } = await this.client.rpc('renew_ivmet_catalog_job', {
+      target_run_id: runId,
+      lease_seconds: env.WORKER_LEASE_SECONDS,
+    });
+    ensureNoError(error, 'No se pudo renovar la incorporacion');
+    if (data !== true) throw new Error('CATALOG_LEASE_LOST');
+  }
+
+  async finishCatalogJob(
+    job: CatalogJob,
+    clientId: string | null,
+    status: SyncRunStatus,
+    counts: SyncCounts,
+    detail: string | null,
+  ): Promise<void> {
+    const { data, error } = await this.client.rpc('finish_ivmet_catalog_job', {
+      target_run_id: job.runId,
+      target_client_id: clientId,
+      final_status: status,
+      scanned_count: counts.scanned,
+      accepted_count: counts.accepted,
+      unchanged_count: counts.unchanged,
+      rejected_count: counts.rejected,
+      error_message: detail,
+      refresh_seconds: env.WORKER_CATALOG_INTERVAL_SECONDS,
+      retry_seconds: env.WORKER_RETRY_SECONDS,
+    });
+    ensureNoError(error, 'No se pudo finalizar la incorporacion');
+    if (data !== true) throw new Error('CATALOG_LEASE_LOST');
+  }
+
+  async listScopes(scopeId?: string): Promise<CatalogScope[]> {
+    const { data, error } = await this.client.rpc(
+      'list_ivmet_catalog_sync_scopes',
+      {
+        target_scope_id: scopeId ?? null,
+      },
+    );
+    ensureNoError(error, 'No se pudieron leer los alcances de sincronizacion');
+
+    return z
+      .array(scopeRowSchema)
+      .parse(data ?? [])
+      .map((row) => ({
+        scopeId: row.scope_id,
+        legacyClientId: row.legacy_cliente_id,
+        legacyClientCode: row.legacy_codigo_cliente.trim(),
+        supabaseClientId: row.supabase_cliente_id,
+        status: row.scope_status,
+        plantCodes: row.plant_codes.map((code) => code.trim()),
+        equipmentCodes: row.equipment_codes.map((code) => code.trim()),
+      }));
   }
 
   async beginRun(
@@ -137,7 +239,8 @@ export class SupabaseGateway {
       error_message: errorMessage,
     });
     ensureNoError(error, 'No se pudo finalizar la ejecucion en Supabase');
-    if (data !== true) throw new Error(`La ejecucion ${runId} ya estaba finalizada o no existe`);
+    if (data !== true)
+      throw new Error(`La ejecucion ${runId} ya estaba finalizada o no existe`);
   }
 
   async markScope(
@@ -146,14 +249,18 @@ export class SupabaseGateway {
     successful: boolean,
     detail: string | null,
   ): Promise<void> {
-    const { data, error } = await this.client.rpc('mark_ivmet_catalog_sync_scope', {
-      target_scope_id: scopeId,
-      target_supabase_cliente_id: clientId,
-      successful,
-      detail,
-    });
+    const { data, error } = await this.client.rpc(
+      'mark_ivmet_catalog_sync_scope',
+      {
+        target_scope_id: scopeId,
+        target_supabase_cliente_id: clientId,
+        successful,
+        detail,
+      },
+    );
     ensureNoError(error, 'No se pudo actualizar el alcance de sincronizacion');
-    if (data !== true) throw new Error(`El alcance ${scopeId} no existe o no esta habilitado`);
+    if (data !== true)
+      throw new Error(`El alcance ${scopeId} no existe o no esta habilitado`);
   }
 
   async recordIdentity(
@@ -173,7 +280,10 @@ export class SupabaseGateway {
     ensureNoError(error, 'No se pudo registrar la identidad legada');
   }
 
-  async recordQuarantine(runId: string, record: QuarantineRecord): Promise<void> {
+  async recordQuarantine(
+    runId: string,
+    record: QuarantineRecord,
+  ): Promise<void> {
     const { error } = await this.client.rpc('record_ivmet_sync_quarantine', {
       target_run_id: runId,
       target_entity_type: record.entityType,
@@ -186,7 +296,10 @@ export class SupabaseGateway {
     ensureNoError(error, 'No se pudo registrar la cuarentena');
   }
 
-  async upsertClient(source: CatalogClient, runId: string): Promise<UpsertOutcome> {
+  async upsertClient(
+    source: CatalogClient,
+    runId: string,
+  ): Promise<UpsertOutcome> {
     const { data: existingData, error: existingError } = await this.client
       .from('clientes')
       .select('id,legacy_cliente_id,source_hash,source_version')
@@ -196,7 +309,13 @@ export class SupabaseGateway {
     const existing = existingData as ExistingCatalogRow | null;
 
     if (existing?.source_hash === source.sourceHash) {
-      await this.recordIdentity(runId, 'CLIENT', String(source.legacyClientId), existing.id, source.sourceHash);
+      await this.recordIdentity(
+        runId,
+        'CLIENT',
+        String(source.legacyClientId),
+        existing.id,
+        source.sourceHash,
+      );
       return { id: existing.id, changed: false };
     }
 
@@ -222,11 +341,21 @@ export class SupabaseGateway {
       .single();
     ensureNoError(error, 'No se pudo guardar el cliente');
     const id = z.string().uuid().parse(data?.id);
-    await this.recordIdentity(runId, 'CLIENT', String(source.legacyClientId), id, source.sourceHash);
+    await this.recordIdentity(
+      runId,
+      'CLIENT',
+      String(source.legacyClientId),
+      id,
+      source.sourceHash,
+    );
     return { id, changed: true };
   }
 
-  async upsertPlant(source: CatalogPlant, clientId: string, runId: string): Promise<UpsertOutcome> {
+  async upsertPlant(
+    source: CatalogPlant,
+    clientId: string,
+    runId: string,
+  ): Promise<UpsertOutcome> {
     const { data: existingData, error: existingError } = await this.client
       .from('plantas')
       .select('id,cliente_id,source_hash,source_version')
@@ -294,7 +423,9 @@ export class SupabaseGateway {
   ): Promise<EquipmentUpsertOutcome> {
     const { data: existingData, error: existingError } = await this.client
       .from('equipos')
-      .select('id,cliente_id,planta_id,legacy_equipo_id,source_hash,source_version')
+      .select(
+        'id,cliente_id,planta_id,legacy_equipo_id,source_hash,source_version',
+      )
       .eq('cod_metrica', source.code)
       .maybeSingle();
     ensureNoError(existingError, 'No se pudo consultar el equipo existente');
@@ -358,7 +489,8 @@ export class SupabaseGateway {
       changed = true;
     }
 
-    if (!equipmentId) throw new Error(`No se resolvio el UUID del equipo ${source.code}`);
+    if (!equipmentId)
+      throw new Error(`No se resolvio el UUID del equipo ${source.code}`);
     await this.recordIdentity(
       runId,
       'EQUIPMENT',
@@ -385,16 +517,33 @@ export class SupabaseGateway {
       .from('equipo_rangos')
       .select('id,numero_rango,source_hash')
       .eq('equipo_id', equipmentId);
-    ensureNoError(existingError, 'No se pudieron consultar los rangos existentes');
+    ensureNoError(
+      existingError,
+      'No se pudieron consultar los rangos existentes',
+    );
 
-    const existingByNumber = new Map<number, { id: string; source_hash: string }>(
-      ((existingData ?? []) as Array<{ id: string; numero_rango: number; source_hash: string }>).map(
-        (row) => [row.numero_rango, { id: row.id, source_hash: row.source_hash }],
-      ),
+    const existingByNumber = new Map<
+      number,
+      { id: string; source_hash: string }
+    >(
+      (
+        (existingData ?? []) as Array<{
+          id: string;
+          numero_rango: number;
+          source_hash: string;
+        }>
+      ).map((row) => [
+        row.numero_rango,
+        { id: row.id, source_hash: row.source_hash },
+      ]),
     );
     let rangeChanged = 0;
     let rangeUnchanged = 0;
-    const ranges: Array<{ id: string; rangeNumber: number; sourceHash: string }> = [];
+    const ranges: Array<{
+      id: string;
+      rangeNumber: number;
+      sourceHash: string;
+    }> = [];
 
     for (const range of source.ranges) {
       const existing = existingByNumber.get(range.rangeNumber);
@@ -425,7 +574,10 @@ export class SupabaseGateway {
         rangeChanged += 1;
       }
 
-      if (!rangeId) throw new Error(`No se resolvio el rango ${source.code}:${range.rangeNumber}`);
+      if (!rangeId)
+        throw new Error(
+          `No se resolvio el rango ${source.code}:${range.rangeNumber}`,
+        );
       await this.recordIdentity(
         runId,
         'EQUIPMENT_RANGE',
@@ -433,13 +585,20 @@ export class SupabaseGateway {
         rangeId,
         range.sourceHash,
       );
-      ranges.push({ id: rangeId, rangeNumber: range.rangeNumber, sourceHash: range.sourceHash });
+      ranges.push({
+        id: rangeId,
+        rangeNumber: range.rangeNumber,
+        sourceHash: range.sourceHash,
+      });
       existingByNumber.delete(range.rangeNumber);
     }
 
     const staleRangeIds = [...existingByNumber.values()].map((row) => row.id);
     if (staleRangeIds.length > 0) {
-      const { error } = await this.client.from('equipo_rangos').delete().in('id', staleRangeIds);
+      const { error } = await this.client
+        .from('equipo_rangos')
+        .delete()
+        .in('id', staleRangeIds);
       ensureNoError(error, 'No se pudieron retirar los rangos obsoletos');
     }
 
@@ -457,16 +616,19 @@ export class SupabaseGateway {
       batch_size: batchSize,
     });
     ensureNoError(error, 'No se pudo reclamar el outbox');
-    return z.array(outboxRowSchema).parse(data ?? []).map((row) => ({
-      eventId: row.event_id,
-      sequence: row.sequence,
-      aggregateType: row.aggregate_type,
-      aggregateKey: asJsonRecord(row.aggregate_key),
-      operation: row.operation,
-      payload: asJsonRecord(row.payload),
-      attempts: row.attempts,
-      createdAt: row.created_at,
-    }));
+    return z
+      .array(outboxRowSchema)
+      .parse(data ?? [])
+      .map((row) => ({
+        eventId: row.event_id,
+        sequence: row.sequence,
+        aggregateType: row.aggregate_type,
+        aggregateKey: asJsonRecord(row.aggregate_key),
+        operation: row.operation,
+        payload: asJsonRecord(row.payload),
+        attempts: row.attempts,
+        createdAt: row.created_at,
+      }));
   }
 
   async acknowledgeOutbox(eventIds: string[]): Promise<number> {
@@ -479,7 +641,11 @@ export class SupabaseGateway {
     return z.number().int().nonnegative().parse(data);
   }
 
-  async failOutbox(eventId: string, message: string, retrySeconds: number): Promise<void> {
+  async failOutbox(
+    eventId: string,
+    message: string,
+    retrySeconds: number,
+  ): Promise<void> {
     const { data, error } = await this.client.rpc('fail_ivmet_sync_outbox', {
       worker_id: env.WORKER_ID,
       target_event_id: eventId,
@@ -487,7 +653,8 @@ export class SupabaseGateway {
       retry_after_seconds: retrySeconds,
     });
     ensureNoError(error, 'No se pudo liberar el evento fallido');
-    if (data !== true) throw new Error(`El evento ${eventId} no pertenece al worker actual`);
+    if (data !== true)
+      throw new Error(`El evento ${eventId} no pertenece al worker actual`);
   }
 
   async releaseOutbox(eventIds: string[], retrySeconds = 5): Promise<number> {

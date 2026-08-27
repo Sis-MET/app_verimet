@@ -21,6 +21,8 @@ export type CatalogScope = {
   equipmentCodes: string[];
 };
 
+export type CatalogJob = CatalogScope & { runId: string; generation: string };
+
 export type CatalogClient = {
   legacyClientId: number;
   code: string;

@@ -9,6 +9,11 @@ module.exports = {
       autorestart: true,
       watch: false,
       restart_delay: 5000,
+      exp_backoff_restart_delay: 5000,
+      kill_timeout: 60000,
+      shutdown_with_message: true,
+      wait_ready: true,
+      listen_timeout: 60000,
       max_memory_restart: '300M',
       time: true,
       env: {

@@ -18,7 +18,9 @@ Object.assign(process.env, {
 });
 
 async function createService(supabase: object, ivmet: object) {
-  const { OutboxSyncService } = await import('../src/services/outbox-sync.service');
+  const { OutboxSyncService } = await import(
+    '../src/services/outbox-sync.service'
+  );
   return new OutboxSyncService(supabase as never, ivmet as never);
 }
 
@@ -68,7 +70,10 @@ test('outbox acknowledges successful events in sequence', async () => {
   const result = await service.run();
 
   assert.deepEqual(applied, [1, 2]);
-  assert.deepEqual(acknowledged, events.map((item) => item.eventId));
+  assert.deepEqual(
+    acknowledged,
+    events.map((item) => item.eventId),
+  );
   assert.deepEqual(result, { status: 'SUCCEEDED', processed: 2 });
 });
 
@@ -107,4 +112,22 @@ test('outbox stops on first failure and releases later sequences', async () => {
   assert.deepEqual(failed, [events[0]!.eventId]);
   assert.deepEqual(released, [[events[1]!.eventId, events[2]!.eventId]]);
   assert.deepEqual(result, { status: 'FAILED', processed: 0 });
+});
+
+test('outbox vacío no genera miles de ejecuciones sin datos', async () => {
+  let released = false;
+  const service = await createService(
+    {
+      claimOutbox: async () => [],
+      beginRun: async () => assert.fail('No debe crear un run vacío'),
+    },
+    {
+      tryAcquireLease: async () => true,
+      releaseLease: async () => {
+        released = true;
+      },
+    },
+  );
+  assert.deepEqual(await service.run(), { status: 'SUCCEEDED', processed: 0 });
+  assert.equal(released, true);
 });

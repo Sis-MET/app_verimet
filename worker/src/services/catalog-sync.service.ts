@@ -1,8 +1,17 @@
 import { env } from '../config';
 import { safeError, sha256, type JsonValue } from '../core/canonical';
-import type { CatalogScope, QuarantineRecord, SyncCounts } from '../domain/types';
+import type {
+  CatalogScope,
+  CatalogJob,
+  QuarantineRecord,
+  SyncCounts,
+} from '../domain/types';
+import { keepLease } from '../core/runtime';
 import { emptyCounts, runStatus } from '../domain/types';
-import type { DataMetRepository, EquipmentReadCandidate } from '../infrastructure/datamet.repository';
+import type {
+  DataMetRepository,
+  EquipmentReadCandidate,
+} from '../infrastructure/datamet.repository';
 import type { IvmetRepository } from '../infrastructure/ivmet.repository';
 import type { SupabaseGateway } from '../infrastructure/supabase.gateway';
 import { logger } from '../logger';
@@ -23,8 +32,6 @@ function groupBy<T>(values: T[], key: (value: T) => string): Map<string, T[]> {
 }
 
 export class CatalogSyncService {
-  private readonly leaseName = 'datamet_to_supabase';
-
   constructor(
     private readonly dataMet: DataMetRepository,
     private readonly supabase: SupabaseGateway,
@@ -32,56 +39,49 @@ export class CatalogSyncService {
   ) {}
 
   async run(): Promise<ScopeResult[]> {
-    const acquired = await this.ivmet.tryAcquireLease(
-      this.leaseName,
-      env.WORKER_ID,
-      env.WORKER_LEASE_SECONDS,
+    // Un alcance por ciclo: los siguientes quedan en una cola persistente y justa.
+    const job = await this.supabase.claimCatalogJob();
+    if (!job) return [];
+    const lease = keepLease(
+      () => this.supabase.renewCatalogJob(job.runId),
+      (env.WORKER_LEASE_SECONDS * 1000) / 3,
     );
-    if (!acquired) {
-      logger.info('Sincronizacion de catalogos omitida: otro worker conserva el lease');
-      return [];
-    }
-
     try {
-      const scopes = await this.supabase.listScopes(env.WORKER_SCOPE_ID);
-      const results: ScopeResult[] = [];
-      for (const scope of scopes) {
-        await this.ivmet.renewLease(this.leaseName, env.WORKER_ID, env.WORKER_LEASE_SECONDS);
-        results.push(await this.syncScope(scope));
-      }
-      return results;
+      return [await this.syncScope(job, lease.assertAlive)];
     } finally {
-      await this.ivmet.releaseLease(this.leaseName, env.WORKER_ID).catch((error) => {
-        logger.warn({ error: safeError(error) }, 'No se pudo liberar el lease de catalogos');
-      });
+      await lease.stop();
     }
   }
 
-  private async syncScope(scope: CatalogScope): Promise<ScopeResult> {
+  private async syncScope(
+    scope: CatalogJob,
+    assertLease: () => void,
+  ): Promise<ScopeResult> {
     const counts = emptyCounts();
-    let supabaseRunId: string | null = null;
+    const supabaseRunId = scope.runId;
     let sqlRunId: string | null = null;
     let clientId: string | null = scope.supabaseClientId;
     let fatalError: string | null = null;
 
     try {
-      supabaseRunId = await this.supabase.beginRun('DATAMET_TO_SUPABASE', scope.scopeId, {
-        scopeId: scope.scopeId,
-        legacyClientId: scope.legacyClientId,
-        plantCount: scope.plantCodes.length,
-        equipmentCount: scope.equipmentCodes.length,
-      });
-      sqlRunId = await this.ivmet.beginRun('DATAMET_TO_SUPABASE', env.WORKER_ID, {
-        scopeId: scope.scopeId,
-        supabaseRunId,
-      });
+      sqlRunId = await this.ivmet.beginRun(
+        'DATAMET_TO_SUPABASE',
+        env.WORKER_ID,
+        {
+          scopeId: scope.scopeId,
+          supabaseRunId,
+        },
+      );
 
       counts.scanned += 1;
       try {
-        const client = await this.dataMet.readClient(scope.legacyClientId, scope.legacyClientCode);
+        const client = await this.dataMet.readClient(
+          scope.legacyClientId,
+          scope.legacyClientCode,
+        );
+        assertLease();
         const outcome = await this.supabase.upsertClient(client, supabaseRunId);
         clientId = outcome.id;
-        outcome.changed ? (counts.accepted += 1) : (counts.unchanged += 1);
         await this.ivmet.upsertDataMetState({
           entityType: 'CLIENT',
           sourceKey: String(client.legacyClientId),
@@ -90,6 +90,7 @@ export class CatalogSyncService {
           scopeId: scope.scopeId,
           runId: sqlRunId,
         });
+        outcome.changed ? (counts.accepted += 1) : (counts.unchanged += 1);
       } catch (error) {
         counts.rejected += 1;
         await this.quarantine(supabaseRunId, sqlRunId, {
@@ -112,19 +113,31 @@ export class CatalogSyncService {
       if (scope.plantCodes.length === 0) {
         counts.scanned += 1;
         counts.rejected += 1;
-        await this.quarantine(supabaseRunId, sqlRunId, this.scopeIssue(scope, 'SCOPE_WITHOUT_PLANTS'));
+        await this.quarantine(
+          supabaseRunId,
+          sqlRunId,
+          this.scopeIssue(scope, 'SCOPE_WITHOUT_PLANTS'),
+        );
       }
       if (scope.equipmentCodes.length === 0) {
         counts.scanned += 1;
         counts.rejected += 1;
-        await this.quarantine(supabaseRunId, sqlRunId, this.scopeIssue(scope, 'SCOPE_WITHOUT_EQUIPMENT'));
+        await this.quarantine(
+          supabaseRunId,
+          sqlRunId,
+          this.scopeIssue(scope, 'SCOPE_WITHOUT_EQUIPMENT'),
+        );
       }
 
-      const plants = await this.dataMet.readPlants(scope.legacyClientId, scope.plantCodes);
+      const plants = await this.dataMet.readPlants(
+        scope.legacyClientId,
+        scope.plantCodes,
+      );
       const plantsByCode = groupBy(plants, (plant) => plant.legacyCode);
       const plantIds = new Map<string, string>();
 
       for (const plantCode of scope.plantCodes) {
+        assertLease();
         counts.scanned += 1;
         const candidates = plantsByCode.get(plantCode) ?? [];
         if (candidates.length !== 1) {
@@ -132,19 +145,26 @@ export class CatalogSyncService {
           await this.quarantine(supabaseRunId, sqlRunId, {
             entityType: 'PLANT',
             sourceKey: `${scope.legacyClientId}:${plantCode}`,
-            reasonCode: candidates.length === 0 ? 'PLANT_NOT_FOUND' : 'PLANT_AMBIGUOUS',
+            reasonCode:
+              candidates.length === 0 ? 'PLANT_NOT_FOUND' : 'PLANT_AMBIGUOUS',
             reasonDetail: `Se encontraron ${candidates.length} filas para la planta seleccionada`,
             safePayload: { legacyClientId: scope.legacyClientId, plantCode },
-            payloadHash: sha256({ legacyClientId: scope.legacyClientId, plantCode }),
+            payloadHash: sha256({
+              legacyClientId: scope.legacyClientId,
+              plantCode,
+            }),
           });
           continue;
         }
 
         const plant = candidates[0]!;
         try {
-          const outcome = await this.supabase.upsertPlant(plant, clientId!, supabaseRunId);
+          const outcome = await this.supabase.upsertPlant(
+            plant,
+            clientId!,
+            supabaseRunId,
+          );
           plantIds.set(plantCode, outcome.id);
-          outcome.changed ? (counts.accepted += 1) : (counts.unchanged += 1);
           await this.ivmet.upsertDataMetState({
             entityType: 'PLANT',
             sourceKey: `${scope.legacyClientId}:${plantCode}`,
@@ -153,6 +173,7 @@ export class CatalogSyncService {
             scopeId: scope.scopeId,
             runId: sqlRunId,
           });
+          outcome.changed ? (counts.accepted += 1) : (counts.unchanged += 1);
         } catch (error) {
           counts.rejected += 1;
           await this.quarantine(supabaseRunId, sqlRunId, {
@@ -166,9 +187,15 @@ export class CatalogSyncService {
         }
       }
 
-      const equipmentCandidates = await this.dataMet.readEquipment(scope.equipmentCodes);
-      const equipmentByCode = groupBy(equipmentCandidates, (candidate) => candidate.sourceCode);
+      const equipmentCandidates = await this.dataMet.readEquipment(
+        scope.equipmentCodes,
+      );
+      const equipmentByCode = groupBy(
+        equipmentCandidates,
+        (candidate) => candidate.sourceCode,
+      );
       for (const equipmentCode of scope.equipmentCodes) {
+        assertLease();
         counts.scanned += 1;
         const candidates = equipmentByCode.get(equipmentCode) ?? [];
         await this.processEquipment(
@@ -185,32 +212,43 @@ export class CatalogSyncService {
     } catch (error) {
       fatalError = safeError(error);
       const classified = counts.accepted + counts.unchanged + counts.rejected;
-      if (classified < counts.scanned) counts.rejected += counts.scanned - classified;
+      if (classified < counts.scanned)
+        counts.rejected += counts.scanned - classified;
       if (counts.scanned === 0) {
         counts.scanned = 1;
         counts.rejected = 1;
       }
-      logger.error({ scopeId: scope.scopeId, error: fatalError }, 'Fallo la sincronizacion del alcance');
+      logger.error(
+        { scopeId: scope.scopeId, error: fatalError },
+        'Fallo la sincronizacion del alcance',
+      );
     }
 
     const status = fatalError ? 'FAILED' : runStatus(counts);
-    if (supabaseRunId) {
-      await this.supabase.finishRun(supabaseRunId, status, counts, fatalError).catch((error) => {
-        logger.error({ error: safeError(error), supabaseRunId }, 'No se pudo cerrar el run de Supabase');
-      });
-      await this.supabase
-        .markScope(scope.scopeId, clientId, status === 'SUCCEEDED', fatalError ?? (status === 'PARTIAL' ? 'SYNC_PARTIAL' : null))
+    if (sqlRunId) {
+      await this.ivmet
+        .finishRun(sqlRunId, status, counts, fatalError)
         .catch((error) => {
-          logger.error({ error: safeError(error), scopeId: scope.scopeId }, 'No se pudo actualizar el alcance');
+          logger.error(
+            { error: safeError(error), sqlRunId },
+            'No se pudo cerrar el run de SQL Server',
+          );
         });
     }
-    if (sqlRunId) {
-      await this.ivmet.finishRun(sqlRunId, status, counts, fatalError).catch((error) => {
-        logger.error({ error: safeError(error), sqlRunId }, 'No se pudo cerrar el run de SQL Server');
-      });
-    }
 
-    logger.info({ scopeId: scope.scopeId, status, counts }, 'Sincronizacion de alcance finalizada');
+    assertLease();
+    await this.supabase.finishCatalogJob(
+      scope,
+      clientId,
+      status,
+      counts,
+      fatalError,
+    );
+
+    logger.info(
+      { scopeId: scope.scopeId, status, counts },
+      'Sincronizacion de alcance finalizada',
+    );
     return { scopeId: scope.scopeId, counts, status };
   }
 
@@ -226,16 +264,18 @@ export class CatalogSyncService {
   ): Promise<void> {
     if (candidates.length !== 1 || !candidates[0]?.equipment) {
       counts.rejected += 1;
-      const reasonCode = candidates.length === 0
-        ? 'EQUIPMENT_NOT_FOUND'
-        : candidates.length > 1
-          ? 'EQUIPMENT_AMBIGUOUS'
-          : 'EQUIPMENT_INVALID';
+      const reasonCode =
+        candidates.length === 0
+          ? 'EQUIPMENT_NOT_FOUND'
+          : candidates.length > 1
+            ? 'EQUIPMENT_AMBIGUOUS'
+            : 'EQUIPMENT_INVALID';
       await this.quarantine(supabaseRunId, sqlRunId, {
         entityType: 'EQUIPMENT',
         sourceKey: equipmentCode,
         reasonCode,
-        reasonDetail: candidates[0]?.error ?? `Se encontraron ${candidates.length} filas`,
+        reasonDetail:
+          candidates[0]?.error ?? `Se encontraron ${candidates.length} filas`,
         safePayload: { equipmentCode },
         payloadHash: sha256({ equipmentCode }),
       });
@@ -264,10 +304,6 @@ export class CatalogSyncService {
         plantId,
         supabaseRunId,
       );
-      outcome.changed || outcome.rangeChanged > 0 || outcome.rangeDeleted > 0
-        ? (counts.accepted += 1)
-        : (counts.unchanged += 1);
-
       await this.ivmet.upsertDataMetState({
         entityType: 'EQUIPMENT',
         sourceKey: String(equipment.legacyEquipmentId),
@@ -300,6 +336,9 @@ export class CatalogSyncService {
           payloadHash: equipment.sourceHash,
         });
       }
+      outcome.changed || outcome.rangeChanged > 0 || outcome.rangeDeleted > 0
+        ? (counts.accepted += 1)
+        : (counts.unchanged += 1);
     } catch (error) {
       counts.rejected += 1;
       await this.quarantine(supabaseRunId, sqlRunId, {
@@ -322,7 +361,10 @@ export class CatalogSyncService {
     await this.ivmet.recordCatalogQuarantine(sqlRunId, record);
   }
 
-  private scopeIssue(scope: CatalogScope, reasonCode: string): QuarantineRecord {
+  private scopeIssue(
+    scope: CatalogScope,
+    reasonCode: string,
+  ): QuarantineRecord {
     const safePayload = {
       scopeId: scope.scopeId,
       legacyClientId: scope.legacyClientId,
