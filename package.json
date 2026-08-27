@@ -9,6 +9,7 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "db:test:admin": "node --test scripts/test-admin-db.mjs",
     "preinstall": "only-allow pnpm",
     "backend:dev": "pnpm --filter @ivmet/backend dev",
     "backend:build": "pnpm --filter @ivmet/backend build",
@@ -19,6 +20,7 @@
     "worker:build": "pnpm --filter @ivmet/worker build",
     "worker:health": "pnpm --filter @ivmet/worker health",
     "worker:once": "pnpm --filter @ivmet/worker sync:once",
+    "worker:start": "pnpm --filter @ivmet/worker start",
     "worker:test": "pnpm --filter @ivmet/worker test",
     "app:get": "cd app && flutter pub get",
     "app:gen": "cd app && dart run build_runner build --delete-conflicting-outputs",
@@ -31,6 +33,7 @@
   },
   "packageManager": "pnpm@11.21.0",
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "only-allow": "^1.2.2",
     "typescript": "5.9.3"
   }
