@@ -12,7 +12,10 @@ las dos bases SQL Server.
 
 ## Protecciones incluidas
 
-- `WORKER_ENABLED=false` bloquea toda mutacion y deja disponible solo `health`.
+- [Guía vigente de producción](../docs/onboarding-production.md): sustituye el
+  recorrido manual del piloto. Las altas normales se gestionan desde RimMET.
+- `WORKER_ENABLED=false` bloquea la sincronización; `health` es estrictamente
+  de lectura. Un arranque de daemon bloqueado puede publicar su estado operativo.
 - Solo importa alcances registrados en `private.catalog_sync_scope`.
 - Relaciona plantas por `cliente_id + codigo_planta`, nunca por `planta_id` solo.
 - Relaciona `DATA_EQUIPOS_BALANZAS` por `cod_metrica`; su columna `id` no es fiable.
@@ -22,14 +25,17 @@ las dos bases SQL Server.
 - Procesa el outbox estrictamente por secuencia y en una transaccion por evento.
 - Un evento repetido se reconoce por `event_id + hash`; no duplica evidencia.
 - Un evento `DEAD` bloquea secuencias posteriores hasta intervención administrativa.
-- Los leases evitan dos instancias activas del mismo flujo.
+- La cola reclama cada alcance con lease renovable; recupera caídas y reintenta
+  automáticamente con espera progresiva. Outbox conserva su lease global.
+- El daemon de producción exige `WORKER_SCOPE_ID` vacío: todas las solicitudes
+  autorizadas, nunca todos los datos maestros.
 
 ## 1. Aplicar el contrato Supabase
 
-La migracion requerida es:
+Aplicar todas las migraciones pendientes, incluida la versión de cola:
 
 ```text
-supabase/migrations/202608260001_worker_contract.sql
+supabase/migrations/202608270004_onboarding_queue.sql
 ```
 
 Con una cuenta propietaria del proyecto:
@@ -50,7 +56,7 @@ muertos.
 Desde `worker/`:
 
 ```powershell
-Copy-Item -LiteralPath '.env.example' -Destination '.env'
+if (-not (Test-Path -LiteralPath '.env')) { Copy-Item -LiteralPath '.env.example' -Destination '.env' }
 ```
 
 Editar `.env` exclusivamente en el servidor. Se requieren:
@@ -60,8 +66,8 @@ Editar `.env` exclusivamente en el servidor. Se requieren:
 - `service_role key` del proyecto;
 - un identificador estable y unico para la maquina.
 
-La `service_role key` nunca debe copiarse a Flutter, RimMET, capturas, Git ni
-logs. El logger del worker redacta campos sensibles conocidos.
+La `service_role key` nunca debe copiarse a Flutter, al navegador de RimMET,
+capturas, Git ni logs. Solo el worker y el backend RimMET usan secretos privados.
 
 Antes de continuar, `sqlserver/007_datamet_read_permissions.sql` debe haber sido
 ejecutado dentro de `DataMET`; la validacion `008` solo comprueba la base
@@ -89,11 +95,10 @@ pnpm worker:health
 - versiones SQL `001-006` y permisos seguros en `IvMET`;
 - acceso a las funciones privadas del worker mediante `service_role`.
 
-## 4. Crear el alcance piloto
+## 4. Referencia histórica: alcance piloto manual
 
-Hasta que RimMET tenga la interfaz de gestion, un administrador puede registrar
-un solo cliente desde el SQL Editor de Supabase. Sustituir los códigos por los
-valores reales aprobados:
+RimMET ya permite incorporar y ampliar clientes. No usar SQL manual para las
+altas de producción. El siguiente ejemplo documenta únicamente el piloto original:
 
 ```sql
 insert into private.catalog_sync_scope (
@@ -158,22 +163,23 @@ El repositorio incluye `ecosystem.config.cjs` para el PM2 corporativo:
 
 ```powershell
 pnpm worker:build
-pm2 start ecosystem.config.cjs
+pm2 start worker/ecosystem.config.cjs --only ivmet-worker
 pm2 save
 pm2 status ivmet-worker
 ```
 
-No se debe iniciar el daemon hasta cerrar el piloto y retirar o conservar
-conscientemente `WORKER_SCOPE_ID`. El despliegue debe mantener `.env` fuera del
-repositorio y respaldar los logs según la política de Metrica.
+Desde la raíz IvMET, cerrar el piloto y retirar `WORKER_SCOPE_ID` antes del daemon
+de producción. Mantener `.env` fuera del repositorio y respaldar/rotar logs.
+`pm2 save` no instala el inicio automático de Windows: completar la guía de
+producción y verificar el reinicio del servidor bajo su cuenta de servicio.
 
 ## Comandos
 
 | Comando | Funcion |
 | --- | --- |
 | `pnpm worker:health` | Verifica conectividad y permisos sin sincronizar. |
-| `pnpm --filter @ivmet/worker sync:catalog` | Ejecuta solo DataMET -> Supabase. |
+| `pnpm --filter @ivmet/worker sync:catalog` | Procesa un alcance vencido DataMET -> Supabase. |
 | `pnpm --filter @ivmet/worker sync:outbox` | Ejecuta solo Supabase -> SQL IvMET. |
-| `pnpm worker:once` | Ejecuta ambos sentidos una vez. |
+| `pnpm worker:once` | Procesa un alcance y un lote de outbox una vez (diagnóstico). |
 | `pnpm --filter @ivmet/worker start` | Inicia el daemon. |
 | `pnpm worker:test` | Ejecuta pruebas unitarias y de contratos. |

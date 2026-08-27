@@ -23,6 +23,22 @@ por lotes desde el dispositivo.
    seguro del cambio obligatorio de contraseña.
 7. `202608260001_worker_contract.sql`: funciones privadas para el worker,
    recuperacion de claims abandonados y bloqueo estricto tras eventos muertos.
+8. `202608260002_fix_worker_function_volatility.sql`: volatilidad compatible con
+   consultas de bloqueo del worker.
+9. `202608270001_admin_read.sql`: lecturas administrativas por cliente para RimMET.
+10. `202608270002_admin_actions.sql`: contratación, pagos, licencias, usuarios,
+    configuración y ampliación del alcance, con auditoría/idempotencia.
+11. `202608270003_generated_plan_codes.sql`: códigos de planes autogenerados e
+    inmutables; conserva los códigos existentes. Aplicar antes del panel actualizado.
+12. `202608270004_onboarding_queue.sql`: cola recuperable de incorporaciones,
+    disponibilidad del worker y seguimiento inmediato en el directorio.
+
+Para pasar del piloto a operación continua, seguir
+[Incorporación automática en producción](../docs/onboarding-production.md).
+
+La puesta en marcha de estas migraciones administrativas se documenta en
+[la entrega de Gestión IvMET](../docs/rimmet-management-release.md).
+Pruebas SQL administrativas aisladas, sin Docker ni claves: `pnpm db:test:admin`.
 
 La operacion y los secretos del worker se documentan en
 [`../worker/README.md`](../worker/README.md).
@@ -59,8 +75,9 @@ pnpm dlx supabase functions deploy ivmet-change-password
 ```
 
 Las claves secretas y `SUPABASE_SERVICE_ROLE_KEY` nunca se incluyen en Flutter,
-RimMET ni Git. Las Edge Functions las reciben del entorno administrado por
-Supabase.
+el navegador de RimMET ni Git. Solo el backend RimMET y el worker pueden
+configurarlas en su entorno privado. Las Edge Functions las reciben del entorno
+administrado por Supabase.
 
 ## Bloqueo metrologico deliberado
 

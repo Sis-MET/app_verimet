@@ -72,6 +72,10 @@ El orden de implementacion y los limites de cada sistema estan documentados en
 Las instrucciones para validar y desplegar las migraciones estan en
 [supabase/README.md](supabase/README.md).
 
+La gestión comercial y de usuarios vive en el proyecto **RimMET**. Su entrega
+administrativa, migraciones y pruebas están descritas en
+[docs/rimmet-management-release.md](docs/rimmet-management-release.md).
+
 La sincronizacion selectiva DataMET -> Supabase -> SQL Server `IvMET` se opera
 segun [worker/README.md](worker/README.md). Arranca bloqueada con
 `WORKER_ENABLED=false` y no abre conexiones entrantes hacia la red corporativa.
