@@ -131,3 +131,120 @@ test('outbox vacío no genera miles de ejecuciones sin datos', async () => {
   assert.deepEqual(await service.run(), { status: 'SUCCEEDED', processed: 0 });
   assert.equal(released, true);
 });
+
+test('un agregado privado nunca llega a SQL Server ni a sus fallos', async () => {
+  const item = {
+    ...event(50),
+    aggregateType: 'public.lecturas',
+    payload: { secret: 'PRIVATE-READING' },
+  };
+  const service = await createService(
+    {
+      claimOutbox: async () => [item],
+      beginRun: async () => 'run',
+      failOutbox: async (_id: string, detail: string) =>
+        assert.equal(detail, 'PRIVATE_OR_UNSUPPORTED_AGGREGATE'),
+      releaseOutbox: async () => 0,
+      finishRun: async () => undefined,
+    },
+    {
+      tryAcquireLease: async () => true,
+      renewLease: async () => undefined,
+      releaseLease: async () => undefined,
+      beginRun: async () => 'run',
+      finishRun: async () => undefined,
+      applyOutboxEvent: async () =>
+        assert.fail('No exportar evidencia privada'),
+      recordOutboxFailure: async () =>
+        assert.fail('No exportar tampoco el payload de error'),
+    },
+  );
+  assert.deepEqual(await service.run(), { status: 'FAILED', processed: 0 });
+});
+test('revalida un caso reclamado antes de retirarse; no entrega la instantánea vieja', async () => {
+  const item = {
+    ...event(51),
+    aggregateType: 'public.casos_compartidos',
+    payload: { snapshot: { secret: 'OLD' }, visibilidad: 'SHARED' },
+  };
+  const service = await createService(
+    {
+      claimOutbox: async () => [item],
+      beginRun: async () => 'run',
+      caseDelivery: async () => ({ snapshot: null, visibilidad: 'WITHDRAWN' }),
+      acknowledgeOutbox: async () => 1,
+      finishRun: async () => undefined,
+    },
+    {
+      tryAcquireLease: async () => true,
+      renewLease: async () => undefined,
+      releaseLease: async () => undefined,
+      beginRun: async () => 'run',
+      finishRun: async () => undefined,
+      applyOutboxEvent: async (e: OutboxEvent) => {
+        assert.equal(e.payload.snapshot, null);
+        assert.equal(e.payload.visibilidad, 'WITHDRAWN');
+        return false;
+      },
+    },
+  );
+  assert.deepEqual(await service.run(), { status: 'SUCCEEDED', processed: 1 });
+});
+
+test('un reintento con consentimiento actualizado conserva el hash del evento original', async () => {
+  const { IvmetRepository } = await import(
+    '../src/infrastructure/ivmet.repository'
+  );
+  const bindings: Record<string, unknown> = {};
+  const request = {
+    input(name: string, _type: unknown, value: unknown) {
+      bindings[name] = value;
+      return this;
+    },
+    output() {
+      return this;
+    },
+    execute: async () => ({ output: { already_applied: true } }),
+  };
+  const repository = new IvmetRepository({} as never);
+  const record = Reflect.get(repository, 'recordAppliedEvent').bind(repository);
+  const item = {
+    ...event(52),
+    aggregateType: 'public.casos_compartidos',
+    sourcePayloadHash: 'a'.repeat(64),
+    payload: { snapshot: { secret: 'OLD' } },
+  };
+  await record({ request: () => request }, item, 'fixture');
+  assert.equal(bindings.payload_hash, 'a'.repeat(64));
+  await record(
+    { request: () => request },
+    { ...item, payload: { snapshot: null, visibilidad: 'WITHDRAWN' } },
+    'fixture',
+  );
+  assert.equal(bindings.payload_hash, 'a'.repeat(64));
+  await assert.rejects(
+    record(
+      { request: () => request },
+      { ...item, sourcePayloadHash: undefined },
+      'fixture',
+    ),
+    /CASE_SOURCE_HASH_REQUIRED/,
+  );
+});
+
+test('revalida una actualización del cliente antes de entregarla al espejo', async () => {
+  const item = {...event(60), aggregateType:'public.actualizaciones_compartidas',
+    payload:{snapshot:{serie:'PRIVATE-OLD'},visibilidad:'SHARED'}};
+  const service = await createService({
+    claimOutbox: async () => [item], beginRun: async () => 'run',
+    equipmentUpdateDelivery: async () => ({snapshot:null,visibilidad:'WITHDRAWN'}),
+    acknowledgeOutbox: async () => 1, finishRun: async () => undefined,
+  }, {
+    tryAcquireLease: async () => true, renewLease: async () => undefined,
+    releaseLease: async () => undefined, beginRun: async () => 'run', finishRun: async () => undefined,
+    applyOutboxEvent: async (e: OutboxEvent) => {
+      assert.equal(e.payload.snapshot,null); assert.equal(e.payload.visibilidad,'WITHDRAWN'); return false;
+    },
+  });
+  assert.deepEqual(await service.run(),{status:'SUCCEEDED',processed:1});
+});

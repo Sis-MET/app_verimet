@@ -11,6 +11,7 @@ import {
 import type { IvmetRepository } from '../infrastructure/ivmet.repository';
 import type { SupabaseGateway } from '../infrastructure/supabase.gateway';
 import { logger } from '../logger';
+import { mirrorSpecs } from '../infrastructure/mirror-specs';
 
 export class OutboxSyncService {
   private readonly leaseName = 'supabase_to_sql_ivmet';
@@ -56,6 +57,7 @@ export class OutboxSyncService {
         null,
         {
           batchSize: env.WORKER_OUTBOX_BATCH_SIZE,
+          privacyContract: 4,
         },
       );
       sqlRunId = await this.ivmet.beginRun(
@@ -64,6 +66,7 @@ export class OutboxSyncService {
         {
           supabaseRunId,
           batchSize: env.WORKER_OUTBOX_BATCH_SIZE,
+          privacyContract: 4,
         },
       );
 
@@ -75,6 +78,16 @@ export class OutboxSyncService {
           env.WORKER_LEASE_SECONDS,
         );
         try {
+          if (!mirrorSpecs[event.aggregateType])
+            throw new Error('PRIVATE_OR_UNSUPPORTED_AGGREGATE');
+          if (event.aggregateType === 'public.casos_compartidos') {
+            // Revalidar justo antes de entregar, no reutilizar un lote antiguo tras una retirada.
+            event.payload = await this.supabase.caseDelivery(
+              String(event.aggregateKey.id),
+            );
+          } else if (event.aggregateType === 'public.actualizaciones_compartidas') {
+            event.payload = await this.supabase.equipmentUpdateDelivery(String(event.aggregateKey.id));
+          }
           const alreadyApplied = await this.ivmet.applyOutboxEvent(
             event,
             env.WORKER_ID,
@@ -89,24 +102,30 @@ export class OutboxSyncService {
           alreadyApplied ? (counts.unchanged += 1) : (counts.accepted += 1);
         } catch (error) {
           counts.rejected += 1;
-          fatalError = safeError(error);
+          // Ni los payloads ni mensajes SQL que puedan contener evidencia se exportan al log.
+          fatalError =
+            error instanceof Error &&
+            error.message === 'PRIVATE_OR_UNSUPPORTED_AGGREGATE'
+              ? error.message
+              : 'OUTBOX_APPLY_FAILED';
           const nextRetryAt = new Date(
             Date.now() + env.WORKER_RETRY_SECONDS * 1000,
           );
-          await this.ivmet
-            .recordOutboxFailure({
-              runId: sqlRunId,
-              event,
-              errorCode: 'OUTBOX_APPLY_FAILED',
-              errorDetail: fatalError,
-              nextRetryAt,
-            })
-            .catch((recordError) => {
-              logger.error(
-                { error: safeError(recordError) },
-                'No se pudo registrar el fallo en SQL Server',
-              );
-            });
+          if (mirrorSpecs[event.aggregateType])
+            await this.ivmet
+              .recordOutboxFailure({
+                runId: sqlRunId,
+                event: { ...event, payload: {} },
+                errorCode: 'OUTBOX_APPLY_FAILED',
+                errorDetail: fatalError,
+                nextRetryAt,
+              })
+              .catch((recordError) => {
+                logger.error(
+                  { error: safeError(recordError) },
+                  'No se pudo registrar el fallo en SQL Server',
+                );
+              });
           await this.supabase
             .failOutbox(event.eventId, fatalError, env.WORKER_RETRY_SECONDS)
             .catch((releaseError) => {
@@ -127,7 +146,7 @@ export class OutboxSyncService {
         }
       }
     } catch (error) {
-      fatalError = safeError(error);
+      fatalError = 'OUTBOX_CYCLE_FAILED';
       if (events.length)
         await this.supabase
           .releaseOutbox(events.map((event) => event.eventId))

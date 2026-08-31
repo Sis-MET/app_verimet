@@ -4,6 +4,12 @@ Estos son los scripts del paso 1 para preparar la nueva base corporativa. La
 fuente principal de IvMET sigue siendo Supabase; SQL Server recibe una
 proyeccion tipada y auditable. `DataMET` solo se consulta.
 
+La entrega del 31/08/2026 deja de exportar evidencia y configuración privada.
+Las tablas antiguas se conservan con acceso operativo denegado; solo se
+proyectan casos y actualizaciones de balanzas autorizados.
+Para actualizar una instalación existente usar la
+[guía coordinada](../docs/customer-configuration-release.md), no repetir 001–008.
+
 ## Que crea cada script
 
 | Orden | Archivo | Base afectada | Proposito |
@@ -16,6 +22,9 @@ proyeccion tipada y auditable. `DataMET` solo se consulta.
 | 6 | `006_permissions_ivmet.sql` | `IvMET` | Usuario y rol de minimo privilegio para el worker. |
 | 7 | `007_datamet_read_permissions.sql` | `DataMET` | Solo crea el usuario y concede `SELECT` sobre cuatro tablas legadas. |
 | 8 | `008_validate_ivmet.sql` | `IvMET` | Verifica versiones, tablas, constraints, procedimientos y permisos. |
+| 9 | `009_shared_cases_privacy.sql` | `IvMET` | Proyección de casos consentidos, campos de versiones y aislamiento de evidencia antigua. |
+| 10 | `010_validate_privacy.sql` | `IvMET` | Comprueba los permisos de privacidad sin consultar resultados. |
+| 11 | `011_customer_configuration_privacy.sql` | `IvMET` | Espejo de fichas consentidas y denegación operativa de áreas, patrones y planes privados. |
 
 Los archivos antiguos `backend/sql/010_ivmet_schema.sql` y
 `backend/sql/011_ivmet_permissions.sql` pertenecen a la arquitectura anterior,

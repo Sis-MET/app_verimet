@@ -36,6 +36,7 @@ test('contrato administrativo de RimMET sobre PostgreSQL aislado', async (t) => 
         throw new Error(`${name}: ${error.message}`, { cause: error });
       }
     }
+    await db.query('select public.ivmet_bootstrap_admin($1,$2)', ['RIMMET:test','Administrador de pruebas']);
     const c1 = randomUUID(),
       c2 = randomUUID(),
       p1 = randomUUID(),
@@ -402,74 +403,23 @@ test('contrato administrativo de RimMET sobre PostgreSQL aislado', async (t) => 
         });
       },
     );
-    await t.test(
-      'áreas y patrones respetan cliente/planta; certificados conservan historial',
-      async () => {
-        await assert.rejects(
-          mutate('area.save', { clientId: c1, plantId: p2, name: 'Ajena' }),
-          /PLANT_SCOPE_INVALID/,
-        );
-        const area = await mutate('area.save', {
-          clientId: c1,
-          plantId: p1,
-          name: 'Calidad',
-          active: true,
-        });
-        await mutate('equipment.configure', {
-          id: equipment,
-          clientId: c1,
-          version: '0',
-          enabled: false,
-          areaId: area.id,
-        });
-        assert.equal((await read('equipment', c1)).items[0].area_id, area.id);
-        await assert.rejects(
-          mutate('pattern.save', {
-            clientId: c1,
-            plantIds: [p2],
-            code: 'P0',
-            description: 'Ajeno',
-            type: 'PESAS',
-            unit: 'kg',
-          }),
-          /PLANT_SCOPE_INVALID/,
-        );
-        const pattern = await mutate('pattern.save', {
-          clientId: c1,
-          plantIds: [p1],
-          code: 'P1',
-          description: 'Pesas de prueba',
-          type: 'PESAS',
-          unit: 'kg',
-          capacity: '0.123456789',
-          active: true,
-        });
-        const cert = await mutate('certificate.create', {
-          clientId: c1,
-          patternId: pattern.id,
-          number: 'CERT-01',
-          lab: 'Laboratorio de prueba',
-          calibratedOn: today,
-          expiresOn: yearEnd,
-        });
-        await assert.rejects(
-          mutate('certificate.annul', {
-            id: cert.id,
-            clientId: c2,
-            reason: 'Intento cruzado',
-          }),
-          /CERTIFICATE_NOT_FOUND/,
-        );
-        await mutate('certificate.annul', {
-          id: cert.id,
-          clientId: c1,
-          reason: 'Certificado de prueba',
-        });
-        const savedPattern = (await read('client', c1)).patterns[0];
-        assert.equal(savedPattern.capacidad, '0.123456789');
-        assert.equal(savedPattern.certificates[0].estado, 'ANNULLED');
-      },
-    );
+    await t.test('RimMET habilita sin plan y no gestiona configuración privada', async () => {
+      for (const action of ['area.save','pattern.save','certificate.create','certificate.annul']) {
+        await assert.rejects(mutate(action,{clientId:c1}), /CUSTOMER_MANAGED_CONFIGURATION/);
+      }
+      await db.query("update public.equipos set estado_catalogo='READY' where id=$1",[equipment]);
+      const payload={id:equipment,clientId:c1,version:'0',enabled:true};
+      const request=randomUUID();
+      await mutate('equipment.configure',payload,request);
+      await mutate('equipment.configure',payload,request);
+      const configured=(await read('equipment',c1)).items[0];
+      assert.equal(configured.habilitado,true);
+      assert.equal(configured.area_id,undefined);
+      assert.equal(configured.plan_version_id,undefined);
+      await assert.rejects(mutate('equipment.configure',{...payload,version:configured.config_version,areaId:randomUUID()}),/CUSTOMER_MANAGED_CONFIGURATION/);
+      assert.deepEqual((await read('client',c1)).patterns,[]);
+      assert.deepEqual((await read('client',c1)).metrologyPlans,[]);
+    });
     await t.test(
       'anular factura inicial cierra el alta impagada y permite corregirla',
       async () => {
@@ -861,7 +811,7 @@ test('contrato administrativo de RimMET sobre PostgreSQL aislado', async (t) => 
         assert.equal(
           (await db.query('select public.ivmet_worker_contract() as n')).rows[0]
             .n,
-          2,
+          4,
         );
         assert.equal((await read('integration')).workers.length, 0);
         const instance = randomUUID();

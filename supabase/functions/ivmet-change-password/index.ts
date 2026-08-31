@@ -39,17 +39,34 @@ Deno.serve(async (request) => {
     global: { headers: { Authorization: authorization } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: authData, error: authError } = await userClient.auth.getUser();
+  const { data: authData, error: authError } = await userClient.auth.getUser(authorization.slice(7));
   if (authError || !authData.user) {
     return jsonResponse({ error: "UNAUTHORIZED" }, 401);
   }
 
-  const { error: passwordError } = await userClient.auth.updateUser({
-    password,
-  });
-  if (passwordError) {
+  const { data: ownProfile, error: ownProfileError } = await userClient
+    .from("perfiles").select("activo,rol").eq("id", authData.user.id).maybeSingle();
+  if (ownProfileError || !ownProfile?.activo ||
+      !["cliente_operador", "cliente_jefe_calidad"].includes(ownProfile.rol)) {
+    return jsonResponse({ error: "PROFILE_DISABLED" }, 403);
+  }
+
+  // El cliente efímero de Edge no tiene una sesión local para updateUser().
+  // Auth valida el JWT y aplica su política de contraseñas en este endpoint.
+  let passwordResponse: Response;
+  try {
+    passwordResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      method: "PUT",
+      headers: { Authorization: authorization, apikey: publishableKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    return jsonResponse({ error: "AUTH_UNAVAILABLE" }, 503);
+  }
+  if (!passwordResponse.ok) {
     return jsonResponse(
-      { error: "PASSWORD_CHANGE_FAILED", detail: passwordError.message },
+      { error: "PASSWORD_CHANGE_FAILED" },
       422,
     );
   }

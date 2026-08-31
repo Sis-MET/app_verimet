@@ -24,6 +24,8 @@ export class HealthService {
       ivmet.versions !== 6 ||
       !ivmet.canSelectMirror ||
       !ivmet.canInsertMirror ||
+      !ivmet.privacyReady ||
+      !ivmet.customerConfigurationReady ||
       ivmet.canDeleteVerification
     ) {
       throw new Error('La base IvMET no cumple el contrato de esquema/permisos');

@@ -103,11 +103,34 @@ export class SupabaseGateway {
     const { data, error } = await this.client.rpc('ivmet_worker_contract');
     ensureNoError(
       error,
-      'Falta la migracion 202608270004_onboarding_queue o no se pudo comprobar el contrato',
+      'Falta la migración 202608280004_customer_configuration o no se pudo comprobar el contrato',
     );
-    if (data !== 2) throw new Error('WORKER_CONTRACT_MISMATCH');
+    if (data !== 4) throw new Error('WORKER_CONTRACT_MISMATCH');
     const scopes = await this.listScopes(env.WORKER_SCOPE_ID);
     return { reachable: true, scopes: scopes.length, contractVersion: data };
+  }
+
+  async caseDelivery(caseId: string): Promise<Record<string, JsonValue>> {
+    const { data, error } = await this.client.rpc('ivmet_case_delivery', {
+      target_case_id: caseId,
+    });
+    ensureNoError(error, 'CASE_DELIVERY_UNAVAILABLE');
+    if (
+      !data ||
+      data.id !== caseId ||
+      !['SHARED', 'WITHDRAWN'].includes(data.visibilidad) ||
+      (data.visibilidad === 'WITHDRAWN' && data.snapshot !== null)
+    )
+      throw new Error('INVALID_CASE_DELIVERY');
+    return asJsonRecord(data);
+  }
+
+  async equipmentUpdateDelivery(id: string): Promise<Record<string, JsonValue>> {
+    const { data, error } = await this.client.rpc('ivmet_equipment_update_delivery', { target_id: id });
+    ensureNoError(error, 'EQUIPMENT_UPDATE_DELIVERY_UNAVAILABLE');
+    if (!data || data.id !== id || !['SHARED', 'WITHDRAWN'].includes(data.visibilidad) ||
+      (data.visibilidad === 'WITHDRAWN' && data.snapshot !== null)) throw new Error('INVALID_EQUIPMENT_UPDATE_DELIVERY');
+    return asJsonRecord(data);
   }
 
   async reportWorker(
@@ -626,6 +649,13 @@ export class SupabaseGateway {
         aggregateKey: asJsonRecord(row.aggregate_key),
         operation: row.operation,
         payload: asJsonRecord(row.payload),
+        sourcePayloadHash:
+          ['public.casos_compartidos', 'public.actualizaciones_compartidas'].includes(row.aggregate_type)
+            ? z
+                .string()
+                .regex(/^[0-9a-f]{64}$/)
+                .parse(row.payload._event_payload_hash)
+            : undefined,
         attempts: row.attempts,
         createdAt: row.created_at,
       }));

@@ -10,6 +10,13 @@ El worker no pertenece a Flutter ni a una Edge Function. Debe ejecutarse dentro
 de la red de Metrica, donde puede abrir conexiones salientes a Supabase y leer
 las dos bases SQL Server.
 
+**Actualización del 31/08/2026:** seguir primero la
+[guía de configuración del cliente](../docs/customer-configuration-release.md).
+Requiere SQL 011 y Supabase 202608280004 (contrato 4). Ya no sincroniza áreas,
+patrones, certificados, planes, borradores, verificaciones, lecturas, alertas
+privadas ni auditoría. Revalida cada caso o actualización consentida justo antes
+de entregarla y conserva el hash original para reintentos idempotentes.
+
 ## Protecciones incluidas
 
 - [Guía vigente de producción](../docs/onboarding-production.md): sustituye el
@@ -24,7 +31,8 @@ las dos bases SQL Server.
 - Registra inconsistencias en cuarentena tanto en Supabase como en SQL `IvMET`.
 - Procesa el outbox estrictamente por secuencia y en una transaccion por evento.
 - Un evento repetido se reconoce por `event_id + hash`; no duplica evidencia.
-- Un evento `DEAD` bloquea secuencias posteriores hasta intervención administrativa.
+- Un evento permitido `DEAD` bloquea secuencias posteriores hasta intervención
+  administrativa. Los eventos bloqueados por privacidad no se exportan ni bloquean.
 - La cola reclama cada alcance con lease renovable; recupera caídas y reintenta
   automáticamente con espera progresiva. Outbox conserva su lease global.
 - El daemon de producción exige `WORKER_SCOPE_ID` vacío: todas las solicitudes
@@ -32,10 +40,14 @@ las dos bases SQL Server.
 
 ## 1. Aplicar el contrato Supabase
 
-Aplicar todas las migraciones pendientes, incluida la versión de cola:
+Aplicar todas las migraciones pendientes, incluidas cola, privacidad y operaciones:
 
 ```text
 supabase/migrations/202608270004_onboarding_queue.sql
+supabase/migrations/202608280001_private_evidence_and_cases.sql
+supabase/migrations/202608280002_management_operations.sql
+supabase/migrations/202608280003_mobile_online_contract.sql
+supabase/migrations/202608280004_customer_configuration.sql
 ```
 
 Con una cuenta propietaria del proyecto:
@@ -92,7 +104,9 @@ pnpm worker:health
 `health` exige simultaneamente:
 
 - `SELECT` y ausencia de `UPDATE` sobre las cuatro tablas de `DataMET`;
-- versiones SQL `001-006` y permisos seguros en `IvMET`;
+- versiones SQL `001-006`, `009`, `011` y permisos privados denegados
+  (`privacyReady=true`, `customerConfigurationReady=true`);
+- contrato Supabase 4;
 - acceso a las funciones privadas del worker mediante `service_role`.
 
 ## 4. Referencia histórica: alcance piloto manual

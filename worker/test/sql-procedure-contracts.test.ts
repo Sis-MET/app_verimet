@@ -22,7 +22,7 @@ test('SQL procedure calls bind the exact deployed parameter names', () => {
 
     const requestChain = repository.slice(requestIndex, executeIndex);
     const boundParameters = [
-      ...requestChain.matchAll(/\.(?:input|output)\('([a-z_]+)'/g),
+      ...requestChain.matchAll(/\.(?:input|output)\(\s*'([a-z_]+)'/g),
     ].map((match) => match[1]!).sort();
 
     const procedurePattern = new RegExp(

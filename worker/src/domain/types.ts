@@ -105,6 +105,8 @@ export type OutboxEvent = {
   aggregateKey: Record<string, JsonValue>;
   operation: 'I' | 'U' | 'D';
   payload: Record<string, JsonValue>;
+  /** Hash del evento original; la entrega de un caso puede actualizarse al retirar consentimiento. */
+  sourcePayloadHash?: string;
   attempts: number;
   createdAt: string;
 };

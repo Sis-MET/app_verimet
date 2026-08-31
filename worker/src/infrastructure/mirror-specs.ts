@@ -23,7 +23,11 @@ export type MirrorSpec = {
   immutable?: boolean;
 };
 
-const column = (target: string, type: MirrorValueType, source = target): MirrorColumn => ({
+const column = (
+  target: string,
+  type: MirrorValueType,
+  source = target,
+): MirrorColumn => ({
   target,
   source,
   type,
@@ -34,7 +38,7 @@ const createdAt = column('created_at', 'datetime');
 const updatedAt = column('updated_at', 'datetime');
 const rowVersion = column('source_row_version', 'bigint', 'row_version');
 
-export const mirrorSpecs: Record<string, MirrorSpec> = {
+const historicalSpecs: Record<string, MirrorSpec> = {
   'public.clientes': {
     table: 'clientes',
     keys: ['id'],
@@ -442,6 +446,9 @@ export const mirrorSpecs: Record<string, MirrorSpec> = {
       column('published_at', 'datetime'),
       column('retired_by', 'uuid'),
       column('retired_at', 'datetime'),
+      column('published_by_external', 'text'),
+      column('retired_by_external', 'text'),
+      column('draft_revision', 'bigint'),
     ],
   },
   'public.plan_pruebas': {
@@ -645,4 +652,61 @@ export const mirrorSpecs: Record<string, MirrorSpec> = {
       createdAt,
     ],
   },
+};
+
+// Documentar los esquemas históricos no autoriza exportarlos. Lista cerrada.
+export const privateEvidenceAggregates = new Set([
+  'public.areas', 'public.equipos_ivmet', 'public.patrones', 'public.patron_plantas', 'public.patron_certificados',
+  'public.planes', 'public.plan_versiones', 'public.plan_pruebas', 'public.plan_puntos', 'public.equipo_planes', 'public.equipos_cliente',
+  'public.verificacion_borradores',
+  'public.verificaciones',
+  'public.verificacion_patrones',
+  'public.pruebas',
+  'public.lecturas',
+  'public.alertas',
+  'public.auditoria',
+]);
+export const mirrorSpecs: Record<string, MirrorSpec> = Object.fromEntries(
+  Object.entries(historicalSpecs).filter(
+    ([name]) => !privateEvidenceAggregates.has(name),
+  ),
+);
+mirrorSpecs['public.casos_compartidos'] = {
+  table: 'casos_compartidos',
+  keys: ['id'],
+  columns: [
+    id,
+    column('codigo', 'text'),
+    column('alerta_id', 'uuid'),
+    column('verificacion_id', 'uuid'),
+    column('cliente_id', 'uuid'),
+    column('planta_id', 'uuid'),
+    column('equipo_id', 'uuid'),
+    column('autorizado_por', 'uuid'),
+    column('autorizado_at', 'datetime'),
+    column('consentimiento_version', 'text'),
+    column('snapshot_hash', 'text'),
+    column('snapshot_json', 'json', 'snapshot'),
+    column('eventos_json', 'json', 'eventos'),
+    column('mensaje', 'text'),
+    column('visibilidad', 'text'),
+    column('retirado_at', 'datetime'),
+    column('retirado_por', 'uuid'),
+    column('motivo_retiro', 'text'),
+    column('estado', 'text'),
+    column('responsable', 'text'),
+    createdAt,
+    updatedAt,
+    rowVersion,
+  ],
+};
+export const consentedAggregates = new Set(['public.casos_compartidos', 'public.actualizaciones_compartidas']);
+mirrorSpecs['public.actualizaciones_compartidas'] = {
+  table: 'actualizaciones_compartidas', keys: ['id'], columns: [
+    id, column('equipo_id', 'uuid'), column('cliente_id', 'uuid'), column('planta_id', 'uuid'),
+    column('autorizado_por', 'uuid'), column('autorizado_at', 'datetime'), column('consentimiento_version', 'text'),
+    column('snapshot_json', 'json', 'snapshot'), column('snapshot_hash', 'text'), column('mensaje', 'text'),
+    column('visibilidad', 'text'), column('retirado_at', 'datetime'), column('estado', 'text'),
+    column('comentario', 'text'), column('revisado_por', 'text'), updatedAt, rowVersion,
+  ],
 };

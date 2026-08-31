@@ -50,4 +50,5 @@ policy = "per_worker"
 verify_jwt = false
 
 [functions.ivmet-change-password]
-verify_jwt = true
+# El handler valida con Auth.getUser(token), también con claves asimétricas.
+verify_jwt = false
