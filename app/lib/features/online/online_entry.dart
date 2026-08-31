@@ -1,0 +1,310 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'mobile_api.dart';
+import 'mobile_session.dart';
+import 'online_widgets.dart';
+import 'workspace_screen.dart';
+
+class OnlineEntry extends ConsumerStatefulWidget {
+  const OnlineEntry({super.key});
+  @override
+  ConsumerState<OnlineEntry> createState() => _OnlineEntryState();
+}
+
+class _OnlineEntryState extends ConsumerState<OnlineEntry>
+    with WidgetsBindingObserver {
+  late final MobileSession session;
+  Timer? timer;
+  StreamSubscription<List<ConnectivityResult>>? connectivity;
+  bool foreground = true;
+  @override
+  void initState() {
+    super.initState();
+    session = ref.read(mobileSessionProvider);
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(session.start());
+    timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (foreground) unawaited(session.refresh());
+    });
+    connectivity = Connectivity().onConnectivityChanged.listen((results) {
+      if (results.contains(ConnectivityResult.none)) {
+        session.suspend(disconnected: true);
+      } else if (foreground && session.stage == SessionStage.offline) {
+        unawaited(session.refresh());
+      }
+    }, onError: (Object _) {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (foreground) {
+      unawaited(session.refresh());
+    } else {
+      session.suspend();
+    }
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    unawaited(connectivity?.cancel());
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: session,
+    builder: (context, _) {
+      if (session.user != null &&
+          session.bootstrap.isNotEmpty &&
+          [
+            SessionStage.ready,
+            SessionStage.offline,
+            SessionStage.suspended,
+          ].contains(session.stage)) {
+        // Conservar campos en memoria al cambiar de app no habilita uso offline:
+        // todo el navegador queda oculto, sin semántica ni interacción.
+        final ready = session.stage == SessionStage.ready;
+        return Stack(
+          children: [
+            Visibility(
+              visible: ready,
+              maintainState: true,
+              child: Navigator(
+                key: ValueKey(
+                  '${session.user!['id']}:${session.workspaceVersion}',
+                ),
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (_) => WorkspaceScreen(session: session),
+                ),
+              ),
+            ),
+            if (!ready) Positioned.fill(child: _locked()),
+          ],
+        );
+      }
+      if (session.stage == SessionStage.login ||
+          session.stage == SessionStage.password) {
+        return AccessForm(
+          key: ValueKey(session.stage),
+          session: session,
+          changingPassword: session.stage == SessionStage.password,
+        );
+      }
+      if (session.stage == SessionStage.starting) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      return _locked();
+    },
+  );
+
+  Widget _locked() => OnlinePage(
+    title: 'Acceso a IvMET',
+    child: ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Icon(Icons.lock_outline, size: 48),
+        Notice(session.error ?? 'Conecta con el servidor para continuar.'),
+        FilledButton(
+          onPressed: session.refresh,
+          child: const Text('Comprobar acceso'),
+        ),
+        TextButton(
+          onPressed: session.logout,
+          child: const Text('Cerrar sesión'),
+        ),
+      ],
+    ),
+  );
+}
+
+class AccessForm extends StatefulWidget {
+  const AccessForm({
+    required this.session,
+    required this.changingPassword,
+    super.key,
+  });
+  final MobileSession session;
+  final bool changingPassword;
+  @override
+  State<AccessForm> createState() => _AccessFormState();
+}
+
+class _AccessFormState extends State<AccessForm> {
+  final form = GlobalKey<FormState>();
+  final username = TextEditingController();
+  final password = TextEditingController();
+  final confirmation = TextEditingController();
+  bool busy = false;
+  bool hidden = true;
+  String? error;
+  @override
+  void dispose() {
+    username.dispose();
+    password.dispose();
+    confirmation.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    if (busy || !form.currentState!.validate()) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      if (widget.changingPassword) {
+        await widget.session.password(password.text);
+      } else {
+        await widget.session.login(username.text, password.text);
+      }
+    } catch (failure) {
+      if (mounted) {
+        setState(
+          () => error = failure is MobileFailure
+              ? failure.message
+              : 'No se pudo completar el acceso.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final configError = widget.session.api.configuration.error;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Form(
+                key: form,
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'IvMET',
+                        style: Theme.of(context).textTheme.displaySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.changingPassword
+                            ? 'Define tu contraseña personal'
+                            : 'Verificaciones metrológicas',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 24),
+                      if (configError != null) Notice(configError),
+                      if (widget.changingPassword)
+                        const Notice(
+                          'Tu contraseña temporal debe cambiarse antes de acceder. Usa al menos 12 caracteres.',
+                        )
+                      else
+                        TextFormField(
+                          controller: username,
+                          enabled: !busy,
+                          autocorrect: false,
+                          autofillHints: const [AutofillHints.username],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Usuario',
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Ingresa tu usuario.'
+                              : null,
+                        ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: password,
+                        enabled: !busy,
+                        obscureText: hidden,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        autofillHints: [
+                          widget.changingPassword
+                              ? AutofillHints.newPassword
+                              : AutofillHints.password,
+                        ],
+                        decoration: InputDecoration(
+                          labelText: widget.changingPassword
+                              ? 'Nueva contraseña'
+                              : 'Contraseña',
+                          suffixIcon: IconButton(
+                            tooltip: hidden
+                                ? 'Mostrar contraseña'
+                                : 'Ocultar contraseña',
+                            onPressed: () => setState(() => hidden = !hidden),
+                            icon: Icon(
+                              hidden
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (v) =>
+                            (v?.length ?? 0) <
+                                    (widget.changingPassword ? 12 : 1) ||
+                                (v?.length ?? 0) > 200
+                            ? 'Revisa la longitud de la contraseña.'
+                            : null,
+                        onFieldSubmitted: (_) {
+                          if (!widget.changingPassword) unawaited(submit());
+                        },
+                      ),
+                      if (widget.changingPassword) ...[
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: confirmation,
+                          enabled: !busy,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Confirmar contraseña',
+                          ),
+                          validator: (v) => v != password.text
+                              ? 'Las contraseñas no coinciden.'
+                              : null,
+                        ),
+                      ],
+                      if (error ?? widget.session.error
+                          case final String message)
+                        Notice(message, icon: Icons.error_outline),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: busy || configError != null ? null : submit,
+                        child: Text(
+                          busy
+                              ? 'Comprobando…'
+                              : widget.changingPassword
+                              ? 'Guardar contraseña'
+                              : 'Ingresar',
+                        ),
+                      ),
+                      if (widget.changingPassword)
+                        TextButton(
+                          onPressed: busy ? null : widget.session.logout,
+                          child: const Text('Cerrar sesión'),
+                        ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Cuentas asignadas por Métrica. Se requiere conexión a internet.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -4,8 +4,8 @@
 
 Monorepo con la app movil Flutter, el backend principal en Supabase y los
 componentes de integracion con los servidores de Metrica. Permite a los
-clientes ejecutar y registrar pruebas de
-**excentricidad**, **repetibilidad** y **linealidad** sobre sus balanzas, entre
+clientes ejecutar y registrar comprobaciones de
+**excentricidad**, **repetibilidad** y **error de indicación** sobre sus balanzas, entre
 calibraciones formales.
 
 - Funciona **online-only**: la app requiere Internet y autoguarda borradores en
@@ -201,7 +201,7 @@ Las mismas features existen en la app y en la API (`snake_case` en Dart,
 | `eccentricity_test` | Prueba de excentricidad. |
 | `repeatability_test` | Prueba de repetibilidad. |
 | `linearity_test` | Prueba de linealidad. |
-| `verification_reports` | Reportes de verificacion intermedia y su PDF. |
+| `verification_reports` | Historial privado y expedientes compartidos; el PDF formal está pendiente. |
 | `clients` | Empresas cliente (tenants), sucursales y areas. |
 | `dashboard` | Resumen operativo del cliente. La gestion interna vive en RimMET. |
 | `sync` | Integracion servidor a servidor; no existe cola offline movil. |
@@ -215,7 +215,9 @@ borradores online, planes versionados, evidencia inmutable, alertas privadas,
 RLS y una outbox idempotente para el espejo SQL Server. El login por usuario y
 el cambio obligatorio de contraseña estan implementados como Edge Functions.
 
-La finalizacion metrologica permanece deliberadamente bloqueada hasta recibir
-el procedimiento oficial de Metrica y aprobar sus pruebas doradas. Flutter aun
-contiene pantallas/datos demo y debe migrarse despues de estabilizar el contrato
-Supabase.
+La finalización de comprobaciones internas está implementada en Supabase con
+perfiles versionados, reglas de decisión, trazabilidad, vencimientos por prueba
+y casos dorados. Flutter captura borradores y solicita la finalización sin
+calcular ni enviar veredictos. El alcance no es calibración acreditada ni
+verificación legal. Ver
+[docs/normative-metrology-engine.md](docs/normative-metrology-engine.md).

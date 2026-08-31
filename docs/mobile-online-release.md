@@ -1,0 +1,176 @@
+# Activación de la app IvMET online
+
+## Qué incluye esta entrega
+
+- Inicio con usuario asignado en RimMET, cambio obligatorio de contraseña,
+  almacenamiento seguro del par de tokens y refresh serializado.
+- Validación de licencia y rol en Supabase. Solo operador y jefe de calidad
+  usan la app; los roles internos continúan en RimMET.
+- Plantas y áreas autorizadas, balanzas habilitadas, búsqueda y paginación.
+- Áreas sugeridas desde `Ubicación`, validación privada de la ficha y
+  revalidación cuando cambia el catálogo maestro.
+- Alta de áreas, patrones y certificados por el cliente; planes versionados
+  definidos, publicados y asignados por el jefe de calidad.
+- Vista previa y consentimiento específico para compartir con Métrica una
+  actualización de balanza, sin incluir planes, patrones ni resultados.
+- Ficha técnica y versión publicada del plan; lecturas decimales como cadenas.
+- Borradores privados en Supabase, reanudación, omisiones justificadas,
+  condiciones ambientales y selección de patrones/certificados.
+- Historial privado, anulación con motivo por el jefe de calidad, vista previa
+  y consentimiento explícito para compartir un expediente; retirada del acceso.
+- Perfiles controlados para plataformas y básculas camioneras estáticas,
+  finalización transaccional, reglas de decisión y vencimientos por prueba.
+- Tema claro/oscuro y barra inferior del diseño Industry existente. Se revisó
+  visualmente con fixtures locales y se corrigió la paginación en ancho móvil.
+
+La entrega crea comprobaciones internas finalizadas, pero no certificados de
+calibración ni verificaciones legales. No modifica DataMET ni envía resultados
+privados al worker. Solo un caso expresamente compartido por el jefe de calidad
+queda disponible para Métrica. El PDF formal sigue fuera de esta entrega.
+
+## 1. Validar en el equipo de desarrollo
+
+Desde `C:\Users\jhona\IvMET`:
+
+```powershell
+pnpm db:test:admin
+pnpm db:test:operations
+pnpm db:test:mobile
+pnpm test:mobile-auth
+Set-Location .\app
+flutter analyze
+flutter test
+```
+
+Las pruebas SQL crean PostgreSQL desechable en memoria. No necesitan `.env`,
+no leen DataMET y no se conectan a Supabase. Los fixtures no aprueban métodos
+para producción. No deben insertarse en un cliente real.
+
+## 2. Aplicar la migración nueva en Supabase
+
+Desde la raíz del repositorio, no desde `app` ni desde SQL Server:
+
+```powershell
+Set-Location 'C:\Users\jhona\IvMET'
+pnpm dlx supabase db push --linked --dry-run
+```
+
+En una instalación actualizada debe aparecer
+`202608310001_normative_metrology_engine.sql`. En una instalación nueva también
+aparecerán las migraciones móviles 003 y 004. Revisa el proyecto enlazado antes
+de confirmar.
+
+```powershell
+pnpm dlx supabase db push --linked
+```
+
+```powershell
+pnpm dlx supabase db lint --linked --level warning
+```
+
+La migración normativa es aditiva: no borra evidencia ni modifica DataMET. Los
+resultados permanecen fuera del outbox. Requiere que las migraciones 003 y 004
+ya estén aplicadas.
+
+## 3. Desplegar las funciones de autenticación
+
+```powershell
+pnpm dlx supabase functions deploy ivmet-login --project-ref gdsiqryebdxwngnokmmm
+```
+
+```powershell
+pnpm dlx supabase functions deploy ivmet-change-password --project-ref gdsiqryebdxwngnokmmm
+```
+
+La función de cambio de contraseña valida explícitamente el JWT con Auth y
+comprueba el perfil activo. `verify_jwt=false` en su configuración evita que el
+gateway antiguo rechace claves asimétricas; no elimina la autenticación del
+handler. Actualiza la contraseña a través de Auth con el token del propio
+usuario, no mediante una sesión ficticia ni dando permisos administrativos al
+móvil. Si Auth cambia la contraseña pero falla la actualización del perfil,
+se informa el fallo y se requiere revisión administrativa.
+
+Los secretos de las funciones pertenecen a Supabase. No se copian al móvil.
+
+## 4. Preparar una cuenta del piloto en RimMET
+
+Comprobar que tenga contrato/licencia activos, cupo disponible, rol de cliente
+y al menos una planta asignada. Para visualizar balanzas, deben estar habilitadas
+y listas en Gestión IvMET. El cliente valida la ficha y el jefe de calidad crea,
+publica y asigna el plan desde la app. Para capturar necesitan ambas condiciones.
+No publicar un plan demo ni insertar una aprobación ficticia para saltar el bloqueo.
+El código de acceso interno de RimMET no es la contraseña del usuario móvil.
+
+## 5. Configurar y ejecutar Flutter
+
+En `app/config/supabase.local.json` solo van URL y clave **pública** publishable
+o anon, obtenidas en la configuración de API del proyecto. Nunca service_role,
+sb_secret, contraseñas SQL ni el hash de acceso de RimMET. La clave pública
+formará parte de la aplicación; la protección real son Auth, RLS y las RPC.
+
+```powershell
+Set-Location 'C:\Users\jhona\IvMET\app'
+Copy-Item -LiteralPath '.\config\supabase.example.json' -Destination '.\config\supabase.local.json'
+```
+
+Editar la clave pública del archivo creado. No volver a copiar encima si ya
+está configurado. El archivo local está excluido de Git.
+
+```powershell
+flutter pub get
+flutter run --dart-define-from-file=config/supabase.local.json
+```
+
+La app no lee `worker/.env` ni `backend/.env`. Sin configuración muestra un
+aviso y deshabilita el ingreso. No hay usuario ni contraseña precargados.
+
+## Comportamiento online y privacidad
+
+Se revalida el acceso cada 30 segundos, al volver al primer plano y al recuperar
+conectividad. Cada RPC vuelve a comprobar licencia y plantas en PostgreSQL.
+Mientras no se puede comprobar el acceso, la pantalla privada se oculta y no
+acepta interacción. Los campos sin guardar pueden permanecer en memoria al
+cambiar de aplicación, pero no son una cola offline ni sobreviven al cierre del
+proceso. La pérdida del rol, licencia, planta o sesión destruye la navegación
+privada. **Guardar en Supabase antes de cerrar la app.**
+
+Logout elimina los tokens locales aunque no haya red. Si no puede confirmar
+la revocación remota, lo indica. El access token emitido puede seguir siendo
+válido hasta expirar; no se promete revocación instantánea de un JWT ya emitido.
+Supabase documenta la [rotación de sesiones](https://supabase.com/docs/guides/auth/sessions)
+y el [alcance del cierre de sesión](https://supabase.com/docs/guides/auth/signout).
+
+Los historiales y borradores no se escriben en SQLite. Las lecturas se mantienen
+como cadenas y se validan en el servidor. No se registran cuerpos HTTP o tokens.
+Un borrador no es evidencia aceptada y puede estar incompleto. Sus certificados
+se vuelven a validar al guardar; un certificado vencido se muestra claramente.
+El snapshot de equipo y plan queda ligado a la creación del borrador. Al
+finalizar, el servidor recalcula los resultados; un certificado vencido produce
+una alerta privada y no trazable. La evidencia final es inmutable.
+
+## Validación manual antes de distribuir
+
+Probar en Android físico el primer ingreso, cierre/reapertura, cambio de
+contraseña, refresh tras expiración, licencia revocada, planta retirada,
+modo avión, teclado decimal, dos dispositivos editando el mismo borrador,
+caducidad, respuesta de guardado perdida, finalización repetida y certificado
+vencido.
+La compilación local y los tests sintéticos no sustituyen esa prueba contra
+el proyecto enlazado. La versión iOS requiere macOS y firma; no se verifica
+desde este equipo Windows.
+
+## Servicios de esta actualización
+
+No se modifica ni reinicia ServiceMET. El contrato 4 sí requiere detener y
+actualizar `ivmet-worker`, aplicar SQL Server 011, publicar Supabase 004 y
+actualizar RimMET/app de forma coordinada. Seguir el orden de
+[configuración del cliente](customer-configuration-release.md); no iniciar un
+worker de contrato 3 contra la nueva allowlist.
+
+## Aprobación previa al piloto
+
+Ejecutar `pnpm db:test:mobile` y conservar la revisión del responsable
+metrológico sobre ejemplos representativos del cliente. Los perfiles actuales
+son de control interno. Una necesidad de calibración acreditada, correcciones
+avanzadas o una nueva edición normativa requiere otra versión del motor. El PDF
+formal es el siguiente entregable y no debe presentarse como certificado.

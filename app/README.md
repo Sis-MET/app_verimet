@@ -1,7 +1,25 @@
 # IvMET — app Flutter
 
-App movil para ejecutar verificaciones intermedias de instrumentos de pesaje.
+App móvil online para capturar verificaciones intermedias de instrumentos de pesaje.
 Forma parte del monorepo IvMET: ver el [README raiz](../README.md).
+
+La entrada activa usa **Supabase**, usuarios de cliente y licencias reales.
+No utiliza VPN, la API Node antigua ni sincronización offline. Las pantallas
+de demostración anteriores permanecen como referencia, sin rutas desde la app.
+
+Guía vigente: [activación móvil online](../docs/mobile-online-release.md).
+Contrato: [API móvil](../docs/mobile-online-api.md).
+
+La app permite que el cliente administre áreas por planta, patrones,
+certificados y planes metrológicos versionados. Cada balanza se valida contra
+el catálogo importado; sus correcciones quedan privadas y solo el jefe de
+calidad puede compartir una vista previa exacta con Métrica.
+
+La captura guarda borradores privados y puede finalizar planes publicados con
+un perfil controlado. Los cálculos se ejecutan otra vez en Supabase; Flutter no
+envía veredictos. Los resultados son comprobaciones internas, no certificados
+de calibración ni verificaciones legales. Ver
+[motor metrológico](../docs/normative-metrology-engine.md).
 
 - Arquitectura y reglas de capas: [../docs/architecture.md](../docs/architecture.md)
 - Instalar / compilar / firmar: [../docs/app-install-guide.md](../docs/app-install-guide.md)
@@ -17,7 +35,7 @@ dart run build_runner build --delete-conflicting-outputs
 ```
 
 ```bash
-flutter run --dart-define=IVMET_API_BASE_URL=https://api.metrica.local
+flutter run --dart-define-from-file=config/supabase.local.json
 ```
 
 ## Mapa de `lib/`
@@ -31,8 +49,11 @@ flutter run --dart-define=IVMET_API_BASE_URL=https://api.metrica.local
 | `shared/` | Tema y widgets reutilizables por varias features. |
 | `features/` | Una carpeta por dominio, cada una con `domain/`, `data/`, `presentation/`. |
 
-`presentation/` nunca importa de `data/`: depende de las interfaces de
-`domain/repositories/` y la implementacion se inyecta desde `app/di/`.
+`features/online/` contiene el transporte Supabase, la sesión, configuración del
+cliente y las pantallas activas. El transporte se inyecta con
+`mobileApiProvider`; los tests usan un
+adaptador HTTP sintético, nunca un proyecto remoto. La base Drift y las features
+demo no participan en este recorrido. No almacenar evidencia localmente.
 
 ## Sistema visual
 
@@ -55,7 +76,22 @@ Dos cosas pendientes de esta capa:
   cerrarlo: dejar los archivos en `app/fonts/` y declarar el bloque `fonts:` en
   `pubspec.yaml` con las familias `Barlow Condensed` y `Barlow`, que es como ya
   las nombra `AppFonts`.
-- **Datos.** Las pantallas se alimentan de los `*_demo_data.dart` de cada
-  feature, con el parque de referencia del diseno. Los providers ya exponen la
-  forma definitiva, asi que conectar los repositorios reales no toca ninguna
-  pantalla.
+- **Validación metrológica del piloto.** Los perfiles y casos automatizados ya
+  están implementados. El responsable metrológico debe revisar los límites del
+  cliente y firmar los ejemplos representativos antes de distribuir el piloto.
+
+## Pruebas
+
+`flutter analyze`, `flutter test` y, desde la raíz, `pnpm db:test:mobile`.
+Las pruebas automatizadas evitan regresiones; no sustituyen la aprobación del
+procedimiento concreto del cliente.
+
+Revisión visual local sin red ni credenciales:
+
+```powershell
+flutter run -d web-server --web-port 8418 -t test/online/mobile_preview.dart
+```
+
+Solo admite debug. Usuario
+ficticio `operador`, contraseña ficticia `fixture-password`. No usar este
+entrypoint para distribuir la app.

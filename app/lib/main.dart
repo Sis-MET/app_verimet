@@ -6,10 +6,7 @@ import 'app/app.dart';
 
 /// Punto de entrada de IvMET.
 ///
-/// La app asume que, para hablar con el servidor de Metrica, el dispositivo ya
-/// tiene levantada la VPN corporativa (ver docs/vpn-install-guide.md). Sin VPN
-/// sigue siendo usable: las verificaciones quedan guardadas localmente y la
-/// feature `sync` las envia cuando haya conexion.
+/// Requiere conexión con Supabase. No utiliza la API antigua, VPN ni cola offline.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

@@ -70,6 +70,7 @@ app/.pub/
 app/build/
 app/coverage/
 app/doc/api/
+app/config/*.local.json
 
 # Codigo generado por build_runner (freezed / json_serializable / riverpod / drift)
 *.g.dart

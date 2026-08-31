@@ -5,9 +5,20 @@ los catalogos legados de clientes, plantas y balanzas; la nueva base SQL Server
 `IvMET` sera un espejo corporativo alimentado desde la bandeja
 `private.sync_outbox`.
 
+Desde la entrega del 31/08/2026 el espejo **excluye resultados y configuración
+privada**. Solo recibe expedientes o fichas concretas con consentimiento
+explícito. Seguir la [guía de configuración y despliegue coordinado](../docs/customer-configuration-release.md)
+antes de actualizar un servidor existente.
+
 La app movil es **online-only**. Guarda borradores en
 `public.verificacion_borradores`; no existe una cola offline ni sincronizacion
 por lotes desde el dispositivo.
+
+La primera entrega móvil usa la migración `202608280003_mobile_online_contract.sql`
+y las funciones `ivmet-login` / `ivmet-change-password`.
+Ver [activación de la app](../docs/mobile-online-release.md) y
+[contrato móvil](../docs/mobile-online-api.md) y
+[motor de comprobaciones internas](../docs/normative-metrology-engine.md).
 
 ## Orden de migraciones
 
@@ -32,6 +43,18 @@ por lotes desde el dispositivo.
     inmutables; conserva los códigos existentes. Aplicar antes del panel actualizado.
 12. `202608270004_onboarding_queue.sql`: cola recuperable de incorporaciones,
     disponibilidad del worker y seguimiento inmediato en el directorio.
+13. `202608280001_private_evidence_and_cases.sql`: bloqueo de exportación privada,
+    expedientes consentidos, vista previa/confirmación y retirada.
+14. `202608280002_management_operations.sql`: permisos internos, casos, borradores
+    metrológicos, preparación/cobros/auditoría y contrato de worker versión 3.
+15. `202608280003_mobile_online_contract.sql`: sesión, catálogos, borradores e
+    historial para la aplicación online.
+16. `202608280004_customer_configuration.sql`: áreas, patrones, certificados y
+    planes administrados por el cliente; validación de balanzas, consentimiento
+    de fichas y contrato del worker versión 4.
+17. `202608310001_normative_metrology_engine.sql`: perfiles controlados,
+    reglas de decisión, cálculo transaccional, finalización idempotente,
+    vencimientos por prueba y evidencia inmutable de control interno.
 
 Para pasar del piloto a operación continua, seguir
 [Incorporación automática en producción](../docs/onboarding-production.md).
@@ -79,10 +102,10 @@ el navegador de RimMET ni Git. Solo el backend RimMET y el worker pueden
 configurarlas en su entorno privado. Las Edge Functions las reciben del entorno
 administrado por Supabase.
 
-## Bloqueo metrologico deliberado
+## Alcance metrológico
 
-Todavia no existe una funcion que acepte definitivamente una verificacion. El
-motor debe implementarse despues de recibir el procedimiento oficial y sus
-casos dorados aprobados por el metrologo. Hasta entonces solo se habilitan
-borradores online; la evidencia final no tiene permisos de escritura desde la
-app.
+La función `ivmet_mobile_finalize_draft` acepta únicamente planes publicados
+con un perfil controlado. Calcula en PostgreSQL y nunca confía en un resultado
+enviado por la app. El alcance declarado es `INTERNAL_CHECK_ONLY`: no emite
+certificados ni afirma acreditación. Toda nueva fórmula requiere versión de
+motor y pruebas doradas, sin alterar resultados históricos.
