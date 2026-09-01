@@ -9,9 +9,9 @@ instrucciones de contrato 3. No ejecuta despliegues automáticamente.
   y el worker solo tiene permisos de lectura sobre sus cuatro tablas.
 - Métrica habilita clientes, plantas, balanzas, contratos, licencias y usuarios
   desde RimMET. Ya no crea áreas, patrones ni planes metrológicos del cliente.
-- El cliente administra en la app sus áreas por planta, patrones, certificados
-  y planes versionados. El jefe de calidad publica, retira y asigna planes; el
-  operador no ve esas acciones.
+- El cliente administra en la app sus áreas por planta, patrones y certificados.
+  El jefe de calidad configura las comprobaciones desde cada balanza; la app
+  crea y asigna la versión interna automáticamente.
 - `Ubicación` sugiere áreas ignorando mayúsculas, acentos y espacios repetidos.
   La sugerencia nunca altera automáticamente la ficha.
 - Cada balanza debe validarse contra la revisión actual del catálogo antes de
@@ -22,24 +22,25 @@ instrucciones de contrato 3. No ejecuta despliegues automáticamente.
   para Métrica. Los cambios posteriores requieren otra autorización.
 - RimMET recibe una bandeja de actualizaciones autorizadas. Marcar una como
   revisada agrega un comentario visible al cliente, pero no escribe en DataMET.
-- Planes, patrones, certificados, áreas y resultados privados no se exportan a
+- Configuraciones, patrones, certificados, áreas y resultados privados no se exportan a
   SQL Server. SQL `IvMET` recibe únicamente la actualización expresamente
   compartida y conserva el recibo histórico si después se retira el acceso.
 
-Actualización: la migración `202608310001_normative_metrology_engine.sql`
-incorpora perfiles y finalización de comprobaciones internas. Su alcance y las
-validaciones previas al piloto se documentan en
+Actualización: las migraciones `202608310001_normative_metrology_engine.sql` y
+`202608310002_equipment_check_configuration.sql` incorporan el motor y la
+configuración guiada por equipo. Su alcance y las validaciones previas al piloto se documentan en
 [Motor metrológico](normative-metrology-engine.md).
 
 ## Componentes de la entrega
 
-- Supabase: `202608280004_customer_configuration.sql` y, para finalización,
-  `202608310001_normative_metrology_engine.sql`; contrato del worker 4.
+- Supabase: `202608280004_customer_configuration.sql`, motor
+  `202608310001_normative_metrology_engine.sql` y configuración guiada
+  `202608310002_equipment_check_configuration.sql`; contrato del worker 4.
 - SQL Server `IvMET`: `011_customer_configuration_privacy.sql`.
 - Worker: allowlist reducida, revalidación de autorizaciones y health de
   privacidad/configuración.
-- Flutter: configuración del cliente, validación de balanzas, planes dinámicos
-  y consentimiento específico.
+- Flutter: configuración del cliente, validación de balanzas, comprobaciones
+  guiadas por equipo y consentimiento específico.
 - RimMET: habilitación comercial/operativa y bandeja de actualizaciones; sin
   editor de áreas, patrones o planes metrológicos.
 
@@ -88,7 +89,7 @@ En SSMS, seleccionar la base **IvMET**, no DataMET, y ejecutar
 `011`, crear el espejo consentido y denegar al worker/lector el acceso a áreas,
 patrones y planes antiguos. El script no modifica DataMET.
 
-### 4. Aplicar Supabase 202608280004
+### 4. Aplicar migraciones pendientes de Supabase
 
 Desde `C:\Users\jhona\IvMET` en el equipo de desarrollo:
 
@@ -99,8 +100,10 @@ pnpm dlx supabase db push --linked
 pnpm dlx supabase db lint --linked --level warning
 ```
 
-El dry-run debe mostrar `202608280004_customer_configuration.sql`. No usar
-`migration repair` para simular que se aplicó. Tras el push, el contrato es 4.
+El dry-run debe mostrar únicamente las migraciones que aún no existan en el
+proyecto enlazado; para esta entrega debe incluir
+`202608310002_equipment_check_configuration.sql`. No usar `migration repair`
+para simular que se aplicó. Tras el push, el contrato del worker continúa en 4.
 
 ### 5. Actualizar RimMET y la app
 
@@ -137,8 +140,8 @@ pm2 save
 ### 7. Piloto funcional
 
 Con un cliente y una planta autorizados, comprobar: sugerencias por planta,
-validación de ficha, cambio del catálogo, roles operador/jefe, creación y
-versionado de plan, patrón/certificado, vista previa de la ficha compartida,
+validación de ficha, cambio del catálogo, roles operador/jefe, configuración y
+versionado interno por balanza, patrón/certificado, vista previa de la ficha compartida,
 retirada del acceso y bandeja de RimMET. Confirmar en SQL `IvMET` que solo llegó
 la actualización autorizada y que DataMET no cambió.
 

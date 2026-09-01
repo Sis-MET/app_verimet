@@ -2,8 +2,8 @@
 
 La entrega inicial de privacidad introdujo casos compartidos y bloqueó la
 exportación masiva de evidencia privada. La arquitectura vigente amplía ese
-aislamiento: áreas, patrones, certificados y planes metrológicos pertenecen al
-cliente y se gestionan desde la app, no desde RimMET.
+aislamiento: áreas, patrones, certificados y configuraciones de comprobación
+pertenecen al cliente y se gestionan desde la app, no desde RimMET.
 
 Para actualizar una instalación existente se debe usar la
 [guía de configuración del cliente y contrato 4](customer-configuration-release.md).

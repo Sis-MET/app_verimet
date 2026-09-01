@@ -141,8 +141,6 @@ del snapshot creado por el servidor; Flutter no puede activarlo.
 | `equipment` | `id` | Maestro, corrección privada, áreas y sugerencia. |
 | `areas`, `area-suggestions` | `plantId`, paginación | Áreas de una planta y coincidencias de Ubicación. |
 | `patterns` | `plantId`, paginación | Patrones y certificados históricos. |
-| `plans`, `plan` | `id?`, paginación | Versiones y detalle del procedimiento del cliente. |
-| `method-catalog` | ninguno | Perfiles, métodos, fuentes y cantidad de puntos admitidos. |
 | `share-preview` | `id` de equipo | Snapshot exacto y hash antes de autorizar. |
 | `updates` | `id?`, paginación | Recibos de fichas compartidas y su estado. |
 
@@ -151,12 +149,19 @@ del snapshot creado por el servidor; Flutter no puede activarlo.
 si la respuesta no pudo confirmarse.
 
 Acciones del operador y jefe: `area.save`, `equipment.validate`,
-`pattern.save`, `certificate.create`, `certificate.annul`. Acciones exclusivas
-del jefe de calidad: `plan.save`, `plan.publish`, `plan.retire`, `plan.assign`,
-`update.share`, `update.withdraw`.
+`pattern.save`, `certificate.create`, `certificate.annul`. Son exclusivas del
+jefe de calidad `update.share` y `update.withdraw`.
+
+`POST /rest/v1/rpc/ivmet_customer_configure_checks` recibe
+`{equipment_id,configuration,request_id}`. `configuration.tests` contiene las
+comprobaciones seleccionadas, periodicidad, límite y cargas o número de
+mediciones. El servidor elige el perfil, genera los puntos, publica una versión
+interna y la asigna a la balanza de forma atómica. Solo puede invocarlo el jefe
+de calidad y requiere que la ficha esté validada y tenga rangos de medición.
+Los contratos anteriores `plan.*`, `plans`, `plan` y `method-catalog` responden
+`LEGACY_PLAN_MANAGEMENT_DISABLED`.
 
 `equipment.validate` solo escribe el overlay del cliente y el área seleccionada;
 no modifica la tabla maestra. `update.share` exige el hash mostrado por
 `share-preview`, un mensaje y consentimiento explícito. Su snapshot contiene la
-ficha de esa balanza, no resultados, planes, patrones ni historial. El nombre de
-un plan existente es inmutable; sus versiones publicadas también lo son.
+ficha de esa balanza, no resultados, configuraciones, patrones ni historial.

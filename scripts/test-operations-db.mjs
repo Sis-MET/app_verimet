@@ -81,6 +81,11 @@ test('privacidad, consentimiento y operaciones en PostgreSQL aislado', async (t)
       `insert into public.equipos(id,cliente_id,planta_id,legacy_equipo_id,cod_metrica,source_hash,estado_catalogo) values($1,$2,$3,1,'0001-01-001',repeat('a',64),'READY')`,
       [equipment, client, plant],
     );
+    await q(
+      `insert into public.equipo_rangos(equipo_id,numero_rango,unidad,capacidad_max,division_escala,source_hash)
+       values($1,1,'kg',100,0.1,repeat('a',64))`,
+      [equipment],
+    );
     const today = (await q('select current_date::text d'))[0].d;
     const nextYear = (
       await q("select (current_date+interval '2 years')::date::text d")
@@ -135,40 +140,21 @@ test('privacidad, consentimiento y operaciones en PostgreSQL aislado', async (t)
     };
     const quality = await user('quality', 'cliente_jefe_calidad'),
       operator = await user('operator', 'cliente_operador');
-    const definition = {
-      name: 'Plan aislado',
-      clientId: client,
-      description: '',
-      notes: '',
-      procedureReference: 'IVMET-CONTROL-INTERNO-PLATAFORMA-V1',
-      tests: [
-        {
-          type: 'linearity',
-          method: 'absolute_error',
-          decisionRule: 'direct',
-          toleranceSource: 'CLIENT_PROCESS',
-          uncertainty: '',
-          unit: 'kg',
-          frequencyDays: 30,
-          warningDays: 5,
-          points: Array.from({length:5},(_,index) => ({
-            code: `P${index+1}`,
-            label: `Carga ${index+1}`,
-            group: 1,
-            load: index === 0 ? '0.123456789' : `${index}`,
-            tolerance: '0.000000001',
-            position: '',
-            direction: 'ascending',
-            metadata: {},
-          })),
-        },
-      ],
+    const guidedConfiguration = {
+      tests: [{
+        type: 'linearity',
+        frequencyDays: '30',
+        tolerance: '0.000000001',
+        loads: ['0.123456789', '1', '2', '3', '4'],
+      }],
     };
     let plan;
-    const customerOp = async (action,payload) => {
-      await identity(quality,'authenticated');
-      return (await q('select public.ivmet_customer_mutate($1,$2,$3) r',[action.replace('metrology.','plan.'),payload,uuid()]))[0].r;
-    };
+    const configureChecks = async (payload, request = uuid()) =>
+      (await q('select public.ivmet_customer_configure_checks($1,$2,$3) r', [
+        equipment,
+        payload,
+        request,
+      ]))[0].r;
     await t.test(
       'permisos específicos, bootstrap único y último administrador',
       async () => {
@@ -216,67 +202,39 @@ test('privacidad, consentimiento y operaciones en PostgreSQL aislado', async (t)
       },
     );
     await t.test(
-      'decimales exactos, versión optimista y rechazo de fórmulas arbitrarias',
+      'configuración guiada, decimales exactos y plan interno inmutable',
       async () => {
-        await assert.rejects(op('metrology.save',definition), /CUSTOMER_MANAGED_CONFIGURATION/);
+        await assert.rejects(op('metrology.save',guidedConfiguration), /CUSTOMER_MANAGED_CONFIGURATION/);
         await assert.rejects(read('metrology'), /CUSTOMER_MANAGED_CONFIGURATION/);
         await mutate('equipment.configure',{id:equipment,clientId:client,version:'0',enabled:true});
-        plan = await customerOp('metrology.save', definition);
-        const record = (await q("select public.ivmet_customer_read('plan',$1) r",[{id:plan.id}]))[0].r;
-        assert.equal(record.tests[0].points[0].carga_nominal, '0.123456789');
+        await identity(quality,'authenticated');
+        await q(`select public.ivmet_customer_mutate('equipment.validate',$1,$2)`, [{
+          id:equipment,version:'0',catalogHash:'a'.repeat(64),areaId:'',
+          data:{ubicacion:'Mi área',cod_interno:'',marca:'',modelo:'',serie:''},
+        },uuid()]);
+        const configured = await configureChecks(guidedConfiguration);
+        plan = {id: configured.configurationId};
+        const record = (await q(`select pp.carga_nominal::text carga_nominal
+          from public.plan_puntos pp join public.plan_pruebas pt on pt.id=pp.plan_prueba_id
+          where pt.plan_version_id=$1 order by pp.orden limit 1`,[plan.id]))[0];
+        assert.equal(record.carga_nominal, '0.123456789');
         await assert.rejects(
-          customerOp('metrology.save', {
-            ...definition,
-            id: plan.id,
-            version: record.draft_revision,
-            name: 'Nombre alterado',
-          }),
-          /PLAN_NAME_IS_IMMUTABLE/,
-        );
-        await assert.rejects(customerOp('metrology.save', {
-          ...definition,
-          name: 'Fórmula arbitraria',
-          procedureReference: 'FIXTURE-NOT-OFFICIAL',
-        }), /NORMATIVE_PROFILE_REQUIRED/);
-        await assert.rejects(
-          customerOp('metrology.save', { ...definition, id: plan.id, version: '999' }),
-          /ROW_VERSION_CONFLICT/,
+          q("select public.ivmet_customer_mutate('plan.save','{}',$1)",[uuid()]),
+          /LEGACY_PLAN_MANAGEMENT_DISABLED/,
         );
         await assert.rejects(
-          customerOp('metrology.save', {
-            ...definition,
-            name: 'Decimal numérico',
-            tests: [
-              {
-                ...definition.tests[0],
-                points: definition.tests[0].points.map((point,index) =>
-                  index === 0 ? {...point,load:0.1} : point),
-              },
-            ],
+          q("select public.ivmet_customer_read('plan','{}')"),
+          /LEGACY_PLAN_MANAGEMENT_DISABLED/,
+        );
+        await assert.rejects(
+          configureChecks({
+            tests: [{...guidedConfiguration.tests[0],loads:[0.1,'1','2','3','4']}],
           }),
           /EXACT_DECIMAL_REQUIRED/,
         );
-        await customerOp('metrology.publish', { id: plan.id, version: '1' });
         await assert.rejects(
-          customerOp('metrology.save', { ...definition, id: plan.id, version: '1' }),
-          /PUBLISHED_PLAN_IS_IMMUTABLE/,
-        );
-        await customerOp('equipment.validate',{id:equipment,version:'0',catalogHash:'a'.repeat(64),areaId:'',
-          data:{ubicacion:'Mi área',cod_interno:'',marca:'',modelo:'',serie:''}});
-        await customerOp('metrology.assign', {
-          equipmentId: equipment,
-          planVersionId: plan.id,
-        });
-        const next = await customerOp('metrology.save', {
-          ...definition,
-          planId: record.plan_id,
-        });
-        await assert.rejects(
-          q(
-            'update public.plan_pruebas set plan_version_id=$1 where plan_version_id=$2',
-            [next.id, plan.id],
-          ),
-          /PUBLISHED_PLAN_IS_IMMUTABLE/,
+          configureChecks({...guidedConfiguration,procedureReference:'FIXTURE-NOT-OFFICIAL'}),
+          /INVALID_CHECK_CONFIGURATION/,
         );
         await assert.rejects(
           q(

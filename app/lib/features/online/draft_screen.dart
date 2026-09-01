@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../shared/theme/app_typography.dart';
+import '../../shared/theme/industry_palette.dart';
+import '../../shared/widgets/blueprint_card.dart';
+import '../../shared/widgets/section_label.dart';
+import '../../shared/widgets/tile_grid.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -58,9 +63,17 @@ class _TrialInput {
         TextEditingController(text: previous[id]?['zero'] as String? ?? ''),
       );
     }
+    completed =
+        saved != null &&
+        (omitted
+            ? reason.text.trim().isNotEmpty
+            : readings.values.every(
+                (reading) => reading.$1.text.trim().isNotEmpty,
+              ));
   }
   final Json plan;
   bool omitted;
+  late bool completed;
   final TextEditingController reason;
   final Map<String, (TextEditingController, TextEditingController)> readings =
       {};
@@ -144,6 +157,17 @@ class _DraftScreenState extends State<DraftScreen> {
     if (!dirty) setState(() => dirty = true);
   }
 
+  bool get allTrialsComplete =>
+      trials.isNotEmpty && trials.every((trial) => trial.completed);
+
+  Future<void> openTrial(_TrialInput trial) async {
+    await openPage<bool>(
+      context,
+      _TrialCaptureScreen(trial: trial, onChanged: changed),
+    );
+    if (mounted) setState(() {});
+  }
+
   Future<void> save() async {
     if (busy || !form.currentState!.validate()) return;
     final payload = {
@@ -194,6 +218,9 @@ class _DraftScreenState extends State<DraftScreen> {
   }
 
   String? get completionIssue {
+    if (!allTrialsComplete) {
+      return 'Finaliza cada ficha de prueba antes de continuar.';
+    }
     var executed = 0;
     for (final trial in trials) {
       if (trial.omitted) {
@@ -324,7 +351,7 @@ class _DraftScreenState extends State<DraftScreen> {
       }
     },
     child: OnlinePage(
-      title: 'Borrador · ${equipment['cod_metrica']}',
+      title: 'Comprobación · ${customerEquipmentCode(equipment)}',
       child: Form(
         key: form,
         onChanged: changed,
@@ -337,7 +364,7 @@ class _DraftScreenState extends State<DraftScreen> {
               icon: Icons.shield_outlined,
             ),
             Text(
-              '${plan['name']} · versión ${plan['version']}',
+              'Configuración activa · versión interna ${plan['version']}',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -403,97 +430,30 @@ class _DraftScreenState extends State<DraftScreen> {
             const Notice(
               'Un certificado vencido no aporta trazabilidad. Su selección se conserva en el borrador; no se emitirá un resultado válido por ello.',
             ),
-            for (final trial in trials)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        testLabel(trial.plan['type']),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        'Frecuencia: ${trial.plan['frequencyDays']} días · ${trial.plan['unit']}',
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Omitir esta prueba'),
-                        value: trial.omitted,
-                        onChanged: busy
-                            ? null
-                            : (value) => setState(() {
-                                trial.omitted = value;
-                                dirty = true;
-                              }),
-                      ),
-                      if (trial.omitted)
-                        TextFormField(
-                          controller: trial.reason,
-                          enabled: !busy,
-                          maxLength: 2000,
-                          decoration: const InputDecoration(
-                            labelText: 'Motivo de omisión',
-                          ),
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                              ? 'Debes justificar la omisión.'
-                              : null,
-                        )
-                      else
-                        for (final point in objects(trial.plan['points']))
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${point['order']}. ${point['label']}',
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                Text(
-                                  'Carga ${point['load']} ${trial.plan['unit']} · tolerancia ${point['tolerance']}',
-                                ),
-                                if (point['position'] != null ||
-                                    point['direction'] != null)
-                                  Text(
-                                    '${point['position'] ?? ''} ${point['direction'] ?? ''} · grupo ${point['group']}',
-                                  ),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: trial.readings[point['id']]!.$1,
-                                  enabled: !busy,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                        signed: true,
-                                      ),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Indicación',
-                                  ),
-                                  validator: decimalError,
-                                ),
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: trial.readings[point['id']]!.$2,
-                                  enabled: !busy,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                        signed: true,
-                                      ),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Retorno a cero (opcional)',
-                                  ),
-                                  validator: decimalError,
-                                ),
-                              ],
-                            ),
-                          ),
-                    ],
+            const SectionLabel('Pruebas de comprobación'),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${trials.where((trial) => trial.completed).length} de ${trials.length} completadas',
+                style: AppTextStyles.caption(context, size: 12),
+              ),
+            ),
+            TileGrid(
+              minTileHeight: 128,
+              cells: [
+                for (final trial in trials)
+                  TileCell(
+                    _TrialTile(
+                      trial: trial,
+                      onTap: busy ? null : () => openTrial(trial),
+                    ),
                   ),
-                ),
+              ],
+            ),
+            if (!allTrialsComplete)
+              const Notice(
+                'Abre cada ficha, registra sus datos y pulsa Finalizar prueba. Podrás volver a entrar para revisarla.',
+                icon: Icons.touch_app_outlined,
               ),
             TextFormField(
               controller: observations,
@@ -508,30 +468,249 @@ class _DraftScreenState extends State<DraftScreen> {
                 'Guardado en Supabase · versión $version${dirty ? ' · hay cambios pendientes' : ''}',
                 icon: Icons.cloud_done_outlined,
               ),
-            FilledButton.icon(
-              onPressed: busy ? null : save,
-              icon: const Icon(Icons.cloud_upload_outlined),
-              label: Text(busy ? 'Guardando…' : 'Guardar borrador privado'),
-            ),
-            const SizedBox(height: 8),
-            if (plan['finalizationEnabled'] == true)
+            if (allTrialsComplete) ...[
               FilledButton.icon(
-                onPressed: busy || dirty || draftId == null ? null : finalize,
-                icon: const Icon(Icons.task_alt),
-                label: Text(
-                  dirty || draftId == null
-                      ? 'Guarda antes de finalizar'
-                      : 'Finalizar comprobación interna',
-                ),
-              )
-            else
-              const OutlinedButton(
-                onPressed: null,
-                child: Text('Este plan aún no admite finalización'),
+                onPressed: busy ? null : save,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: Text(busy ? 'Guardando…' : 'Guardar borrador privado'),
               ),
+              const SizedBox(height: 8),
+              if (plan['finalizationEnabled'] == true)
+                FilledButton.icon(
+                  onPressed: busy || dirty || draftId == null ? null : finalize,
+                  icon: const Icon(Icons.task_alt),
+                  label: Text(
+                    dirty || draftId == null
+                        ? 'Guarda antes de finalizar'
+                        : 'Finalizar comprobación interna',
+                  ),
+                )
+              else
+                const OutlinedButton(
+                  onPressed: null,
+                  child: Text('Este plan aún no admite finalización'),
+                ),
+            ],
           ],
         ),
       ),
     ),
   );
+}
+
+/// Ficha resumida de una prueba. Conserva el lenguaje de módulos del Inicio.
+class _TrialTile extends StatelessWidget {
+  const _TrialTile({required this.trial, required this.onTap});
+  final _TrialInput trial;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+    final completed = trial.completed;
+    final ink = completed ? palette.successInk : palette.text;
+    final points = objects(trial.plan['points']).length;
+
+    return BlueprintCard(
+      onTap: onTap,
+      background: completed ? palette.successSurface : null,
+      markColor: completed ? palette.success : null,
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                completed ? Icons.check_circle : Icons.science_outlined,
+                size: 25,
+                color: completed ? palette.success : palette.accentInk,
+              ),
+              if (completed) ...[
+                const Spacer(),
+                Text(
+                  'COMPLETADA',
+                  style: AppTextStyles.caption(
+                    context,
+                    size: 10,
+                  ).copyWith(color: palette.successInk),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                testLabel(trial.plan['type']),
+                style: AppTextStyles.figure(context, size: 18, color: ink),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                completed
+                    ? 'Pulsa para revisar los datos'
+                    : '$points ${points == 1 ? 'punto' : 'puntos'} · ${trial.plan['unit']}',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.3,
+                  color: completed ? palette.successInk : palette.muted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Captura enfocada: al entrar solo se ve una prueba y sus puntos.
+class _TrialCaptureScreen extends StatefulWidget {
+  const _TrialCaptureScreen({required this.trial, required this.onChanged});
+  final _TrialInput trial;
+  final VoidCallback onChanged;
+
+  @override
+  State<_TrialCaptureScreen> createState() => _TrialCaptureScreenState();
+}
+
+class _TrialCaptureScreenState extends State<_TrialCaptureScreen> {
+  final form = GlobalKey<FormState>();
+
+  void changed() {
+    widget.trial.completed = false;
+    widget.onChanged();
+    if (mounted) setState(() {});
+  }
+
+  void finish() {
+    if (!form.currentState!.validate()) return;
+    widget.trial.completed = true;
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trial = widget.trial;
+    final unit = valueLabel(trial.plan['unit']);
+
+    return OnlinePage(
+      title: testLabel(trial.plan['type']),
+      child: Form(
+        key: form,
+        onChanged: changed,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            if (trial.completed)
+              const Notice(
+                'Esta prueba está completada. Puedes revisar los valores y finalizarla nuevamente si haces cambios.',
+                icon: Icons.check_circle_outline,
+              )
+            else
+              Notice(
+                '${objects(trial.plan['points']).length} puntos · $unit · frecuencia ${trial.plan['frequencyDays']} días',
+                icon: Icons.science_outlined,
+              ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Omitir esta prueba'),
+              subtitle: const Text('Requiere indicar el motivo.'),
+              value: trial.omitted,
+              onChanged: (value) {
+                trial.omitted = value;
+                changed();
+              },
+            ),
+            if (trial.omitted)
+              TextFormField(
+                controller: trial.reason,
+                maxLength: 500,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo de omisión',
+                ),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Debes justificar la omisión.'
+                    : null,
+              )
+            else
+              for (final point in objects(trial.plan['points'])) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: BlueprintCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${point['order']}. ${point['label']}',
+                          style: AppTextStyles.figure(context, size: 17),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Carga ${point['load']} $unit · tolerancia ${point['tolerance']}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: IndustryPalette.of(context).muted,
+                          ),
+                        ),
+                        if (point['position'] != null ||
+                            point['direction'] != null)
+                          Text(
+                            '${point['position'] ?? ''} ${point['direction'] ?? ''} · grupo ${point['group']}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: IndustryPalette.of(context).muted,
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: trial.readings[point['id']]!.$1,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Indicación',
+                          ),
+                          validator: (value) {
+                            if ((value ?? '').trim().isEmpty) {
+                              return 'Ingresa la indicación.';
+                            }
+                            return decimalError(value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: trial.readings[point['id']]!.$2,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Retorno a cero (opcional)',
+                          ),
+                          validator: decimalError,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: finish,
+              icon: const Icon(Icons.check),
+              label: const Text('Finalizar prueba'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -9,11 +9,12 @@
 - Plantas y áreas autorizadas, balanzas habilitadas, búsqueda y paginación.
 - Áreas sugeridas desde `Ubicación`, validación privada de la ficha y
   revalidación cuando cambia el catálogo maestro.
-- Alta de áreas, patrones y certificados por el cliente; planes versionados
-  definidos, publicados y asignados por el jefe de calidad.
+- Alta de áreas, patrones y certificados por el cliente; configuración guiada
+  de las comprobaciones desde la ficha de cada balanza por el jefe de calidad.
 - Vista previa y consentimiento específico para compartir con Métrica una
   actualización de balanza, sin incluir planes, patrones ni resultados.
-- Ficha técnica y versión publicada del plan; lecturas decimales como cadenas.
+- Ficha técnica y versión interna de la configuración; lecturas decimales como
+  cadenas.
 - Borradores privados en Supabase, reanudación, omisiones justificadas,
   condiciones ambientales y selección de patrones/certificados.
 - Historial privado, anulación con motivo por el jefe de calidad, vista previa
@@ -96,9 +97,10 @@ Los secretos de las funciones pertenecen a Supabase. No se copian al móvil.
 
 Comprobar que tenga contrato/licencia activos, cupo disponible, rol de cliente
 y al menos una planta asignada. Para visualizar balanzas, deben estar habilitadas
-y listas en Gestión IvMET. El cliente valida la ficha y el jefe de calidad crea,
-publica y asigna el plan desde la app. Para capturar necesitan ambas condiciones.
-No publicar un plan demo ni insertar una aprobación ficticia para saltar el bloqueo.
+y listas en Gestión IvMET. El cliente valida la ficha y el jefe de calidad usa
+`Configurar comprobaciones` en esa balanza. IvMET publica y asigna la versión
+interna automáticamente. Para capturar necesitan ambas condiciones. No insertar
+una aprobación ficticia para saltar el bloqueo.
 El código de acceso interno de RimMET no es la contraseña del usuario móvil.
 
 ## 5. Configurar y ejecutar Flutter
@@ -144,7 +146,7 @@ Los historiales y borradores no se escriben en SQLite. Las lecturas se mantienen
 como cadenas y se validan en el servidor. No se registran cuerpos HTTP o tokens.
 Un borrador no es evidencia aceptada y puede estar incompleto. Sus certificados
 se vuelven a validar al guardar; un certificado vencido se muestra claramente.
-El snapshot de equipo y plan queda ligado a la creación del borrador. Al
+El snapshot de equipo y configuración queda ligado a la creación del borrador. Al
 finalizar, el servidor recalcula los resultados; un certificado vencido produce
 una alerta privada y no trazable. La evidencia final es inmutable.
 

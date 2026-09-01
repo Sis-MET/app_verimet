@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ivmet/features/online/customer_configuration.dart';
-import 'package:ivmet/features/online/customer_plans.dart';
+import 'package:ivmet/features/online/equipment_check_configuration.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/online_widgets.dart';
@@ -130,44 +130,110 @@ void main() {
       session.dispose();
     },
   );
-  testWidgets(
-    'operador no ve alta de planes y puede consultar áreas por planta',
-    (tester) async {
-      final server = CustomerFixtureServer();
-      final session = MobileSession(server.api);
-      await tester.runAsync(
-        () => session.login('operador', 'fixture-password'),
-      );
-      await show(
-        tester,
-        CustomerSetupScreen(session: session, initialSection: 'plans'),
-      );
-      expect(find.text('Nuevo plan metrológico'), findsNothing);
-      expect(find.textContaining('jefe de calidad'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      session.dispose();
-    },
-  );
-  testWidgets('plan no tiene tolerancias de muestra y requiere una prueba', (
+  testWidgets('la configuración general ya no expone planes metrológicos', (
     tester,
   ) async {
     final server = CustomerFixtureServer();
     final session = MobileSession(server.api);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
-    await show(tester, CustomerPlanEditor(session: session));
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Nombre del plan'),
-      'Mi procedimiento',
+    await show(
+      tester,
+      CustomerSetupScreen(session: session, initialSection: 'plans'),
     );
-    final button = find.text('Guardar borrador del plan');
-    await scrollTo(tester, button);
-    await tester.tap(button);
+    expect(find.text('Nuevo plan metrológico'), findsNothing);
+    expect(find.text('Planes metrológicos'), findsNothing);
+    expect(find.text('Plantas y sus áreas'), findsOneWidget);
+    expect(find.text('Planta uno'), findsOneWidget);
+    expect(find.text('Gestionar'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    session.dispose();
+  });
+  testWidgets('plantas contiene sus áreas y patrones queda separado', (
+    tester,
+  ) async {
+    final server = CustomerFixtureServer();
+    final session = MobileSession(server.api);
+    await tester.runAsync(() => session.login('operador', 'fixture-password'));
+    await show(
+      tester,
+      CustomerSetupScreen(session: session, initialSection: 'plants'),
+    );
+    await tester.tap(find.text('Planta uno'));
     await tester.pumpAndSettle();
-    expect(find.text('Incluye al menos una prueba.'), findsOneWidget);
+    expect(find.text('Áreas · Planta uno'), findsOneWidget);
+    expect(find.text('Nueva área'), findsOneWidget);
+    expect(find.text('Producción'), findsOneWidget);
+    expect(find.text('Nuevo patrón'), findsNothing);
+    expect(find.text('Gestionar'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    session.dispose();
+  });
+  testWidgets('la rutina guiada guarda una sola configuración por balanza', (
+    tester,
+  ) async {
+    final server = CustomerFixtureServer();
+    final session = MobileSession(server.api);
+    await tester.runAsync(() => session.login('operador', 'fixture-password'));
+    session.user!['role'] = 'cliente_jefe_calidad';
+    await show(
+      tester,
+      EquipmentCheckConfigurationScreen(
+        session: session,
+        bundle: const {
+          'equipment': {
+            'id': 'equipment-fixture',
+            'cod_metrica': '0001-01-001',
+            'tipo_balanza': 'Plataforma',
+          },
+          'ranges': [
+            {
+              'numero_rango': 1,
+              'capacidad_max': '100',
+              'division_escala': '0.1',
+              'unidad': 'kg',
+            },
+          ],
+          'plan': null,
+        },
+      ),
+    );
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('3. Límites y confirmación'), findsOneWidget);
+    for (final field
+        in find
+            .widgetWithText(TextFormField, 'Límite de aceptación (kg)')
+            .evaluate()
+            .toList()
+            .asMap()
+            .keys) {
+      await tester.enterText(
+        find
+            .widgetWithText(TextFormField, 'Límite de aceptación (kg)')
+            .at(field),
+        '0.5',
+      );
+    }
+    await tester.tap(find.text('Activar configuración'));
+    await tester.pumpAndSettle();
+    final requests = server.requests
+        .where((r) => r.path.contains('ivmet_customer_configure_checks'))
+        .toList();
+    expect(requests, hasLength(1));
+    final body = object(requests.single.data);
+    final configuration = object(body['configuration']);
+    expect(objects(configuration['tests']), hasLength(3));
+    expect(configuration.containsKey('name'), false);
+    expect(configuration.containsKey('procedureReference'), false);
     expect(
-      server.requests.where((r) => r.path.contains('ivmet_customer_mutate')),
-      isEmpty,
+      objects(configuration['tests']).every(
+        (test) => test['frequencyDays'] == '30' && test['tolerance'] == '0.5',
+      ),
+      true,
     );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

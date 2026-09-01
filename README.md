@@ -211,13 +211,13 @@ Las mismas features existen en la app y en la API (`snake_case` en Dart,
 ## Estado actual
 
 La primera base Supabase ya define catalogos selectivos, contratos, licencias,
-borradores online, planes versionados, evidencia inmutable, alertas privadas,
+borradores online, configuraciones internas versionadas, evidencia inmutable, alertas privadas,
 RLS y una outbox idempotente para el espejo SQL Server. El login por usuario y
 el cambio obligatorio de contraseña estan implementados como Edge Functions.
 
 La finalización de comprobaciones internas está implementada en Supabase con
-perfiles versionados, reglas de decisión, trazabilidad, vencimientos por prueba
-y casos dorados. Flutter captura borradores y solicita la finalización sin
+configuración guiada por balanza, perfiles internos versionados, trazabilidad,
+vencimientos por prueba y casos dorados. Flutter captura borradores y solicita la finalización sin
 calcular ni enviar veredictos. El alcance no es calibración acreditada ni
 verificación legal. Ver
 [docs/normative-metrology-engine.md](docs/normative-metrology-engine.md).

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
@@ -19,6 +20,9 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
   Timer? timer;
   StreamSubscription<List<ConnectivityResult>>? connectivity;
   bool foreground = true;
+  bool handlingBack = false;
+  String? navigatorUserId;
+  GlobalKey<NavigatorState> workspaceNavigator = GlobalKey<NavigatorState>();
   @override
   void initState() {
     super.initState();
@@ -55,10 +59,93 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
     super.dispose();
   }
 
+  Future<void> handleBack() async {
+    if (handlingBack) return;
+    handlingBack = true;
+    try {
+      if (await (workspaceNavigator.currentState?.maybePop() ??
+          Future.value(false))) {
+        return;
+      }
+      if (!mounted) return;
+      final exit = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('¿Salir de IvMET?'),
+          content: const Text(
+            'Estás en la pantalla principal. Puedes cancelar para continuar trabajando.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Salir'),
+            ),
+          ],
+        ),
+      );
+      if (exit == true) await SystemNavigator.pop();
+    } finally {
+      handlingBack = false;
+    }
+  }
+
+  Widget workspace(bool ready) {
+    final userId = session.user!['id'].toString();
+    if (navigatorUserId != userId) {
+      navigatorUserId = userId;
+      workspaceNavigator = GlobalKey<NavigatorState>();
+    }
+    return PopScope(
+      key: ValueKey('workspace-$userId'),
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(handleBack());
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !ready,
+              child: ExcludeSemantics(
+                excluding: !ready,
+                child: AnimatedOpacity(
+                  opacity: ready ? 1 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Navigator(
+                    key: workspaceNavigator,
+                    onGenerateRoute: (_) => MaterialPageRoute<void>(
+                      builder: (_) => WorkspaceScreen(session: session),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: ready
+                  ? const SizedBox.shrink(key: ValueKey('workspace-ready'))
+                  : KeyedSubtree(
+                      key: const ValueKey('workspace-locked'),
+                      child: _locked(),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: session,
     builder: (context, _) {
+      late Widget content;
       if (session.user != null &&
           session.bootstrap.isNotEmpty &&
           [
@@ -69,36 +156,42 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
         // Conservar campos en memoria al cambiar de app no habilita uso offline:
         // todo el navegador queda oculto, sin semántica ni interacción.
         final ready = session.stage == SessionStage.ready;
-        return Stack(
-          children: [
-            Visibility(
-              visible: ready,
-              maintainState: true,
-              child: Navigator(
-                key: ValueKey(
-                  '${session.user!['id']}:${session.workspaceVersion}',
-                ),
-                onGenerateRoute: (_) => MaterialPageRoute<void>(
-                  builder: (_) => WorkspaceScreen(session: session),
-                ),
-              ),
-            ),
-            if (!ready) Positioned.fill(child: _locked()),
-          ],
-        );
-      }
-      if (session.stage == SessionStage.login ||
+        content = workspace(ready);
+      } else if (session.stage == SessionStage.login ||
           session.stage == SessionStage.password) {
-        return AccessForm(
+        content = AccessForm(
           key: ValueKey(session.stage),
           session: session,
           changingPassword: session.stage == SessionStage.password,
         );
+      } else if (session.stage == SessionStage.starting) {
+        content = const Scaffold(
+          key: ValueKey('starting'),
+          body: Center(child: CircularProgressIndicator()),
+        );
+      } else {
+        content = KeyedSubtree(
+          key: const ValueKey('access-locked'),
+          child: _locked(),
+        );
       }
-      if (session.stage == SessionStage.starting) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
-      }
-      return _locked();
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        reverseDuration: const Duration(milliseconds: 170),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.02, 0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        child: content,
+      );
     },
   );
 

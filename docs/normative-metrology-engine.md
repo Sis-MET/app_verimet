@@ -12,7 +12,8 @@ calibraciones, pero no constituye:
 - una declaración emitida por Métrica sobre información que el cliente no haya
   decidido compartir.
 
-La base guarda `INTERNAL_CHECK_ONLY` en el plan, la verificación y los snapshots.
+La base guarda `INTERNAL_CHECK_ONLY` en la configuración interna, la
+verificación y los snapshots.
 Las pantallas repiten este alcance para evitar una interpretación incorrecta.
 
 ## Referencias controladas
@@ -47,16 +48,33 @@ cliente en laboratorio acreditado.
 | Báscula camionera estática | Repetibilidad | Desviación estándar muestral a una misma carga. |
 | Báscula camionera estática | Desplazamiento | Diferencia respecto de la referencia en posiciones inicio/centro/final. |
 
-El código del motor es `ivmet-internal-1.0.0`. El jefe de calidad elige el
-perfil, las pruebas incluidas, la frecuencia de cada prueba, las cargas, los
-límites y su origen. No puede enviar una fórmula arbitraria desde Flutter.
+El código del motor es `ivmet-internal-1.0.0`. Desde la ficha de cada balanza,
+el jefe de calidad elige las comprobaciones, su periodicidad, confirma las
+cargas sugeridas e introduce el límite de aceptación. IvMET determina el perfil
+por tipo de equipo y genera, publica y asigna una versión interna en una sola
+transacción. El cliente no administra nombres, códigos, métodos ni estados de
+planes y no puede enviar una fórmula arbitraria desde Flutter.
+
+## Configuración guiada por balanza
+
+La app presenta tres pasos: comprobaciones y periodicidad, cargas o posiciones,
+y límites de aceptación. Linealidad propone cinco cargas distribuidas hasta la
+capacidad máxima; repetibilidad propone una carga intermedia y cinco lecturas;
+excentricidad fija cinco posiciones para plataforma o tres para báscula
+camionera. Las propuestas se pueden ajustar dentro del rango permitido.
+
+Las tablas de planes y versiones se conservan únicamente como mecanismo
+interno para reproducir la configuración histórica de una verificación. Cada
+cambio crea una versión inmutable y reemplaza de forma atómica la asignación
+activa. Los RPC antiguos de creación, publicación y asignación manual están
+deshabilitados.
 
 ## Límites y reglas de decisión
 
-Los orígenes admitidos son proceso del cliente, fabricante, informe de
-calibración y referencia OIML R 76 en servicio. Esta última solo aplica al error
-de indicación y requiere clase e intervalo de verificación `e` en el catálogo
-del equipo.
+La configuración guiada versión 1 registra el límite como criterio del proceso
+del cliente y aplica comparación directa. El motor conserva soporte interno
+versionado para otras fuentes y reglas, pero no las ofrece en la app hasta que
+exista un procedimiento aprobado que indique cuándo utilizarlas.
 
 - Comparación directa: conforme cuando `|métrica| <= límite`.
 - Banda de guarda: conforme cuando `|métrica| + U <= límite`; no conforme cuando
@@ -71,8 +89,8 @@ con revisión metrológica y nuevos casos dorados.
 ## Finalización y evidencia
 
 1. El móvil guarda un borrador privado con números como cadenas decimales.
-2. Al finalizar, Supabase vuelve a validar licencia, planta, equipo, versión del
-   plan y certificados.
+2. Al finalizar, Supabase vuelve a validar licencia, planta, equipo, versión de
+   la configuración y certificados.
 3. `private.evaluate_draft_payload` calcula todo antes de insertar la cabecera.
 4. La verificación, pruebas y lecturas nacen con su resultado definitivo. Los
    triggers impiden editarlas o eliminarlas; solo existe anulación justificada.

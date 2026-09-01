@@ -14,6 +14,7 @@ class BlueprintCard extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     this.onTap,
     this.background,
+    this.markColor,
     super.key,
   });
 
@@ -26,12 +27,18 @@ class BlueprintCard extends StatelessWidget {
   /// Por defecto transparente: el sistema no rellena las tarjetas.
   final Color? background;
 
+  /// Tinta de las marcas de registro. Solo se pasa cuando la tarjeta va
+  /// rellena de acero y la tinta normal no contrastaria.
+  final Color? markColor;
+
   @override
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
     final Widget card = CustomPaint(
-      foregroundPainter: _RegistrationMarks(color: palette.text.withValues(alpha: 0.55)),
+      foregroundPainter: _RegistrationMarks(
+        color: markColor ?? palette.text.withValues(alpha: 0.55),
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: background,

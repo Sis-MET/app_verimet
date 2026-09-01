@@ -23,6 +23,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     required this.muted,
     required this.mutedStrong,
     required this.track,
+    required this.success,
+    required this.successSurface,
+    required this.successInk,
     required this.fail,
     required this.failBar,
     required this.failSurface,
@@ -48,6 +51,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     muted: AppColors.neutral600,
     mutedStrong: AppColors.neutral700,
     track: AppColors.neutral300,
+    success: AppColors.success,
+    successSurface: AppColors.successSurface,
+    successInk: AppColors.successInk,
     fail: AppColors.fail,
     failBar: AppColors.failBar,
     failSurface: AppColors.failSurface,
@@ -73,6 +79,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     muted: AppColors.neutral600Dark,
     mutedStrong: AppColors.neutral700Dark,
     track: AppColors.neutral300Dark,
+    success: AppColors.successDark,
+    successSurface: AppColors.successSurfaceDark,
+    successInk: AppColors.successInkDark,
     fail: Color(0xFFE08A73),
     failBar: AppColors.failBar,
     failSurface: Color(0xFF3A241E),
@@ -122,6 +131,15 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
   /// Riel de las barras de progreso.
   final Color track;
 
+  /// Confirmación puntual de una tarea terminada.
+  final Color success;
+
+  /// Fondo de una ficha completada.
+  final Color successSurface;
+
+  /// Tinta sobre el fondo de una ficha completada.
+  final Color successInk;
+
   /// Fuera de tolerancia.
   final Color fail;
 
@@ -165,6 +183,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     Color? muted,
     Color? mutedStrong,
     Color? track,
+    Color? success,
+    Color? successSurface,
+    Color? successInk,
     Color? fail,
     Color? failBar,
     Color? failSurface,
@@ -188,6 +209,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
       muted: muted ?? this.muted,
       mutedStrong: mutedStrong ?? this.mutedStrong,
       track: track ?? this.track,
+      success: success ?? this.success,
+      successSurface: successSurface ?? this.successSurface,
+      successInk: successInk ?? this.successInk,
       fail: fail ?? this.fail,
       failBar: failBar ?? this.failBar,
       failSurface: failSurface ?? this.failSurface,
@@ -217,6 +241,9 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
       muted: mix(muted, other.muted),
       mutedStrong: mix(mutedStrong, other.mutedStrong),
       track: mix(track, other.track),
+      success: mix(success, other.success),
+      successSurface: mix(successSurface, other.successSurface),
+      successInk: mix(successInk, other.successInk),
       fail: mix(fail, other.fail),
       failBar: mix(failBar, other.failBar),
       failSurface: mix(failSurface, other.failSurface),

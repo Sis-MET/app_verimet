@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../core/domain/compliance_status.dart';
+import '../../shared/theme/app_typography.dart';
+import '../../shared/theme/industry_palette.dart';
+import '../../shared/widgets/status_tag.dart';
 import 'draft_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
@@ -37,88 +41,176 @@ class _HistoryScreenState extends State<HistoryScreen> {
         widget.drafts ? 'drafts' : 'history',
         {'page': page, 'equipmentId': widget.equipmentId},
       ),
-      builder: (data) => ListView(
-        padding: const EdgeInsets.all(18),
-        children: [
-          Text('${data['total']} registros'),
-          if (objects(data['items']).isEmpty)
-            Notice(
-              widget.drafts
-                  ? 'No tienes borradores guardados.'
-                  : 'Todavía no hay verificaciones finalizadas. Las capturas sin evaluación están en Mis borradores.',
+      builder: (data) {
+        final items = objects(data['items']);
+        final total = (data['total'] as num).toInt();
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          children: [
+            Text(
+              '$total registros',
+              style: AppTextStyles.caption(context, size: 12),
             ),
-          for (final item in objects(data['items']))
-            Card(
-              child: ListTile(
-                title: Text(valueLabel(item['cod_metrica'])),
-                subtitle: Text(
-                  widget.drafts
-                      ? 'Borrador · ${dateLabel(item['updated_at'])} · versión ${item['version']}'
-                      : '${dateLabel(item['realizado_at'])} · ${verdictLabel(item['veredicto_global'])}\n${item['estado'] == 'ANNULLED'
-                            ? 'Anulada'
-                            : item['trazabilidad'] == 'non_traceable'
-                            ? 'No trazable'
-                            : 'Trazable'} · ${item['alcance'] == 'partial' ? 'Parcial' : 'Completa'}',
-                ),
-                trailing: Icon(
-                  widget.drafts
-                      ? Icons.edit_note
-                      : item['alerta_id'] == null
-                      ? Icons.chevron_right
-                      : Icons.warning_amber_outlined,
-                ),
-                onTap: () async {
-                  if (widget.drafts) {
-                    await openPage(
-                      context,
-                      Scaffold(
-                        body: RemotePanel(
-                          load: () => widget.session.api.read('draft', {
-                            'id': item['id'],
-                          }),
-                          builder: (draft) => DraftScreen(
-                            session: widget.session,
-                            bundle: object(draft['context_snapshot']),
-                            draft: draft,
-                          ),
-                        ),
-                      ),
-                    );
-                  } else {
-                    await openPage(
-                      context,
-                      VerificationScreen(
-                        session: widget.session,
-                        id: item['id'] as String,
-                      ),
-                    );
-                  }
-                  if (mounted) setState(() => revision++);
-                },
+            const SizedBox(height: 4),
+            if (items.isEmpty)
+              Notice(
+                widget.drafts
+                    ? 'No tienes borradores guardados.'
+                    : 'Todavía no hay verificaciones finalizadas. Las capturas sin evaluación están en Mis borradores.',
               ),
+            for (final item in items)
+              _HistoryRow(
+                item: item,
+                draft: widget.drafts,
+                onTap: () => _open(item),
+              ),
+            if (total > 25)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: page > 1 ? () => setState(() => page--) : null,
+                      child: const Text('Anterior'),
+                    ),
+                    Text(
+                      'Página $page',
+                      style: AppTextStyles.caption(context, size: 12),
+                    ),
+                    TextButton(
+                      onPressed: page * 25 < total
+                          ? () => setState(() => page++)
+                          : null,
+                      child: const Text('Siguiente'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    ),
+  );
+
+  Future<void> _open(Json item) async {
+    if (widget.drafts) {
+      await openPage(
+        context,
+        Scaffold(
+          body: RemotePanel(
+            load: () => widget.session.api.read('draft', {'id': item['id']}),
+            builder: (draft) => DraftScreen(
+              session: widget.session,
+              bundle: object(draft['context_snapshot']),
+              draft: draft,
             ),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
+          ),
+        ),
+      );
+    } else {
+      await openPage(
+        context,
+        VerificationScreen(session: widget.session, id: item['id'] as String),
+      );
+    }
+    if (mounted) setState(() => revision++);
+  }
+}
+
+/// Fila del historial: el codigo manda a la izquierda, el veredicto cierra a
+/// la derecha y en medio queda el contexto. Un hairline las separa, sin caja
+/// por fila: son treinta registros seguidos y treinta cajas no se leen.
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({
+    required this.item,
+    required this.draft,
+    required this.onTap,
+  });
+  final Json item;
+  final bool draft;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+    final annulled = item['estado'] == 'ANNULLED';
+    final verdict = valueLabel(item['veredicto_global']);
+    final failed = verdict == 'fail';
+
+    final String meta = draft
+        ? '${dateLabel(item['updated_at'])} · versión ${item['version']}'
+        : '${dateLabel(item['realizado_at'])} · '
+              '${annulled ? 'Anulada' : item['trazabilidad'] == 'non_traceable' ? 'No trazable' : 'Trazable'} · '
+              '${item['alcance'] == 'partial' ? 'Parcial' : 'Completa'}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.divider)),
+          ),
+          child: Row(
             children: [
-              TextButton(
-                onPressed: page > 1 ? () => setState(() => page--) : null,
-                child: const Text('Anterior'),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      valueLabel(item['cod_metrica']),
+                      style: AppTextStyles.reading(
+                        context,
+                        size: 15,
+                        color: palette.accentInk,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      meta,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: palette.muted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Text('Página $page'),
-              TextButton(
-                onPressed: page * 25 < (data['total'] as num)
-                    ? () => setState(() => page++)
-                    : null,
-                child: const Text('Siguiente'),
+              const SizedBox(width: 10),
+              if (draft)
+                StatusTag('Borrador')
+              else
+                StatusTag(
+                  verdictLabel(item['veredicto_global']),
+                  status: annulled
+                      ? ComplianceStatus.conforme
+                      : failed
+                      ? ComplianceStatus.noConforme
+                      : verdict == 'pass'
+                      ? ComplianceStatus.conforme
+                      : ComplianceStatus.observado,
+                ),
+              const SizedBox(width: 6),
+              Icon(
+                item['alerta_id'] == null
+                    ? Icons.chevron_right
+                    : Icons.warning_amber_outlined,
+                size: 20,
+                color: item['alerta_id'] == null
+                    ? palette.text.withValues(alpha: 0.45)
+                    : palette.fail,
               ),
             ],
           ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class VerificationScreen extends StatefulWidget {

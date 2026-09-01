@@ -31,6 +31,18 @@ class CustomerFixtureServer extends FixtureServer {
     final body = request.data is Map
         ? object(request.data)
         : <String, dynamic>{};
+    if (request.path.contains('ivmet_customer_configure_checks')) {
+      requests.add(request);
+      return (
+        200,
+        {
+          'equipmentId': body['equipment_id'],
+          'configurationId': 'configuration-fixture',
+          'version': 1,
+          'state': 'PUBLISHED',
+        },
+      );
+    }
     if (request.path.contains('ivmet_customer_mutate')) {
       requests.add(request);
       if (saveFailures > 0) {

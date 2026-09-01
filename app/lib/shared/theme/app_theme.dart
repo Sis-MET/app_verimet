@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
@@ -51,9 +52,23 @@ abstract final class AppTheme {
       fontFamily: AppFonts.body,
       fontFamilyFallback: AppFonts.fallback,
       visualDensity: VisualDensity.comfortable,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       extensions: <ThemeExtension<dynamic>>[palette],
       textTheme: _textTheme(palette),
-      dividerTheme: DividerThemeData(color: palette.divider, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(
+        color: palette.divider,
+        thickness: 1,
+        space: 1,
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -72,8 +87,14 @@ abstract final class AppTheme {
         filled: true,
         fillColor: palette.surface,
         isDense: false,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        labelStyle: TextStyle(fontSize: 12, color: palette.text.withValues(alpha: 0.7)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 12,
+        ),
+        labelStyle: TextStyle(
+          fontSize: 12,
+          color: palette.text.withValues(alpha: 0.7),
+        ),
         floatingLabelBehavior: FloatingLabelBehavior.never,
         border: _inputBorder(palette.divider),
         enabledBorder: _inputBorder(palette.divider),
@@ -129,7 +150,10 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: palette.accentDeep,
-        contentTextStyle: TextStyle(color: palette.bg, fontFamily: AppFonts.body),
+        contentTextStyle: TextStyle(
+          color: palette.bg,
+          fontFamily: AppFonts.body,
+        ),
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         behavior: SnackBarBehavior.floating,
       ),
@@ -162,13 +186,14 @@ abstract final class AppTheme {
       color: palette.text,
     );
 
-    TextStyle body(double size, {double height = 1.55, Color? color}) => TextStyle(
-      fontFamily: AppFonts.body,
-      fontFamilyFallback: AppFonts.fallback,
-      fontSize: size,
-      height: height,
-      color: color ?? palette.text,
-    );
+    TextStyle body(double size, {double height = 1.55, Color? color}) =>
+        TextStyle(
+          fontFamily: AppFonts.body,
+          fontFamilyFallback: AppFonts.fallback,
+          fontSize: size,
+          height: height,
+          color: color ?? palette.text,
+        );
 
     return TextTheme(
       displaySmall: heading(42),

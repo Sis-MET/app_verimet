@@ -109,6 +109,8 @@ class MobileFailure implements Exception {
       'La prueba de excentricidad necesita una única lectura de referencia.',
     'EQUIPMENT_VALIDATION_REQUIRED' =>
       'Primero revisa y valida la ficha de esta balanza.',
+    'NO_EQUIPMENT_CORRECTIONS' =>
+      'La ficha no tiene correcciones nuevas para compartir con Métrica.',
     'CATALOG_CHANGED' =>
       'Métrica actualizó el catálogo. Abre nuevamente la ficha para revisar esos cambios.',
     'AREA_ALREADY_EXISTS' => 'Ya existe un área equivalente en esta planta.',
@@ -122,6 +124,18 @@ class MobileFailure implements Exception {
       'Usa cadenas decimales con punto y hasta 9 decimales.',
     'INVALID_PLAN_TEST' =>
       'Revisa unidad, puntos y frecuencia. El aviso debe ser menor que la frecuencia.',
+    'INVALID_CHECK_CONFIGURATION' =>
+      'Revisa las pruebas y periodicidades seleccionadas.',
+    'DUPLICATE_CHECK_TYPE' =>
+      'Cada tipo de comprobación solo puede aparecer una vez.',
+    'INVALID_CHECK_TOLERANCE' =>
+      'Cada comprobación necesita un límite mayor que cero.',
+    'INVALID_CHECK_LOADS' => 'Revisa las cargas y el número de mediciones.',
+    'CHECK_LOAD_OUT_OF_RANGE' => 'Una carga supera la capacidad de la balanza.',
+    'EQUIPMENT_RANGES_REQUIRED' =>
+      'La balanza no tiene capacidad y división válidas. Solicita revisar el catálogo.',
+    'LEGACY_PLAN_MANAGEMENT_DISABLED' =>
+      'Configura las comprobaciones desde la ficha de cada balanza.',
     'EXPLICIT_CONSENT_REQUIRED' =>
       'Revisa la información y confirma expresamente que deseas compartirla.',
     _ when status == 401 => 'La sesión venció. Ingresa nuevamente.',

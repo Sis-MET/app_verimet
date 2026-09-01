@@ -13,7 +13,7 @@ enum UserRole {
   /// Personal de Metrica: ve todas las empresas y registra correcciones.
   tecnicoMetrica('metrica_tecnico', 'Técnico de Métrica'),
 
-  /// Administra usuarios, catálogos y planes metrológicos.
+  /// Administra usuarios, catálogos y configuraciones de comprobación.
   administradorMetrica('metrica_admin', 'Administrador de Métrica');
 
   const UserRole(this.wireValue, this.label);
@@ -22,9 +22,10 @@ enum UserRole {
   final String label;
 
   static UserRole fromWire(String value) => UserRole.values.firstWhere(
-        (role) => role.wireValue == value,
-        orElse: () => throw ArgumentError.value(value, 'value', 'Rol IvMET desconocido'),
-      );
+    (role) => role.wireValue == value,
+    orElse: () =>
+        throw ArgumentError.value(value, 'value', 'Rol IvMET desconocido'),
+  );
 }
 
 /// Usuario con sesion abierta.
@@ -45,6 +46,7 @@ class SessionUser {
   final String nombre;
   final String? email;
   final UserRole role;
+
   /// Nulo para `metrica_tecnico` y `metrica_admin`.
   final String? empresaId;
   final String? empresaNombre;

@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../shared/theme/app_typography.dart';
+import '../../shared/widgets/section_label.dart';
+import '../../shared/widgets/tile_grid.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
-import 'customer_plans.dart';
 
 Future<Json> customerRead(
   MobileSession session,
@@ -332,20 +334,31 @@ class _CustomerFormState extends State<CustomerForm> {
 class CustomerSetupScreen extends StatefulWidget {
   const CustomerSetupScreen({
     required this.session,
-    this.initialSection = 'areas',
+    this.initialSection = 'plants',
+    this.plantId,
     this.equipmentId,
     super.key,
   });
   final MobileSession session;
   final String initialSection;
+  final String? plantId;
   final String? equipmentId;
   @override
   State<CustomerSetupScreen> createState() => _CustomerSetupScreenState();
 }
 
 class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
-  late String section = widget.initialSection;
+  late String section =
+      const {
+        'plants',
+        'areas',
+        'patterns',
+        'updates',
+      }.contains(widget.initialSection)
+      ? widget.initialSection
+      : 'plants';
   late String? plantId =
+      widget.plantId ??
       objects(widget.session.bootstrap['plants']).firstOrNull?['id'] as String?;
   int page = 1, revision = 0;
   Map<String, String> get plants => {
@@ -440,324 +453,333 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
     ),
   );
 
+  Widget _plantManagement(BuildContext context) {
+    final bootstrap = widget.session.bootstrap;
+    final availablePlants = objects(bootstrap['plants']);
+    final availableAreas = objects(bootstrap['areas']);
+    final client = object(bootstrap['client']);
+
+    return OnlinePage(
+      title: 'Gestionar plantas',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 32),
+        children: [
+          Kicker(valueLabel(client['name'])),
+          const SizedBox(height: 2),
+          Text(
+            'Plantas y sus áreas',
+            style: AppTextStyles.figure(context, size: 29),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 3, bottom: 18),
+            child: Text(
+              'Selecciona una planta para crear, revisar o editar únicamente sus áreas.',
+              style: AppTextStyles.caption(context, size: 12.5),
+            ),
+          ),
+          if (availablePlants.isEmpty)
+            const Notice(
+              'No tienes plantas asignadas. Solicita su habilitación en RimMET.',
+            )
+          else
+            TileGrid(
+              minTileHeight: 132,
+              cells: [
+                for (final plant in availablePlants)
+                  TileCell(
+                    ActionTile(
+                      icon: Icons.factory_outlined,
+                      label: valueLabel(plant['name']),
+                      caption:
+                          '${availableAreas.where((area) => area['plantId'] == plant['id']).length} áreas · Gestionar áreas',
+                      onTap: () => edit(
+                        CustomerSetupScreen(
+                          session: widget.session,
+                          initialSection: 'areas',
+                          plantId: plant['id'] as String,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => OnlinePage(
-    title: 'Mi configuración',
-    child: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: section,
+  Widget build(BuildContext context) {
+    if (section == 'plants') return _plantManagement(context);
+
+    final title = section == 'areas'
+        ? 'Áreas · ${plants[plantId] ?? 'Planta'}'
+        : section == 'patterns'
+        ? 'Gestionar patrones'
+        : 'Actualizaciones compartidas';
+
+    return OnlinePage(
+      title: title,
+      child: Column(
+        children: [
+          if (section == 'patterns')
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: DropdownButtonFormField<String>(
+                initialValue: plantId,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Gestionar'),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'areas',
-                    child: Text('Áreas por planta'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'patterns',
-                    child: Text('Patrones y certificados'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'plans',
-                    child: Text('Planes metrológicos'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'updates',
-                    child: Text('Actualizaciones compartidas'),
-                  ),
-                ],
+                decoration: const InputDecoration(
+                  labelText: 'Filtrar patrones por planta',
+                ),
+                items: plants.entries
+                    .map(
+                      (p) => DropdownMenuItem(
+                        value: p.key,
+                        child: Text(p.value, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (v) => setState(() {
-                  section = v!;
+                  plantId = v;
                   page = 1;
                 }),
               ),
-              if (section == 'areas' || section == 'patterns') ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: plantId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Planta'),
-                  items: plants.entries
-                      .map(
-                        (p) => DropdownMenuItem(
-                          value: p.key,
-                          child: Text(p.value, overflow: TextOverflow.ellipsis),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    plantId = v;
-                    page = 1;
-                  }),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (plantId == null && (section == 'areas' || section == 'patterns'))
-          const Notice('No tienes plantas autorizadas.')
-        else
-          Expanded(
-            child: RemotePanel(
-              dataKey: '$section|$plantId|$page|$revision',
-              load: () => customerRead(widget.session, section, {
-                'plantId': plantId,
-                'page': page,
-                if (section == 'updates') 'id': widget.equipmentId,
-              }),
-              builder: (data) => ListView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                children: [
-                  if (section == 'areas') ...[
-                    FilledButton.icon(
-                      onPressed: areaForm,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Nueva área'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () => edit(
-                        AreaSuggestions(
-                          session: widget.session,
-                          plantId: plantId!,
-                        ),
-                      ),
-                      child: const Text('Sugerir áreas desde Ubicación'),
-                    ),
-                    const Notice(
-                      'Las coincidencias ignoran mayúsculas, acentos y espacios repetidos. Cada planta mantiene sus propias áreas.',
-                    ),
-                  ],
-                  if (section == 'patterns')
-                    FilledButton.icon(
-                      onPressed: patternForm,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Nuevo patrón'),
-                    ),
-                  if (section == 'plans') ...[
-                    const Notice(
-                      'El jefe de calidad define cargas, frecuencias, límites y regla de decisión. IvMET fija las fórmulas del perfil seleccionado y las ejecuta en Supabase.',
-                    ),
-                    if (widget.session.quality)
+            ),
+          if (plantId == null && (section == 'areas' || section == 'patterns'))
+            const Notice('No tienes plantas autorizadas.')
+          else
+            Expanded(
+              child: RemotePanel(
+                dataKey: '$section|$plantId|$page|$revision',
+                load: () => customerRead(widget.session, section, {
+                  'plantId': plantId,
+                  'page': page,
+                  if (section == 'updates') 'id': widget.equipmentId,
+                }),
+                builder: (data) => ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  children: [
+                    if (section == 'areas') ...[
                       FilledButton.icon(
-                        onPressed: () =>
-                            edit(CustomerPlanEditor(session: widget.session)),
+                        onPressed: areaForm,
                         icon: const Icon(Icons.add),
-                        label: const Text('Nuevo plan metrológico'),
+                        label: const Text('Nueva área'),
                       ),
-                  ],
-                  if (section == 'updates')
-                    const Notice(
-                      'Solo se comparte lo que autorizaste explícitamente. Los cambios posteriores requieren una autorización nueva.',
-                    ),
-                  if (objects(data['items']).isEmpty)
-                    const Notice('Todavía no hay registros en esta sección.'),
-                  for (final item in objects(data['items']))
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: section == 'areas'
-                            ? ListTile(
-                                title: Text(valueLabel(item['name'])),
-                                subtitle: Text(
-                                  item['active'] == true
-                                      ? 'Activa'
-                                      : 'Inactiva',
-                                ),
-                                trailing: const Icon(Icons.edit_outlined),
-                                onTap: () => areaForm(item),
-                              )
-                            : section == 'patterns'
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${item['codigo']} · ${item['descripcion']}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                  Text(
-                                    '${valueLabel(item['tipo'])} · ${valueLabel(item['capacidad'])} ${item['unidad'] ?? ''}',
-                                  ),
-                                  if (item['canEdit'] == true)
-                                    Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () => patternForm(item),
-                                          child: const Text('Editar patrón'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              certificateForm(item),
-                                          child: const Text(
-                                            'Agregar certificado',
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  else
-                                    const Notice(
-                                      'Para editar este patrón necesitas acceso a todas sus plantas.',
-                                    ),
-                                  for (final cert in objects(
-                                    item['certificates'],
-                                  ))
-                                    ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(
-                                        '${cert['numero']} · ${cert['laboratorio']}',
-                                      ),
-                                      subtitle: Text(
-                                        'Calibrado: ${dateLabel(cert['calibrado_el'])}\nVence: ${dateLabel(cert['vence_el'])} · ${cert['estado'] == 'ANNULLED' ? 'Anulado' : 'Registrado'}',
-                                      ),
-                                      trailing:
-                                          cert['estado'] == 'ACTIVE' &&
-                                              item['canEdit'] == true
-                                          ? IconButton(
-                                              tooltip: 'Anular certificado',
-                                              icon: const Icon(
-                                                Icons.cancel_outlined,
-                                              ),
-                                              onPressed: () => edit(
-                                                CustomerForm(
-                                                  session: widget.session,
-                                                  title: 'Anular certificado',
-                                                  action: 'certificate.annul',
-                                                  initial: {
-                                                    'id': cert['id'],
-                                                    'version':
-                                                        cert['row_version'],
-                                                  },
-                                                  fields: const [
-                                                    CustomerField(
-                                                      'reason',
-                                                      'Motivo',
-                                                      max: 2000,
-                                                    ),
-                                                  ],
-                                                  submitLabel:
-                                                      'Anular conservando historial',
-                                                ),
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                ],
-                              )
-                            : section == 'plans'
-                            ? ListTile(
-                                title: Text(
-                                  '${item['name']} · v${item['version']}',
-                                ),
-                                subtitle: Text(planState(item['estado'])),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => edit(
-                                  CustomerPlanDetail(
-                                    session: widget.session,
-                                    plan: item,
-                                    equipmentId: widget.equipmentId,
-                                  ),
-                                ),
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    valueLabel(
-                                      object(item['snapshot'])['code'],
-                                    ),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                  DetailField(
-                                    'Enviado',
-                                    dateLabel(item['autorizado_at']),
-                                  ),
-                                  DetailField(
-                                    'Estado',
-                                    item['visibilidad'] == 'WITHDRAWN'
-                                        ? 'Acceso retirado'
-                                        : item['estado'] == 'REVIEWED'
-                                        ? 'Revisado por Métrica'
-                                        : 'Pendiente de revisión',
-                                  ),
-                                  DetailField(
-                                    'Comentario de Métrica',
-                                    item['comentario'],
-                                  ),
-                                  ExpansionTile(
-                                    title: const Text('Información autorizada'),
-                                    children: [
-                                      EquipmentUpdatePreview(
-                                        snapshot: object(item['snapshot']),
-                                      ),
-                                    ],
-                                  ),
-                                  if (widget.session.quality &&
-                                      item['visibilidad'] == 'SHARED')
-                                    TextButton(
-                                      onPressed: () => edit(
-                                        CustomerForm(
-                                          session: widget.session,
-                                          title: 'Retirar acceso a Métrica',
-                                          action: 'update.withdraw',
-                                          initial: {
-                                            'id': item['id'],
-                                            'version': item['row_version'],
-                                          },
-                                          notice:
-                                              'No elimina las copias que Métrica ya haya recibido.',
-                                          fields: const [
-                                            CustomerField(
-                                              'reason',
-                                              'Motivo',
-                                              max: 2000,
-                                            ),
-                                          ],
-                                          submitLabel: 'Retirar acceso',
-                                        ),
-                                      ),
-                                      child: const Text('Retirar acceso'),
-                                    ),
-                                ],
-                              ),
+                      OutlinedButton(
+                        onPressed: () => edit(
+                          AreaSuggestions(
+                            session: widget.session,
+                            plantId: plantId!,
+                          ),
+                        ),
+                        child: const Text('Sugerir áreas desde Ubicación'),
                       ),
-                    ),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      TextButton(
-                        onPressed: page > 1
-                            ? () => setState(() => page--)
-                            : null,
-                        child: const Text('Anterior'),
-                      ),
-                      Text('Página $page'),
-                      TextButton(
-                        onPressed: page * 25 < (data['total'] as num)
-                            ? () => setState(() => page++)
-                            : null,
-                        child: const Text('Siguiente'),
+                      const Notice(
+                        'Las coincidencias ignoran mayúsculas, acentos y espacios repetidos. Cada planta mantiene sus propias áreas.',
                       ),
                     ],
-                  ),
-                ],
+                    if (section == 'patterns')
+                      FilledButton.icon(
+                        onPressed: patternForm,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Nuevo patrón'),
+                      ),
+                    if (section == 'updates')
+                      const Notice(
+                        'Solo se comparte lo que autorizaste explícitamente. Los cambios posteriores requieren una autorización nueva.',
+                      ),
+                    if (objects(data['items']).isEmpty)
+                      const Notice('Todavía no hay registros en esta sección.'),
+                    for (final item in objects(data['items']))
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: section == 'areas'
+                              ? ListTile(
+                                  title: Text(valueLabel(item['name'])),
+                                  subtitle: Text(
+                                    item['active'] == true
+                                        ? 'Activa'
+                                        : 'Inactiva',
+                                  ),
+                                  trailing: const Icon(Icons.edit_outlined),
+                                  onTap: () => areaForm(item),
+                                )
+                              : section == 'patterns'
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${item['codigo']} · ${item['descripcion']}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                    Text(
+                                      '${valueLabel(item['tipo'])} · ${valueLabel(item['capacidad'])} ${item['unidad'] ?? ''}',
+                                    ),
+                                    if (item['canEdit'] == true)
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () => patternForm(item),
+                                            child: const Text('Editar patrón'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                certificateForm(item),
+                                            child: const Text(
+                                              'Agregar certificado',
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      const Notice(
+                                        'Para editar este patrón necesitas acceso a todas sus plantas.',
+                                      ),
+                                    for (final cert in objects(
+                                      item['certificates'],
+                                    ))
+                                      ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          '${cert['numero']} · ${cert['laboratorio']}',
+                                        ),
+                                        subtitle: Text(
+                                          'Calibrado: ${dateLabel(cert['calibrado_el'])}\nVence: ${dateLabel(cert['vence_el'])} · ${cert['estado'] == 'ANNULLED' ? 'Anulado' : 'Registrado'}',
+                                        ),
+                                        trailing:
+                                            cert['estado'] == 'ACTIVE' &&
+                                                item['canEdit'] == true
+                                            ? IconButton(
+                                                tooltip: 'Anular certificado',
+                                                icon: const Icon(
+                                                  Icons.cancel_outlined,
+                                                ),
+                                                onPressed: () => edit(
+                                                  CustomerForm(
+                                                    session: widget.session,
+                                                    title: 'Anular certificado',
+                                                    action: 'certificate.annul',
+                                                    initial: {
+                                                      'id': cert['id'],
+                                                      'version':
+                                                          cert['row_version'],
+                                                    },
+                                                    fields: const [
+                                                      CustomerField(
+                                                        'reason',
+                                                        'Motivo',
+                                                        max: 2000,
+                                                      ),
+                                                    ],
+                                                    submitLabel:
+                                                        'Anular conservando historial',
+                                                  ),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      valueLabel(
+                                        object(item['snapshot'])['code'],
+                                      ),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                    DetailField(
+                                      'Enviado',
+                                      dateLabel(item['autorizado_at']),
+                                    ),
+                                    DetailField(
+                                      'Estado',
+                                      item['visibilidad'] == 'WITHDRAWN'
+                                          ? 'Acceso retirado'
+                                          : item['estado'] == 'REVIEWED'
+                                          ? 'Revisado por Métrica'
+                                          : 'Pendiente de revisión',
+                                    ),
+                                    DetailField(
+                                      'Comentario de Métrica',
+                                      item['comentario'],
+                                    ),
+                                    ExpansionTile(
+                                      title: const Text(
+                                        'Información autorizada',
+                                      ),
+                                      children: [
+                                        EquipmentUpdatePreview(
+                                          snapshot: object(item['snapshot']),
+                                        ),
+                                      ],
+                                    ),
+                                    if (widget.session.quality &&
+                                        item['visibilidad'] == 'SHARED')
+                                      TextButton(
+                                        onPressed: () => edit(
+                                          CustomerForm(
+                                            session: widget.session,
+                                            title: 'Retirar acceso a Métrica',
+                                            action: 'update.withdraw',
+                                            initial: {
+                                              'id': item['id'],
+                                              'version': item['row_version'],
+                                            },
+                                            notice:
+                                                'No elimina las copias que Métrica ya haya recibido.',
+                                            fields: const [
+                                              CustomerField(
+                                                'reason',
+                                                'Motivo',
+                                                max: 2000,
+                                              ),
+                                            ],
+                                            submitLabel: 'Retirar acceso',
+                                          ),
+                                        ),
+                                        child: const Text('Retirar acceso'),
+                                      ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        TextButton(
+                          onPressed: page > 1
+                              ? () => setState(() => page--)
+                              : null,
+                          child: const Text('Anterior'),
+                        ),
+                        Text('Página $page'),
+                        TextButton(
+                          onPressed: page * 25 < (data['total'] as num)
+                              ? () => setState(() => page++)
+                              : null,
+                          child: const Text('Siguiente'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class AreaSuggestions extends StatefulWidget {

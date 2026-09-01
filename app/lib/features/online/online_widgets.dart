@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../shared/theme/industry_palette.dart';
 import 'mobile_api.dart';
 
 Future<T?> openPage<T>(BuildContext context, Widget page) =>
-    Navigator.of(context).push<T>(
-      PageRouteBuilder(
-        pageBuilder: (_, _, _) => page,
-        transitionDuration: const Duration(milliseconds: 160),
-        reverseTransitionDuration: const Duration(milliseconds: 120),
-        transitionsBuilder: (_, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
-      ),
-    );
+    Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));
 
 class OnlinePage extends StatelessWidget {
   const OnlinePage({
@@ -29,27 +22,53 @@ class OnlinePage extends StatelessWidget {
   );
 }
 
+/// Nota al pie de una pantalla: alcance legal, privacidad, aviso de estado.
+///
+/// Es texto secundario y se pinta como tal — una regla de acero a la
+/// izquierda y cuerpo pequeno, sin relleno. Antes iba en caja rellena y con
+/// 16 px de aire: apiladas de tres en tres tapaban la pantalla y competian
+/// con las acciones.
 class Notice extends StatelessWidget {
-  const Notice(this.text, {this.icon = Icons.info_outline, super.key});
+  const Notice(
+    this.text, {
+    this.icon = Icons.info_outline,
+    this.alert = false,
+    super.key,
+  });
   final String text;
   final IconData icon;
+
+  /// Reserva el oxido a lo que bloquea trabajo (falta un dato para configurar).
+  final bool alert;
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.symmetric(vertical: 8),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainer,
-      border: Border.all(color: Theme.of(context).dividerColor),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text)),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+    final rule = alert ? palette.fail : palette.accent;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: rule, width: 2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: alert ? palette.fail : palette.muted),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.45,
+                color: palette.muted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class RemotePanel extends StatefulWidget {
@@ -83,41 +102,68 @@ class _RemotePanelState extends State<RemotePanel> {
         : OnlinePage(title: widget.frameTitle!, child: child);
     return FutureBuilder<Json>(
       future: future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return frame(const Center(child: CircularProgressIndicator()));
-        }
-        if (snapshot.hasError) {
-          return frame(
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Notice(
-                      snapshot.error is MobileFailure
-                          ? (snapshot.error as MobileFailure).message
-                          : 'No se pudo cargar la información.',
-                    ),
-                    OutlinedButton(
-                      onPressed: () => setState(() => future = widget.load()),
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
+      builder: (context, snapshot) => AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        reverseDuration: const Duration(milliseconds: 150),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.015),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        child: snapshot.connectionState != ConnectionState.done
+            ? frame(
+                const Center(
+                  key: ValueKey('remote-loading'),
+                  child: CircularProgressIndicator(),
                 ),
+              )
+            : snapshot.hasError
+            ? frame(
+                Center(
+                  key: const ValueKey('remote-error'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Notice(
+                          snapshot.error is MobileFailure
+                              ? (snapshot.error as MobileFailure).message
+                              : 'No se pudo cargar la información.',
+                        ),
+                        OutlinedButton(
+                          onPressed: () =>
+                              setState(() => future = widget.load()),
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : KeyedSubtree(
+                key: ValueKey('remote-data-${widget.dataKey}'),
+                child: widget.builder(snapshot.data!),
               ),
-            ),
-          );
-        }
-        return widget.builder(snapshot.data!);
-      },
+      ),
     );
   }
 }
 
 String valueLabel(Object? value) =>
     value == null || value == '' ? 'No registrado' : value.toString();
+String customerEquipmentCode(Json equipment) {
+  final code = equipment['cod_interno']?.toString().trim() ?? '';
+  return code.isEmpty ? 'Sin código interno' : code;
+}
+
 String testLabel(Object? value) => switch (value) {
   'linearity' => 'Error de indicación',
   'repeatability' => 'Repetibilidad',

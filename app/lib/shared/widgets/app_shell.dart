@@ -18,7 +18,7 @@ const EdgeInsets kShellContentPadding = EdgeInsets.fromLTRB(18, 16, 18, 132);
 enum AppSection {
   inicio('Inicio', IndustryIcon.home),
   verificar('Verificar', IndustryIcon.clipboardCheck),
-  areas('Áreas', IndustryIcon.grid),
+  areas('Plantas', IndustryIcon.grid),
   ajustes('Ajustes', IndustryIcon.sliders);
 
   const AppSection(this.label, this.icon);
@@ -69,7 +69,11 @@ class AppShell extends StatelessWidget {
 
 /// Barra de navegacion flotante con icono y etiqueta.
 class FloatingNavBar extends StatelessWidget {
-  const FloatingNavBar({required this.current, required this.onSelect, super.key});
+  const FloatingNavBar({
+    required this.current,
+    required this.onSelect,
+    super.key,
+  });
 
   final AppSection current;
   final ValueChanged<AppSection> onSelect;
@@ -117,7 +121,11 @@ class FloatingNavBar extends StatelessWidget {
 }
 
 class _NavButton extends StatelessWidget {
-  const _NavButton({required this.section, required this.isActive, required this.onTap});
+  const _NavButton({
+    required this.section,
+    required this.isActive,
+    required this.onTap,
+  });
 
   final AppSection section;
   final bool isActive;

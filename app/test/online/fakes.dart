@@ -66,7 +66,12 @@ const fixtureUser = {
 const fixtureBootstrap = {
   'client': {'id': 'client-fixture', 'name': 'Cliente aislado', 'code': '0001'},
   'plants': [
-    {'id': 'plant-fixture', 'name': 'Planta uno', 'code': '0001-01'},
+    {
+      'id': 'plant-fixture',
+      'name': 'Planta uno',
+      'code': '0001-01',
+      'equipmentCount': 1,
+    },
   ],
   'areas': [],
   'equipmentCount': 1,
@@ -97,13 +102,25 @@ const fixturePlan = {
   ],
 };
 const fixtureBundle = {
-  'equipment': {'id': 'equipment-fixture', 'cod_metrica': '0001-01-001'},
+  'equipment': {
+    'id': 'equipment-fixture',
+    'cod_metrica': '0001-01-001',
+    'cod_interno': 'BAL-014',
+    'marca': 'Marca',
+    'modelo': 'Modelo',
+    'serie': 'SERIE-1',
+    'ubicacion': 'Producción',
+  },
   'plan': fixturePlan,
   'ranges': [],
   'patterns': [],
 };
 const fixtureNormativeBundle = {
-  'equipment': {'id': 'equipment-fixture', 'cod_metrica': '0001-01-001'},
+  'equipment': {
+    'id': 'equipment-fixture',
+    'cod_metrica': '0001-01-001',
+    'cod_interno': 'BAL-014',
+  },
   'plan': {
     'id': 'version-normative-fixture',
     'name': 'Control interno de prueba',
@@ -141,6 +158,7 @@ class FixtureServer {
   Json user = {...fixtureUser};
   bool allowed = true;
   bool online = true;
+  bool customerUpdatePending = false;
   int bootstrapCalls = 0;
   final List<RequestOptions> requests = [];
   late final api = MobileApi(
@@ -243,14 +261,25 @@ class FixtureServer {
               {
                 'id': 'equipment-fixture',
                 'cod_metrica': '0001-01-001',
+                'cod_interno': 'BAL-014',
+                'marca': 'Marca',
+                'modelo': 'Modelo',
                 'planta': 'Planta uno',
                 'area': 'Sin área',
+                'departamento': 'Producción',
               },
             ],
           },
         );
       case 'equipment':
-        return (200, fixtureBundle);
+        return (
+          200,
+          {
+            ...fixtureBundle,
+            'customerValidated': true,
+            'customerUpdatePending': customerUpdatePending,
+          },
+        );
       case 'drafts':
       case 'history':
         return (200, {'total': 0, 'items': []});

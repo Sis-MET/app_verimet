@@ -51,8 +51,16 @@ abstract final class AppColors {
   static const Color neutral600Dark = Color(0xFF9AA0A4);
   static const Color neutral700Dark = Color(0xFFC2C7CA);
 
-  /// Fuera de tolerancia. El sistema no tiene "verde de OK": lo conforme se
-  /// dice en acento o en neutro, y el oxido queda reservado para el fallo.
+  /// Confirmación de una tarea concluida. Es un verde industrial apagado:
+  /// aparece solo cuando una captura está completa y no compite con el acero.
+  static const Color success = Color(0xFF4F765E);
+  static const Color successSurface = Color(0xFFE4EEE7);
+  static const Color successInk = Color(0xFF31513D);
+  static const Color successDark = Color(0xFF78A88A);
+  static const Color successSurfaceDark = Color(0xFF203029);
+  static const Color successInkDark = Color(0xFFB8D9C3);
+
+  /// Fuera de tolerancia. El óxido queda reservado al fallo.
   static const Color fail = Color(0xFFA5442F);
   static const Color failBar = Color(0xFFC4735D);
   static const Color failSurface = Color(0xFFF4DCD5);

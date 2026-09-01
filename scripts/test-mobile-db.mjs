@@ -48,6 +48,8 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       ($1,$2,'0001-01',repeat('a',64)),($3,$2,'0001-02',repeat('b',64)),($4,$5,'0002-01',repeat('c',64))`, [plant, client, hiddenPlant, otherPlant, other]);
     await q(`insert into public.equipos(id,cliente_id,planta_id,legacy_equipo_id,cod_metrica,source_hash) values
       ($1,$2,$3,1,'0001-01-001',repeat('a',64)),($4,$2,$5,2,'0001-02-001',repeat('b',64))`, [equipment, client, plant, hiddenEquipment, hiddenPlant]);
+    await q(`insert into public.equipo_rangos(equipo_id,numero_rango,unidad,capacidad_max,division_escala,source_hash)
+      values($1,1,'kg',100,0.1,repeat('a',64)),($2,1,'kg',100,0.1,repeat('b',64))`, [equipment,hiddenEquipment]);
     await q(`insert into public.equipos_ivmet(equipo_id,habilitado,estado_configuracion) values($1,true,'READY'),($2,true,'READY')`, [equipment, hiddenEquipment]);
     const today = (await q('select current_date::text d'))[0].d;
     const commercial = await mutate('plan.save', { name: 'Fixture', seats: 5, graceDays: 0 });
@@ -84,6 +86,7 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       assert.equal((await read('session')).access.allowed, true);
       const boot = await read('bootstrap');
       assert.deepEqual(boot.plants.map(p => p.id), [plant]);
+      assert.equal(boot.plants[0].equipmentCount, 1);
       assert.equal(boot.equipmentCount, 1);
       assert.equal((await read('instruments', { plantId: hiddenPlant })).total, 0);
       assert.equal((await read('instruments', { page: 2, pageSize: 1 })).items.length, 0);
@@ -103,6 +106,10 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       await assert.rejects(save(), /EQUIPMENT_VALIDATION_REQUIRED/);
       await q('select public.ivmet_customer_mutate($1,$2,$3)', ['equipment.validate', {id:equipment,version:'0',catalogHash:'a'.repeat(64),areaId:'',
         data:{ubicacion:'',cod_interno:'',marca:'',modelo:'',serie:''}}, uuid()]);
+      assert.equal((await read('equipment',{equipmentId:equipment})).customerUpdatePending,false);
+      await identity(quality);
+      await assert.rejects(q('select public.ivmet_customer_read($1,$2)', ['share-preview',{id:equipment}]), /NO_EQUIPMENT_CORRECTIONS/);
+      await identity(operator);
       draft = await save();
       assert.equal(draft.version, '1');
       assert.deepEqual(await save(), draft);
@@ -175,6 +182,8 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       await assert.rejects(read('verification', { id: hiddenVerification }), /VERIFICATION_NOT_ACCESSIBLE/);
     });
     const customer = async (action, payload, request = uuid()) => (await q('select public.ivmet_customer_mutate($1,$2,$3) r', [action,payload,request]))[0].r;
+    const configureChecks = async (equipmentId, configuration, request = uuid()) =>
+      (await q('select public.ivmet_customer_configure_checks($1,$2,$3) r', [equipmentId,configuration,request]))[0].r;
     const setup = async (section, filters = {}) => (await q('select public.ivmet_customer_read($1,$2) r', [section,filters]))[0].r;
     let area, customerPattern, sharedUpdate;
     const equipmentData = { ubicacion:'PRIVADO-UBICACION-CLIENTE', cod_interno:'CLI-01', marca:'Cliente', modelo:'Confirmado', serie:'S-CLIENTE' };
@@ -206,6 +215,11 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       const detail=await read('equipment',{equipmentId:equipment});
       assert.equal(detail.equipment.ubicacion,equipmentData.ubicacion);
       assert.equal(detail.customerValidated,true);
+      assert.equal(detail.customerUpdatePending,true);
+      const completeList=await read('instruments',{search:'producción norte'});
+      assert.equal(completeList.total,1);
+      assert.equal(completeList.items[0].cod_interno,'CLI-01');
+      assert.equal(completeList.items[0].departamento,'Producción Norte');
       await assert.rejects(customer('equipment.validate',{...validation,data:{...equipmentData,serie:'otra'}},request),/IDEMPOTENCY_CONFLICT/);
       await assert.rejects(customer('equipment.validate',validation),/ROW_VERSION_CONFLICT/);
       await assert.rejects(customer('equipment.validate',{...validation,id:hiddenEquipment}),/EQUIPMENT_NOT_ACCESSIBLE/);
@@ -247,7 +261,9 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       await assert.rejects(customer('update.share',{...share,hash:'0'.repeat(64)}),/SHARE_PREVIEW_CHANGED/);
       const request=uuid(); sharedUpdate=await customer('update.share',share,request);
       assert.deepEqual(await customer('update.share',share,request),sharedUpdate);
+      assert.equal((await read('equipment',{equipmentId:equipment})).customerUpdatePending,false);
       await customer('equipment.validate',{...validation,version:'2',data:{...equipmentData,serie:'CAMBIO-NO-COMPARTIDO'}});
+      assert.equal((await read('equipment',{equipmentId:equipment})).customerUpdatePending,true);
       await identity('', 'service_role');
       const inbox=(await q("select public.ivmet_ops_read($1,'equipment-updates','{}') r",[admin]))[0].r;
       assert.equal(inbox.total,1); assert.equal(inbox.items[0].snapshot.customer.serie,'S-CLIENTE');
@@ -267,7 +283,16 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       await assert.rejects(setup('equipment',{id:equipment}),/permission denied/);
       await identity(operator);
     });
-    await t.test('plan normativo finaliza evidencia inmutable, trazable e idempotente', async () => {
+    await t.test('configuración guiada finaliza evidencia inmutable, trazable e idempotente', async () => {
+      const loads = ['0', '25', '50', '75', '100'];
+      const guidedConfiguration = { tests: [{
+        type: 'linearity', frequencyDays: '30', tolerance: '0.5', loads,
+      }, {
+        type: 'repeatability', frequencyDays: '15', tolerance: '0.5', load: '50', repetitions: '5',
+      }] };
+      await assert.rejects(customer('plan.save', {}), /LEGACY_PLAN_MANAGEMENT_DISABLED/);
+      await assert.rejects(setup('plans'), /LEGACY_PLAN_MANAGEMENT_DISABLED/);
+      await assert.rejects(configureChecks(equipment, guidedConfiguration), /QUALITY_MANAGER_REQUIRED/);
       await identity(quality);
       const validCertificate = await customer('certificate.create', {
         patternId: pattern,
@@ -276,30 +301,15 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
         calibratedOn: (await q("select (current_date-interval '1 day')::date::text d"))[0].d,
         expiresOn: (await q("select (current_date+interval '1 year')::date::text d"))[0].d,
       });
-      const loads = ['0', '25', '50', '75', '100'];
-      const normative = await customer('plan.save', {
-        name: 'Control interno plataforma',
-        procedureReference: 'IVMET-CONTROL-INTERNO-PLATAFORMA-V1',
-        notes: 'Fixture normativo',
-        tests: [{
-          type: 'linearity', frequencyDays: '30', warningDays: '5', unit: 'kg',
-          decisionRule: 'direct', toleranceSource: 'CLIENT_PROCESS', uncertainty: '',
-          points: loads.map((load, index) => ({
-            group: '1', code: `L${index + 1}`, label: `Carga ${load} kg`, load,
-            tolerance: '0.5', position: '', direction: '', metadata: {},
-          })),
-        }, {
-          type: 'repeatability', frequencyDays: '15', warningDays: '3', unit: 'kg',
-          decisionRule: 'direct', toleranceSource: 'CLIENT_PROCESS', uncertainty: '',
-          points: Array.from({length: 5}, (_, index) => ({
-            group: '1', code: `R${index + 1}`, label: `Repetición ${index + 1}`, load: '50',
-            tolerance: '0.5', position: '', direction: '', metadata: {},
-          })),
-        }],
-      });
-      const normativeVersion = normative.id;
-      await customer('plan.publish', { id: normativeVersion, version: '1' });
-      await customer('plan.assign', { equipmentId: equipment, planVersionId: normativeVersion });
+      const configurationRequest = uuid();
+      const normative = await configureChecks(equipment, guidedConfiguration, configurationRequest);
+      assert.deepEqual(await configureChecks(equipment, guidedConfiguration, configurationRequest), normative);
+      await assert.rejects(configureChecks(equipment, {
+        tests: [{ type: 'linearity', frequencyDays: '30', tolerance: '0.6', loads }],
+      }, configurationRequest), /IDEMPOTENCY_CONFLICT/);
+      const normativeVersion = normative.configurationId;
+      assert.equal(normative.state, 'PUBLISHED');
+      assert.equal((await q('select count(*)::int n from public.equipo_planes where equipo_id=$1 and vigente_hasta is null',[equipment]))[0].n,1);
       await identity(operator);
       const bundle = await read('equipment', { equipmentId: equipment });
       assert.equal(bundle.plan.finalizationEnabled, true);
