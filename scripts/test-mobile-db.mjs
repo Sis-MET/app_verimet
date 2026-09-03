@@ -109,6 +109,12 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       assert.equal((await read('equipment',{equipmentId:equipment})).customerUpdatePending,false);
       await identity(quality);
       await assert.rejects(q('select public.ivmet_customer_read($1,$2)', ['share-preview',{id:equipment}]), /NO_EQUIPMENT_CORRECTIONS/);
+      await identity('', 'service_role');
+      await q("update public.equipos set cod_interno='MASTER-01' where id=$1",[equipment]);
+      await identity(operator);
+      assert.equal((await read('instruments')).items[0].cod_interno,'MASTER-01');
+      await identity('', 'service_role');
+      await q('update public.equipos set cod_interno=null where id=$1',[equipment]);
       await identity(operator);
       draft = await save();
       assert.equal(draft.version, '1');
