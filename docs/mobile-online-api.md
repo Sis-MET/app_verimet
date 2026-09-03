@@ -80,6 +80,15 @@ No se puede iniciar otro con una versión retirada. Los borradores caducan a los
 
 ## Finalización privada
 
+La extensión de captura v2 se anuncia con `plan.captureVersion: 2` y
+`plan.captureEngineVersion: ivmet-internal-2.0.0`. Mantiene las mismas RPC e
+idempotencia y agrega cargas utilizadas, configuración por prueba, grupos y
+filas retiradas al contenido del borrador. Las lecturas de pruebas omitidas se
+conservan en v2 y quedan excluidas de la evaluación. Consultar el
+[DTO y sus reglas](flexible-metrology-capture.md#contrato-y-recuperación).
+El ejemplo de guardado anterior corresponde al protocolo v1, que continúa
+admitiéndose para compatibilidad; no se cambia el protocolo de un borrador existente.
+
 `POST /rest/v1/rpc/ivmet_mobile_finalize_draft`:
 
 ```json
@@ -93,7 +102,7 @@ No se puede iniciar otro con una versión retirada. Los borradores caducan a los
 ```
 
 Solo se habilita cuando el snapshot contiene un perfil controlado y el motor
-`ivmet-internal-1.0.0`. El servidor exige al menos una prueba completa, ignora
+`ivmet-internal-1.0.0`, o la capacidad de captura v2 indicada arriba. El servidor exige al menos una prueba completa, ignora
 cualquier veredicto del cliente y calcula lecturas, métricas, veredictos,
 trazabilidad, alerta y alcance en una transacción. Respuesta:
 `{id,draftId,version,verdict,traceability,scope,alertCreated,idempotent}`.
@@ -154,9 +163,10 @@ jefe de calidad `update.share` y `update.withdraw`.
 
 `POST /rest/v1/rpc/ivmet_customer_configure_checks` recibe
 `{equipment_id,configuration,request_id}`. `configuration.tests` contiene las
-comprobaciones seleccionadas, periodicidad, límite y cargas o número de
-mediciones. El servidor elige el perfil, genera los puntos, publica una versión
-interna y la asigna a la balanza de forma atómica. Solo puede invocarlo el jefe
+comprobaciones seleccionadas, periodicidad y error permisible. El servidor
+genera referencias internas desde la capacidad; cargas y cantidades antiguas
+se ignoran porque se declaran al ejecutar. Luego elige el perfil, publica una
+versión interna y la asigna a la balanza de forma atómica. Solo puede invocarlo el jefe
 de calidad y requiere que la ficha esté validada y tenga rangos de medición.
 Los contratos anteriores `plan.*`, `plans`, `plan` y `method-catalog` responden
 `LEGACY_PLAN_MANAGEMENT_DISABLED`.

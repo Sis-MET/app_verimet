@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../settings/presentation/providers/settings_providers.dart';
@@ -13,6 +14,7 @@ import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'customer_configuration.dart';
+import 'draft_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({required this.session, super.key});
@@ -23,14 +25,56 @@ class WorkspaceScreen extends StatefulWidget {
 
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
   AppSection section = AppSection.inicio;
+  bool recoveryChecked = false;
+  bool recovering = false;
+  String? recoveryError;
   @override
   void initState() {
     super.initState();
     widget.session.addListener(_sessionChanged);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_restoreDraft()),
+    );
+  }
+
+  Future<void> _restoreDraft() async {
+    final session = widget.session;
+    if (!mounted ||
+        recoveryChecked ||
+        recovering ||
+        session.stage != SessionStage.ready) {
+      return;
+    }
+    recovering = true;
+    final owner = session.recoveryOwner;
+    try {
+      final snapshot = await session.recovery.active(owner);
+      if (!mounted ||
+          session.stage != SessionStage.ready ||
+          session.recoveryOwner != owner) {
+        return;
+      }
+      recoveryChecked = true;
+      recoveryError = null;
+      if (snapshot != null) {
+        await openPage(
+          context,
+          RecoveredDraftScreen(session: session, snapshot: snapshot),
+        );
+      }
+    } catch (_) {
+      recoveryError = 'No se pudo recuperar la comprobación pendiente.';
+    } finally {
+      recovering = false;
+      if (mounted) setState(() {});
+    }
   }
 
   void _sessionChanged() {
-    if (mounted && widget.session.stage == SessionStage.ready) setState(() {});
+    if (mounted && widget.session.stage == SessionStage.ready) {
+      setState(() {});
+      unawaited(_restoreDraft());
+    }
   }
 
   @override
@@ -41,6 +85,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!recoveryChecked && recoveryError == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final session = widget.session;
     return PopScope(
       canPop: section == AppSection.inicio,
@@ -92,6 +139,23 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                   onSelect: (value) => setState(() => section = value),
                 ),
               ),
+              if (recoveryError != null)
+                Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  child: Material(
+                    child: Column(
+                      children: [
+                        Notice(recoveryError!, alert: true),
+                        TextButton(
+                          onPressed: _restoreDraft,
+                          child: const Text('Reintentar recuperación'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

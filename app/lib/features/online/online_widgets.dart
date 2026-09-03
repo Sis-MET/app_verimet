@@ -165,7 +165,7 @@ String customerEquipmentCode(Json equipment) {
 }
 
 String testLabel(Object? value) => switch (value) {
-  'linearity' => 'Error de indicación',
+  'linearity' => 'Linealidad',
   'repeatability' => 'Repetibilidad',
   'eccentricity' => 'Excentricidad',
   _ => valueLabel(value),

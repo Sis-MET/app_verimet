@@ -15,11 +15,18 @@ certificados y planes metrológicos versionados. Cada balanza se valida contra
 el catálogo importado; sus correcciones quedan privadas y solo el jefe de
 calidad puede compartir una vista previa exacta con Métrica.
 
-La captura guarda borradores privados y puede finalizar planes publicados con
+La captura recorre cinco pasos: pesas patrón y ambiente, excentricidad,
+repetibilidad, linealidad y resumen. Guarda borradores privados y puede finalizar planes publicados con
 un perfil controlado. Los cálculos se ejecutan otra vez en Supabase; Flutter no
 envía veredictos. Los resultados son comprobaciones internas, no certificados
 de calibración ni verificaciones legales. Ver
 [motor metrológico](../docs/normative-metrology-engine.md).
+
+Las cargas de configuración se muestran como sugerencias. En los tres ensayos
+se registra la carga realmente utilizada, incluidas cargas de trabajo y
+productos, con su origen. La captura admite plataformas y posiciones,
+varias cargas de repetibilidad y puntos de indicación por sustitución.
+Ver [captura flexible y comparación con ServiceMET](../docs/flexible-metrology-capture.md).
 
 - Arquitectura y reglas de capas: [../docs/architecture.md](../docs/architecture.md)
 - Instalar / compilar / firmar: [../docs/app-install-guide.md](../docs/app-install-guide.md)
@@ -52,8 +59,10 @@ flutter run --dart-define-from-file=config/supabase.local.json
 `features/online/` contiene el transporte Supabase, la sesión, configuración del
 cliente y las pantallas activas. El transporte se inyecta con
 `mobileApiProvider`; los tests usan un
-adaptador HTTP sintético, nunca un proyecto remoto. La base Drift y las features
-demo no participan en este recorrido. No almacenar evidencia localmente.
+adaptador HTTP sintético, nunca un proyecto remoto. Las features demo no
+participan en este recorrido. La captura utiliza SQLite/Drift exclusivamente
+para recuperar borradores en el móvil; la evidencia final y el historial
+permanecen en Supabase. Ver [recuperación de capturas](../docs/draft-recovery.md).
 
 ## Sistema visual
 

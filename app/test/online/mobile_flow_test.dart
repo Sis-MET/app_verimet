@@ -14,7 +14,7 @@ void main() {
     'compartir requiere mensaje y consentimiento para el snapshot exacto',
     (tester) async {
       final server = FixtureServer();
-      final session = MobileSession(server.api);
+      final session = MobileSession(server.api, recovery: server.recovery);
       await tester.runAsync(
         () => server.api.login('operador', 'fixture-password'),
       );
@@ -56,7 +56,10 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [mobileApiProvider.overrideWithValue(server.api)],
+        overrides: [
+          mobileApiProvider.overrideWithValue(server.api),
+          draftRecoveryProvider.overrideWithValue(server.recovery),
+        ],
         child: const IvmetApp(),
       ),
     );
@@ -73,6 +76,11 @@ void main() {
       'fixture-password',
     );
     await tester.tap(find.text('Ingresar'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> nextStep(WidgetTester tester) async {
+    await tester.tap(find.text('Siguiente'));
     await tester.pumpAndSettle();
   }
 
@@ -204,7 +212,7 @@ void main() {
     tester,
   ) async {
     final server = FixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     tester.view.physicalSize = const Size(430, 1800);
     tester.view.devicePixelRatio = 1;
@@ -216,19 +224,19 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Guardar borrador privado'), findsNothing);
-    await tester.tap(find.text('Error de indicación'));
-    await tester.pumpAndSettle();
+    await nextStep(tester);
+    await nextStep(tester);
+    await nextStep(tester);
     final indication = find.widgetWithText(TextFormField, 'Indicación');
     await tester.ensureVisible(indication);
     await tester.enterText(indication, '0,123456789');
-    await tester.tap(find.text('Finalizar prueba'));
-    await tester.pumpAndSettle();
-    expect(find.text('COMPLETADA'), findsOneWidget);
+    await nextStep(tester);
+    expect(find.text('Paso 5 de 5'), findsOneWidget);
     final save = find.text('Guardar borrador privado');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
-    final request = server.requests.singleWhere(
+    final request = server.requests.lastWhere(
       (r) => r.path.contains('ivmet_mobile_save_draft'),
     );
     final content = object(object(request.data)['content']);
@@ -245,7 +253,10 @@ void main() {
       ),
       false,
     );
-    expect(find.textContaining('Guardado en Supabase'), findsOneWidget);
+    expect(
+      find.text('Guardado en este dispositivo y en el servidor'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     session.dispose();
@@ -254,10 +265,8 @@ void main() {
     tester,
   ) async {
     final server = FixtureServer();
-    final session = MobileSession(server.api);
-    await tester.runAsync(
-      () => server.api.login('operador', 'fixture-password'),
-    );
+    final session = MobileSession(server.api, recovery: server.recovery);
+    await tester.runAsync(() => session.login('operador', 'fixture-password'));
     tester.view.physicalSize = const Size(430, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -267,18 +276,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Error de indicación'));
-    await tester.pumpAndSettle();
+    await nextStep(tester);
+    await nextStep(tester);
+    await nextStep(tester);
     final indication = find.widgetWithText(TextFormField, 'Indicación');
     await tester.ensureVisible(indication);
     await tester.enterText(indication, '10.1');
-    await tester.tap(find.text('Finalizar prueba'));
-    await tester.pumpAndSettle();
+    await nextStep(tester);
     final save = find.text('Guardar borrador privado');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
-    final finalize = find.text('Finalizar comprobación interna');
+    final finalize = find.text('Guardar y finalizar');
     await tester.ensureVisible(finalize);
     await tester.tap(finalize);
     await tester.pumpAndSettle();
@@ -291,7 +300,10 @@ void main() {
     );
     final body = object(request.data);
     expect(body['draft_id'], 'draft-fixture');
-    expect(body['expected_version'], '1');
+    expect(
+      body['expected_version'],
+      server.savedDrafts.values.single['version'],
+    );
     expect(body['finalize_id'], isNotEmpty);
     expect(body.containsKey('verdict'), false);
     await tester.tap(find.text('Ver historial'));
@@ -304,7 +316,7 @@ void main() {
     tester,
   ) async {
     final server = FixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     session.user!['role'] = 'cliente_jefe_calidad';
 
@@ -335,4 +347,110 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     session.dispose();
   });
+
+  testWidgets(
+    'reiniciar recupera automáticamente el paso y la captura incompleta',
+    (tester) async {
+      final server = FixtureServer()..bundle = fixtureWizardBundle;
+      final session = MobileSession(server.api, recovery: server.recovery);
+      await tester.runAsync(
+        () => session.login('operador', 'fixture-password'),
+      );
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DraftScreen(session: session, bundle: fixtureWizardBundle),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Temperatura (°C)'),
+        '23,125',
+      );
+      final humidity = find.widgetWithText(
+        TextFormField,
+        'Humedad relativa (%)',
+      );
+      await tester.ensureVisible(humidity);
+      await tester.enterText(humidity, '48');
+      await nextStep(tester);
+      expect(find.text('Excentricidad'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Indicación'),
+        '10,001',
+      );
+      await nextStep(tester);
+      expect(find.text('Repetibilidad'), findsOneWidget);
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Motivo de omisión'),
+        'Carga no disponible',
+      );
+      await nextStep(tester);
+      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      final indication = find.widgetWithText(TextFormField, 'Indicación');
+      await tester.enterText(indication, '10,');
+      await tester.pumpAndSettle();
+      // Destroy both the widget tree and the session without saving or leaving.
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+      await start(tester, server);
+      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      expect(tester.widget<TextFormField>(indication).controller!.text, '10,');
+      await tester.tap(find.text('Anterior'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        true,
+      );
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.widgetWithText(TextFormField, 'Motivo de omisión'),
+            )
+            .controller!
+            .text,
+        'Carga no disponible',
+      );
+      await tester.tap(find.byTooltip('Pesas patrón y ambiente'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.widgetWithText(TextFormField, 'Temperatura (°C)'),
+            )
+            .controller!
+            .text,
+        '23,125',
+      );
+      expect(
+        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        true,
+      );
+      // Also exercise the summary with the real app theme at narrow width.
+      tester.view.physicalSize = const Size(320, 740);
+      await nextStep(tester);
+      await nextStep(tester);
+      await nextStep(tester);
+      await tester.enterText(indication, '10,002');
+      await nextStep(tester);
+      expect(find.text('Paso 5 de 5'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextFormField, 'Observaciones'),
+        250,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Observaciones'),
+        'Comprobación recuperada',
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }

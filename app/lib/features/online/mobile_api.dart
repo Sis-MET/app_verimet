@@ -70,7 +70,27 @@ class MobileFailure implements Exception {
       'Un certificado ya no está disponible para esta planta.',
     'DRAFT_EXPIRED' => 'El borrador venció. Inicia uno nuevo.',
     'INCOMPLETE_TEST' =>
-      'Completa todas las indicaciones de cada prueba ejecutada.',
+      'Completa las cargas utilizadas y las indicaciones de cada prueba ejecutada.',
+    'LOAD_OUT_OF_CAPACITY' =>
+      'La carga debe estar entre cero y la capacidad máxima de la balanza.',
+    'POSITIVE_LOAD_REQUIRED' =>
+      'Utiliza una carga mayor que cero para excentricidad y repetibilidad.',
+    'DISTINCT_LOADS_REQUIRED' =>
+      'Registra al menos dos cargas diferentes para evaluar la linealidad.',
+    'GROUP_LOAD_MISMATCH' =>
+      'Cada grupo debe repetir la misma carga utilizada.',
+    'INVALID_PLATFORM_POSITIONS' =>
+      'Revisa la forma de la plataforma y la cantidad de posiciones.',
+    'INVALID_READING_COUNT' || 'INVALID_READING_ORDER' =>
+      'Revisa la cantidad y el orden de las mediciones.',
+    'INVALID_TEST_SETUP' => 'Revisa la configuración de esta prueba.',
+    'SUBSTITUTION_REFERENCE_REQUIRED' =>
+      'La sustitución requiere una carga base y una referencia anteriores completas.',
+    'INVALID_SUBSTITUTION' => 'Revisa los datos de la carga por sustitución.',
+    'SUBSTITUTION_PENDING' =>
+      'Completa o descarta la sustitución pendiente antes de finalizar.',
+    'CAPTURE_VERSION_MISMATCH' =>
+      'Este borrador requiere la versión de la app con la que fue creado. Actualiza la app para recuperarlo.',
     'ALL_TESTS_OMITTED' => 'Debes ejecutar al menos una prueba.',
     'FINALIZATION_CONFLICT' =>
       'La finalización ya fue utilizada con otros datos. Vuelve a abrir el borrador.',

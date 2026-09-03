@@ -3,7 +3,24 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:ivmet/core/storage/token_storage.dart';
+import 'package:ivmet/core/storage/draft_recovery_store.dart';
+import 'package:ivmet/features/online/draft_recovery.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
+
+class MemoryDraftStore implements DraftRecoveryStore {
+  final documents = <String, String>{};
+  bool failWrites = false;
+  @override
+  Future<String?> read(String owner) async => documents[owner];
+  @override
+  Future<void> write(String owner, String document) async {
+    if (failWrites) throw StateError('Disk full');
+    documents[owner] = document;
+  }
+
+  @override
+  Future<void> close() async {}
+}
 
 class MemoryTokens implements TokenStorage {
   String? access;
@@ -154,7 +171,53 @@ const fixtureNormativeBundle = {
   'patterns': [],
 };
 
+final fixtureWizardBundle = {
+  ...fixtureBundle,
+  'plan': {
+    ...fixturePlan,
+    'finalizationEnabled': true,
+    'tests': [
+      for (final type in ['linearity', 'repeatability', 'eccentricity'])
+        {
+          'id': 'test-$type',
+          'type': type,
+          'unit': 'kg',
+          'frequencyDays': 30,
+          'points': [
+            {
+              'id': 'point-$type',
+              'order': 1,
+              'label': 'Lectura de prueba',
+              'load': '10',
+              'tolerance': '0.5',
+            },
+          ],
+        },
+    ],
+  },
+  'patterns': [
+    {
+      'id': 'pattern-1',
+      'code': 'JP-001',
+      'description': 'Juego de pesas patrón',
+      'certificates': [
+        {
+          'id': 'cert-1',
+          'number': 'CERT-2026',
+          'laboratory': 'Laboratorio',
+          'expiresOn': '2027-09-01',
+          'expired': false,
+        },
+      ],
+    },
+  ],
+};
+
 class FixtureServer {
+  Json bundle = {...fixtureBundle};
+  final recovery = DraftRecovery(MemoryDraftStore());
+  final Map<String, Json> savedDrafts = {};
+  final Map<String, Json> saveReceipts = {};
   Json user = {...fixtureUser};
   bool allowed = true;
   bool online = true;
@@ -211,15 +274,28 @@ class FixtureServer {
       return (200, {'id': 'case-fixture', 'codigo': 'CASO-TEST'});
     }
     if (request.path.contains('ivmet_mobile_save_draft')) {
-      return (
-        200,
-        {
-          'id': 'draft-fixture',
-          'requestId': body['request_id'],
-          'version': '1',
-          'savedAt': '2026-08-28T12:00:00Z',
-        },
-      );
+      final prior = saveReceipts[body['save_id']];
+      if (prior != null) return (200, prior);
+      final current = savedDrafts[body['request_id']];
+      final version = int.parse(current?['version']?.toString() ?? '0');
+      if (body['expected_version'].toString() != version.toString()) {
+        return (409, {'message': 'ROW_VERSION_CONFLICT'});
+      }
+      final receipt = {
+        'id': 'draft-fixture',
+        'requestId': body['request_id'],
+        'version': '${version + 1}',
+        'savedAt': '2026-08-28T12:00:00Z',
+      };
+      savedDrafts[body['request_id'] as String] = {
+        'id': 'draft-fixture',
+        'request_uuid': body['request_id'],
+        'version': '${version + 1}',
+        'context_snapshot': bundle,
+        'payload': body['content'],
+      };
+      saveReceipts[body['save_id'] as String] = receipt;
+      return (200, receipt);
     }
     if (request.path.contains('ivmet_mobile_finalize_draft')) {
       return (
@@ -275,12 +351,18 @@ class FixtureServer {
         return (
           200,
           {
-            ...fixtureBundle,
+            ...bundle,
             'customerValidated': true,
             'customerUpdatePending': customerUpdatePending,
           },
         );
       case 'drafts':
+        return (
+          200,
+          {'total': savedDrafts.length, 'items': savedDrafts.values.toList()},
+        );
+      case 'draft':
+        return (200, savedDrafts.values.first);
       case 'history':
         return (200, {'total': 0, 'items': []});
       default:

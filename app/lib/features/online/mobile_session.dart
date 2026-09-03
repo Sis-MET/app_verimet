@@ -5,7 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/di/core_providers.dart';
+import '../../core/storage/draft_recovery_store.dart';
+import 'draft_recovery.dart';
 import 'mobile_api.dart';
+
+final draftRecoveryProvider = Provider<DraftRecovery>((ref) {
+  final store = createDraftRecoveryStore();
+  ref.onDispose(() => unawaited(store.close()));
+  return DraftRecovery(store);
+});
 
 final mobileApiProvider = Provider<MobileApi>((ref) {
   final api = MobileApi(
@@ -17,7 +25,10 @@ final mobileApiProvider = Provider<MobileApi>((ref) {
 });
 
 final mobileSessionProvider = Provider<MobileSession>((ref) {
-  final session = MobileSession(ref.watch(mobileApiProvider));
+  final session = MobileSession(
+    ref.watch(mobileApiProvider),
+    recovery: ref.watch(draftRecoveryProvider),
+  );
   ref.onDispose(session.dispose);
   return session;
 });
@@ -33,10 +44,21 @@ enum SessionStage {
 }
 
 class MobileSession extends ChangeNotifier {
-  MobileSession(this.api) {
+  MobileSession(this.api, {DraftRecovery? recovery})
+    : recovery = recovery ?? DraftRecovery(createDraftRecoveryStore()),
+      _ownsRecovery = recovery == null {
     api.onFailure = observeFailure;
   }
   final MobileApi api;
+  final DraftRecovery recovery;
+  final bool _ownsRecovery;
+  String get recoveryOwner {
+    if (user == null) {
+      throw StateError('Recovery requires an authenticated user');
+    }
+    return jsonEncode([api.configuration.url, user!['clientId'], user!['id']]);
+  }
+
   SessionStage stage = SessionStage.starting;
   Json? user;
   Json access = {};
@@ -167,7 +189,7 @@ class MobileSession extends ChangeNotifier {
     _checking = false;
     stage = disconnected ? SessionStage.offline : SessionStage.suspended;
     error = disconnected
-        ? 'Sin conexión. El contenido está protegido hasta validar el acceso. Los cambios sin guardar solo permanecen en memoria.'
+        ? 'Sin conexión. El contenido está protegido hasta validar el acceso. Las comprobaciones conservan su borrador en este dispositivo.'
         : null;
     _notify();
   }
@@ -200,6 +222,7 @@ class MobileSession extends ChangeNotifier {
     api.onFailure = null;
     _disposed = true;
     _check++;
+    if (_ownsRecovery) unawaited(recovery.store.close());
     super.dispose();
   }
 }

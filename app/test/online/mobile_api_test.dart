@@ -113,7 +113,7 @@ void main() {
     'la sesión valida contraseña, licencia, revocación y salida offline',
     () async {
       final server = FixtureServer();
-      final session = MobileSession(server.api);
+      final session = MobileSession(server.api, recovery: server.recovery);
       await session.start();
       expect(session.stage, SessionStage.login);
       server.user['mustChangePassword'] = true;

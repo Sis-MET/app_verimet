@@ -44,7 +44,7 @@ void main() {
     tester,
   ) async {
     final server = CustomerFixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     await show(
       tester,
@@ -81,7 +81,7 @@ void main() {
     'compartir exige consentimiento y reintenta el mismo UUID y snapshot',
     (tester) async {
       final server = CustomerFixtureServer()..saveFailures = 1;
-      final session = MobileSession(server.api);
+      final session = MobileSession(server.api, recovery: server.recovery);
       await tester.runAsync(
         () => session.login('operador', 'fixture-password'),
       );
@@ -134,7 +134,7 @@ void main() {
     tester,
   ) async {
     final server = CustomerFixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     await show(
       tester,
@@ -153,7 +153,7 @@ void main() {
     tester,
   ) async {
     final server = CustomerFixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     await show(
       tester,
@@ -174,7 +174,7 @@ void main() {
     tester,
   ) async {
     final server = CustomerFixtureServer();
-    final session = MobileSession(server.api);
+    final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     session.user!['role'] = 'cliente_jefe_calidad';
     await show(
@@ -201,22 +201,12 @@ void main() {
     );
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Continuar'));
-    await tester.pumpAndSettle();
-    expect(find.text('3. Límites y confirmación'), findsOneWidget);
+    expect(find.text('2. Errores permisibles y confirmación'), findsOneWidget);
+    expect(find.text('Linealidad'), findsOneWidget);
+    expect(find.textContaining('Carga ('), findsNothing);
     for (final field
-        in find
-            .widgetWithText(TextFormField, 'Límite de aceptación (kg)')
-            .evaluate()
-            .toList()
-            .asMap()
-            .keys) {
-      await tester.enterText(
-        find
-            .widgetWithText(TextFormField, 'Límite de aceptación (kg)')
-            .at(field),
-        '0.5',
-      );
+        in find.byType(TextFormField).evaluate().toList().asMap().keys) {
+      await tester.enterText(find.byType(TextFormField).at(field), '0.5');
     }
     await tester.tap(find.text('Activar configuración'));
     await tester.pumpAndSettle();
@@ -231,7 +221,13 @@ void main() {
     expect(configuration.containsKey('procedureReference'), false);
     expect(
       objects(configuration['tests']).every(
-        (test) => test['frequencyDays'] == '30' && test['tolerance'] == '0.5',
+        (test) =>
+            test['frequencyDays'] == '30' &&
+            test['tolerance'] == '0.5' &&
+            !test.containsKey('loads') &&
+            !test.containsKey('load') &&
+            !test.containsKey('repetitions') &&
+            !test.containsKey('positions'),
       ),
       true,
     );

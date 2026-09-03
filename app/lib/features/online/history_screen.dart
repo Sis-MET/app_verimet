@@ -37,13 +37,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ],
     child: RemotePanel(
       dataKey: '$page|$revision',
-      load: () => widget.session.api.read(
-        widget.drafts ? 'drafts' : 'history',
-        {'page': page, 'equipmentId': widget.equipmentId},
-      ),
+      load: () async {
+        final data = await widget.session.api.read(
+          widget.drafts ? 'drafts' : 'history',
+          {'page': page, 'equipmentId': widget.equipmentId},
+        );
+        if (widget.drafts) {
+          data['localDrafts'] =
+              (await widget.session.recovery.list(widget.session.recoveryOwner))
+                  .where(
+                    (d) =>
+                        widget.equipmentId == null ||
+                        object(object(d['bundle'])['equipment'])['id'] ==
+                            widget.equipmentId,
+                  )
+                  .toList();
+        }
+        return data;
+      },
       builder: (data) {
         final items = objects(data['items']);
         final total = (data['total'] as num).toInt();
+        final localDrafts = objects(data['localDrafts']);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
@@ -53,13 +68,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
               style: AppTextStyles.caption(context, size: 12),
             ),
             const SizedBox(height: 4),
-            if (items.isEmpty)
+            for (final local in localDrafts)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_note),
+                title: Text(
+                  customerEquipmentCode(
+                    object(object(local['bundle'])['equipment']),
+                  ),
+                ),
+                subtitle: Text(
+                  'En este dispositivo · paso ${(local['step'] as num).toInt() + 1} de 5',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await openPage(
+                    context,
+                    RecoveredDraftScreen(
+                      session: widget.session,
+                      snapshot: local,
+                    ),
+                  );
+                  if (mounted) setState(() => revision++);
+                },
+              ),
+            if (items.isEmpty && localDrafts.isEmpty)
               Notice(
                 widget.drafts
                     ? 'No tienes borradores guardados.'
                     : 'Todavía no hay verificaciones finalizadas. Las capturas sin evaluación están en Mis borradores.',
               ),
-            for (final item in items)
+            for (final item in items.where(
+              (item) => !localDrafts.any(
+                (d) => d['requestId'] == item['request_uuid'],
+              ),
+            ))
               _HistoryRow(
                 item: item,
                 draft: widget.drafts,
@@ -142,7 +185,11 @@ class _HistoryRow extends StatelessWidget {
     final String meta = draft
         ? '${dateLabel(item['updated_at'])} · versión ${item['version']}'
         : '${dateLabel(item['realizado_at'])} · '
-              '${annulled ? 'Anulada' : item['trazabilidad'] == 'non_traceable' ? 'No trazable' : 'Trazable'} · '
+              '${annulled
+                  ? 'Anulada'
+                  : item['trazabilidad'] == 'non_traceable'
+                  ? 'No trazable'
+                  : 'Trazable'} · '
               '${item['alcance'] == 'partial' ? 'Parcial' : 'Completa'}';
 
     return Material(

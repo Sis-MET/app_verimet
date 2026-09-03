@@ -17,6 +17,8 @@
   cadenas.
 - Borradores privados en Supabase, reanudación, omisiones justificadas,
   condiciones ambientales y selección de patrones/certificados.
+- Cargas sugeridas editables en todos los ensayos, origen de las cargas,
+  grupos de repetibilidad y sustitución; recuperación de filas retiradas.
 - Historial privado, anulación con motivo por el jefe de calidad, vista previa
   y consentimiento explícito para compartir un expediente; retirada del acceso.
 - Perfiles controlados para plataformas y básculas camioneras estáticas,
@@ -56,10 +58,13 @@ Set-Location 'C:\Users\jhona\IvMET'
 pnpm dlx supabase db push --linked --dry-run
 ```
 
-En una instalación actualizada debe aparecer
-`202608310001_normative_metrology_engine.sql`. En una instalación nueva también
-aparecerán las migraciones móviles 003 y 004. Revisa el proyecto enlazado antes
-de confirmar.
+Para la captura flexible debe aparecer
+`202609030002_load_free_check_configuration.sql`, después de
+`202609030001_flexible_test_loads.sql` y cualquier migración anterior
+pendiente. Aplicarlas en orden; requiere el motor normativo, la configuración
+guiada y las correcciones posteriores de catálogo. Revisa el proyecto enlazado
+antes de confirmar. La app activa la captura flexible al recibir la capacidad
+v2 del servidor; los borradores anteriores conservan su formato original.
 
 ```powershell
 pnpm dlx supabase db push --linked
@@ -131,10 +136,11 @@ aviso y deshabilita el ingreso. No hay usuario ni contraseña precargados.
 Se revalida el acceso cada 30 segundos, al volver al primer plano y al recuperar
 conectividad. Cada RPC vuelve a comprobar licencia y plantas en PostgreSQL.
 Mientras no se puede comprobar el acceso, la pantalla privada se oculta y no
-acepta interacción. Los campos sin guardar pueden permanecer en memoria al
-cambiar de aplicación, pero no son una cola offline ni sobreviven al cierre del
-proceso. La pérdida del rol, licencia, planta o sesión destruye la navegación
-privada. **Guardar en Supabase antes de cerrar la app.**
+acepta interacción. Las comprobaciones conservan cada cambio en un borrador
+local y recuperan el paso activo al reiniciar, después de validar la sesión y
+el acceso a la balanza. El resto de los formularios mantiene su comportamiento
+online. La pérdida de acceso oculta la navegación privada; no elimina una
+captura pendiente. Ver [recuperación de capturas](draft-recovery.md).
 
 Logout elimina los tokens locales aunque no haya red. Si no puede confirmar
 la revocación remota, lo indica. El access token emitido puede seguir siendo
@@ -142,8 +148,11 @@ válido hasta expirar; no se promete revocación instantánea de un JWT ya emiti
 Supabase documenta la [rotación de sesiones](https://supabase.com/docs/guides/auth/sessions)
 y el [alcance del cierre de sesión](https://supabase.com/docs/guides/auth/signout).
 
-Los historiales y borradores no se escriben en SQLite. Las lecturas se mantienen
-como cadenas y se validan en el servidor. No se registran cuerpos HTTP o tokens.
+Los borradores de comprobación se escriben en SQLite en el directorio privado
+de soporte de la app. Están separados por servidor, cliente y usuario; la
+recuperación se retira al confirmar la finalización. El historial no se guarda
+localmente. Las lecturas se mantienen como cadenas y se validan en el servidor.
+No se registran cuerpos HTTP o tokens.
 Un borrador no es evidencia aceptada y puede estar incompleto. Sus certificados
 se vuelven a validar al guardar; un certificado vencido se muestra claramente.
 El snapshot de equipo y configuración queda ligado a la creación del borrador. Al

@@ -24,7 +24,7 @@ Las pantallas repiten este alcance para evitar una interpretación incorrecta.
   que cualquier nueva edición exige una nueva versión del motor y pruebas
   doradas; no se modifica silenciosamente un plan publicado.
 - [EURAMET Calibration Guide No. 18, versión 4.0](https://www.euramet.org/publications-media-centre/calibration-guidelines/):
-  estructura técnica de error de indicación, repetibilidad y excentricidad para
+  estructura técnica de linealidad, repetibilidad y excentricidad para
   instrumentos de pesaje no automáticos.
 - [ILAC G8:09/2019](https://ilac.org/publications-and-resources/ilac-guidance-series/):
   reglas de decisión y resultados no concluyentes cuando se usa banda de guarda.
@@ -41,27 +41,27 @@ cliente en laboratorio acreditado.
 
 | Perfil | Prueba | Evaluación del servidor |
 | --- | --- | --- |
-| Plataforma estática | Error de indicación | `indicación - carga nominal`; veredicto por valor absoluto. |
+| Plataforma estática | Linealidad | `indicación - carga utilizada`; veredicto por valor absoluto. |
 | Plataforma estática | Repetibilidad | Desviación estándar muestral de indicaciones a una misma carga. |
 | Plataforma estática | Excentricidad | Diferencia de cada posición respecto de una lectura de referencia. |
-| Báscula camionera estática | Error de indicación | Igual que plataforma; puede usar MPE OIML en servicio como referencia. |
+| Báscula camionera estática | Linealidad | Igual que plataforma; puede usar MPE OIML en servicio como referencia. |
 | Báscula camionera estática | Repetibilidad | Desviación estándar muestral a una misma carga. |
 | Báscula camionera estática | Desplazamiento | Diferencia respecto de la referencia en posiciones inicio/centro/final. |
 
 El código del motor es `ivmet-internal-1.0.0`. Desde la ficha de cada balanza,
-el jefe de calidad elige las comprobaciones, su periodicidad, confirma las
-cargas sugeridas e introduce el límite de aceptación. IvMET determina el perfil
+el jefe de calidad elige las comprobaciones, su periodicidad e introduce los
+errores permisibles. IvMET determina el perfil
 por tipo de equipo y genera, publica y asigna una versión interna en una sola
 transacción. El cliente no administra nombres, códigos, métodos ni estados de
 planes y no puede enviar una fórmula arbitraria desde Flutter.
 
 ## Configuración guiada por balanza
 
-La app presenta tres pasos: comprobaciones y periodicidad, cargas o posiciones,
-y límites de aceptación. Linealidad propone cinco cargas distribuidas hasta la
-capacidad máxima; repetibilidad propone una carga intermedia y cinco lecturas;
-excentricidad fija cinco posiciones para plataforma o tres para báscula
-camionera. Las propuestas se pueden ajustar dentro del rango permitido.
+La app presenta dos pasos: comprobaciones con su periodicidad y errores
+permisibles con confirmación. No se configuran cargas ni cantidades de
+mediciones. Supabase genera puntos de referencia internos desde la capacidad
+para iniciar la captura, pero el operador declara allí las cargas realmente
+utilizadas y el número de mediciones.
 
 Las tablas de planes y versiones se conservan únicamente como mecanismo
 interno para reproducir la configuración histórica de una verificación. Cada
@@ -85,6 +85,13 @@ versión 1 no estima incertidumbre de calibración ni corrige empuje del aire,
 histéresis, redondeo de indicación o carga sustitutiva. Si el procedimiento del
 cliente necesita esas magnitudes debe crearse una versión posterior del motor,
 con revisión metrológica y nuevos casos dorados.
+
+La extensión `ivmet-internal-2.0.0` incorpora cargas utilizadas distintas de
+las sugerencias, grupos independientes y cálculo de cargas por sustitución
+tomado de ServiceMET. El motor v1 permanece para capturas anteriores. La
+extensión no propaga incertidumbre de sustitución ni amplía el alcance a una
+calibración certificada. Ver [captura flexible](flexible-metrology-capture.md)
+para fórmulas, procedencia de las cargas, persistencia y casos de prueba.
 
 ## Finalización y evidencia
 
@@ -118,7 +125,7 @@ comprueba, entre otros casos:
 
 - puntos frontera de MPE OIML clase III;
 - comparación directa y banda de guarda;
-- error de indicación y desviación estándar muestral;
+- linealidad mediante el error de cada indicación y desviación estándar muestral;
 - finalización trazable e idempotente;
 - evidencia inmutable;
 - prueba parcial, certificado vencido, resultado no conforme y alerta privada;

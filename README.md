@@ -5,11 +5,12 @@
 Monorepo con la app movil Flutter, el backend principal en Supabase y los
 componentes de integracion con los servidores de Metrica. Permite a los
 clientes ejecutar y registrar comprobaciones de
-**excentricidad**, **repetibilidad** y **error de indicación** sobre sus balanzas, entre
+**excentricidad**, **repetibilidad** y **linealidad** sobre sus balanzas, entre
 calibraciones formales.
 
 - Funciona **online-only**: la app requiere Internet y autoguarda borradores en
-  Supabase.
+  Supabase. La captura también conserva un borrador local para recuperarse de
+  cierres inesperados, con el paso y las lecturas pendientes.
 - Es **multi-tenant**: cada cliente ve solo sus instrumentos y reportes.
 - El personal de Métrica solo recibe las **alertas que el jefe de calidad
   comparte expresamente**, junto con su verificación y PDF.

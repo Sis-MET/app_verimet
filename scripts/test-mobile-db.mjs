@@ -405,6 +405,143 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
         where aggregate_type in ('public.verificaciones','public.pruebas','public.lecturas') and not privacy_blocked`))[0].n, 0);
       await identity(operator);
     });
+    await t.test('cargas flexibles: cálculo real, grupos independientes, sustitución y recuperación', async () => {
+      await identity(quality);
+      const configurationRequest = uuid();
+      const obsoleteLoads = { tests: [
+        { type: 'linearity', frequencyDays: '30', tolerance: '0.5', loads: ['1','2','3','4','5'] },
+        { type: 'repeatability', frequencyDays: '30', tolerance: '0.5', load: '99', repetitions: '10' },
+        { type: 'eccentricity', frequencyDays: '30', tolerance: '0.5', load: '99', positions: '3' },
+      ] };
+      const loadFree = { tests: [
+        { type: 'linearity', frequencyDays: '30', tolerance: '0.5' },
+        { type: 'repeatability', frequencyDays: '30', tolerance: '0.5' },
+        { type: 'eccentricity', frequencyDays: '30', tolerance: '0.5' },
+      ] };
+      const configured = await configureChecks(equipment, obsoleteLoads, configurationRequest);
+      assert.deepEqual(await configureChecks(equipment, loadFree, configurationRequest), configured,
+        'obsolete load fields do not participate in configuration or its idempotency hash');
+      const cert = await customer('certificate.create', {
+        patternId: pattern, number: 'CERT-FLEXIBLE', lab: 'Laboratorio',
+        calibratedOn: today, expiresOn: endsOn,
+      });
+      await identity(operator);
+      const bundle = await read('equipment', { equipmentId: equipment });
+      assert.equal(bundle.plan.captureVersion, 2);
+      assert.equal(bundle.plan.captureEngineVersion, 'ivmet-internal-2.0.0');
+      const trialOf = type => bundle.plan.tests.find(t => t.type === type);
+      const setupOf = (extra = {}) => ({ source: 'process', description: 'Sacos de producto, masa asignada', notes: '',
+        platform: 'square', indicatorPosition: 'front', groupCount: 1, measurementCount: 3, pointCount: 5,
+        loadingMethod: 'none', substitutionMethod: 'none', ...extra });
+      const row = (pointId, slot, load, indication, group = 1) => ({ pointId, slot, group, load, indication, zero: '' });
+      const lin = trialOf('linearity'), rep = trialOf('repeatability'), ecc = trialOf('eccentricity');
+      assert.deepEqual(lin.points.map(p => Number(p.load)), [0,25,50,75,100]);
+      assert.ok(rep.points.every(p => Number(p.load) === 50));
+      assert.ok(ecc.points.every(p => Math.abs(Number(p.load) - 33.333333333) < 1e-9));
+      const contentV2 = { captureVersion: 2, certificates: [cert.id], temperature: '', humidity: '', observations: '', tests: [
+        { id: lin.id, omitted: false, reason: '', setup: setupOf({ pointCount: 2 }),
+          readings: [row(lin.points[0].id, 1, '12.123456789', '12.223456789'), row(uuid(), 2, '23', '23.2')],
+          retainedReadings: [row(uuid(), 3, '24,', '-', 1)] },
+        { id: rep.id, omitted: false, reason: '', setup: setupOf({ groupCount: 2 }),
+          readings: [
+            ...['10','10.1','9.9'].map((i,n) => row(rep.points[n].id,n+1,'10',i)),
+            ...['80','80.2','79.8'].map((i,n) => row(uuid(),n+1,'80',i,2)),
+          ], retainedReadings: [] },
+        { id: ecc.id, omitted: false, reason: '', setup: setupOf(),
+          readings: ['19.8','19.9','19.7','19.8','19.8'].map((i,n) => row(ecc.points[n].id,n+1,'20',i)), retainedReadings: [] },
+      ] };
+      const saveV2 = async payload => (await q('select public.ivmet_mobile_save_draft($1,$2,$3,0,$4,$5) r',
+        [uuid(),equipment,configured.configurationId,payload,uuid()]))[0].r;
+      const finalizeV2 = async draft => (await q('select public.ivmet_mobile_finalize_draft($1,$2,$3) r',
+        [draft.id,Number(draft.version),uuid()]))[0].r;
+      const saved = await saveV2(contentV2);
+      const resumed = await read('draft', { id: saved.id });
+      assert.deepEqual(resumed.payload, contentV2, 'raw inactive fields and all active loads survive a server round trip');
+      const result = await finalizeV2(saved);
+      assert.equal(result.verdict, 'pass');
+      assert.equal(result.traceability, 'non_traceable', 'a valid certificate does not certify working loads');
+      const evidence = await q(`select p.tipo,p.valor_metrica::text,p.media::text,p.evaluacion_snapshot,
+        jsonb_agg(jsonb_build_object('load',l.carga_nominal::text,'error',l.error::text,'metadata',l.metadata) order by l.orden) readings
+        from public.pruebas p join public.lecturas l on l.prueba_id=p.id where p.verificacion_id=$1 group by p.id`, [result.id]);
+      const linearResult = evidence.find(e => e.tipo === 'linearity');
+      assert.equal(linearResult.readings.length, 2, 'inactive readings never enter the evaluation');
+      assert.equal(linearResult.readings[0].load, '12.123456789');
+      assert.equal(linearResult.readings[0].error, '0.100000000', 'actual, not suggested, load is used');
+      assert.equal(linearResult.readings[0].metadata.suggestedLoad, lin.points[0].load);
+      const repeatResult = evidence.find(e => e.tipo === 'repeatability');
+      assert.equal(repeatResult.valor_metrica, '0.200000000', 'maximum of within-group sample standard deviations');
+      assert.equal(repeatResult.media, null, 'no meaningless average across different loads');
+      assert.deepEqual(repeatResult.evaluacion_snapshot.groups.map(g => Number(g.mean)), [10,80]);
+      assert.equal(evidence.find(e => e.tipo === 'eccentricity').valor_metrica, '0.100000000');
+
+      const substituted = structuredClone(contentV2);
+      const linear = substituted.tests[0];
+      linear.retainedReadings = [];
+      linear.setup.pointCount = 3;
+      linear.setup.substitutionMethod = 'method_1';
+      linear.readings = [row(lin.points[0].id,1,'10','10.1'), row(lin.points[1].id,2,'20','20.2'),
+        { ...row(uuid(),3,'99','35.1'), substitution: { referencePointId: lin.points[0].id, basePointId: lin.points[1].id, indication: '15.1' } }];
+      linear.substitutionDraft = { referencePointId: lin.points[0].id, basePointId: lin.points[1].id, indication: '15,' };
+      const pendingSubstitution = await saveV2(substituted);
+      assert.deepEqual((await read('draft', { id: pendingSubstitution.id })).payload.tests[0].substitutionDraft, linear.substitutionDraft);
+      await assert.rejects(finalizeV2(pendingSubstitution), /SUBSTITUTION_PENDING/);
+      delete linear.substitutionDraft;
+      const substitutedResult = await finalizeV2(await saveV2(substituted));
+      const derived = (await q(`select l.carga_nominal::text,l.error::text,l.metadata from public.lecturas l
+        join public.pruebas p on p.id=l.prueba_id where p.verificacion_id=$1 and p.tipo='linearity' and l.orden=3`, [substitutedResult.id]))[0];
+      assert.equal(derived.carga_nominal, '35.000000000', 'server derives substitution load instead of trusting 99');
+      assert.equal(derived.error, '0.100000000');
+      assert.equal(derived.metadata.substitution.indication, '15.1');
+
+      const invalid = structuredClone(contentV2);
+      invalid.tests[1].setup.measurementCount = '3';
+      await assert.rejects(saveV2(invalid), /INVALID_TEST_SETUP/);
+      invalid.tests[1].setup.measurementCount = 3;
+      invalid.tests[0].readings[0].pointId = rep.points[0].id;
+      await assert.rejects(saveV2(invalid), /INVALID_POINT/);
+      invalid.tests[0] = structuredClone(contentV2.tests[0]);
+      invalid.tests[1].readings[1].load = '11';
+      await assert.rejects(saveV2(invalid), /GROUP_LOAD_MISMATCH/);
+      invalid.tests[1] = structuredClone(contentV2.tests[1]);
+      invalid.tests[0].readings[1].load = '101';
+      await assert.rejects(finalizeV2(await saveV2(invalid)), /LOAD_OUT_OF_CAPACITY/);
+      invalid.tests[0].readings[1].load = '12.123456789';
+      await assert.rejects(finalizeV2(await saveV2(invalid)), /DISTINCT_LOADS_REQUIRED/);
+      invalid.tests[0] = structuredClone(substituted.tests[0]);
+      invalid.tests[0].readings[2].substitution.basePointId = invalid.tests[0].readings[2].pointId;
+      await assert.rejects(saveV2(invalid), /SUBSTITUTION_REFERENCE_REQUIRED/);
+      invalid.tests[0] = structuredClone(contentV2.tests[0]);
+      invalid.tests[2].setup.platform = 'triangular';
+      await assert.rejects(saveV2(invalid), /INVALID_PLATFORM_POSITIONS/);
+
+      const omitted = structuredClone(contentV2);
+      omitted.tests[0].omitted = true;
+      omitted.tests[0].reason = 'Sin producto disponible';
+      omitted.tests[0].readings[0].indication = '12,';
+      const omittedResult = await finalizeV2(await saveV2(omitted));
+      assert.equal(omittedResult.scope, 'partial');
+      const standards = structuredClone(contentV2);
+      standards.tests.forEach(t => { t.setup.source = 'standard'; });
+      assert.equal((await finalizeV2(await saveV2(standards))).traceability, 'traceable');
+      standards.certificates = [];
+      assert.equal((await finalizeV2(await saveV2(standards))).traceability, 'non_traceable');
+
+      // The OIML reference must follow the actual load, including unit conversion.
+      await identity('', 'service_role');
+      const referencePlan = uuid(), referenceVersion = uuid(), referenceTrial = uuid(), referencePoint = uuid();
+      await q('insert into public.planes(id,cliente_id,nombre) values($1,$2,$3)', [referencePlan,client,'Fixture OIML flexible']);
+      await q('insert into public.plan_versiones(id,plan_id,version) values($1,$2,1)', [referenceVersion,referencePlan]);
+      await q(`insert into public.plan_pruebas(id,plan_version_id,tipo,metodo_evaluacion,unidad,frecuencia_dias,fuente_tolerancia)
+        values($1,$2,'linearity','absolute_error','g',30,'OIML_IN_SERVICE_REFERENCE')`, [referenceTrial,referenceVersion]);
+      await q(`insert into public.plan_puntos(id,plan_prueba_id,orden,codigo,etiqueta,carga_nominal,tolerancia)
+        values($1,$2,1,'P1','Sugerencia',10000,1)`, [referencePoint,referenceTrial]);
+      await q("update public.equipos set clase='III' where id=$1", [equipment]);
+      await q('update public.equipo_rangos set intervalo_verificacion=0.1 where equipo_id=$1', [equipment]);
+      const limits = (await q(`select private.flexible_load_tolerance($1,$2,$3,10000)::float8 low,
+        private.flexible_load_tolerance($1,$2,$3,80000)::float8 high`, [equipment,referenceTrial,referencePoint]))[0];
+      assert.deepEqual(limits, { low: 100, high: 200 });
+      await identity(operator);
+    });
     await t.test('revocar planta o licencia corta el acceso real, no solo la interfaz', async () => {
       await identity('', 'service_role');
       await q('update public.usuario_plantas set activa=false where usuario_id=$1', [operator]);

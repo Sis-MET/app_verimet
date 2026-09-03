@@ -21,25 +21,15 @@ class _CheckConfiguration {
     required this.enabled,
     required this.frequencyDays,
     required this.tolerance,
-    required this.load,
-    required this.count,
-    required this.loads,
   });
 
   final String type;
   bool enabled;
   String frequencyDays;
   final TextEditingController tolerance;
-  final TextEditingController load;
-  int count;
-  final List<TextEditingController> loads;
 
   void dispose() {
     tolerance.dispose();
-    load.dispose();
-    for (final controller in loads) {
-      controller.dispose();
-    }
   }
 }
 
@@ -108,14 +98,6 @@ class _EquipmentCheckConfigurationScreenState
     });
   }
 
-  static String _formatSuggestion(double value) {
-    if (!value.isFinite || value < 0) return '';
-    return value
-        .toStringAsFixed(9)
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
-  }
-
   Map<String, _CheckConfiguration> _initialChecks() {
     final existing = <String, Json>{
       for (final test in objects(current?['tests']))
@@ -128,18 +110,6 @@ class _EquipmentCheckConfigurationScreenState
           .map((point) => point['tolerance']?.toString() ?? '')
           .where((value) => value.isNotEmpty)
           .toSet();
-      final suggestedLoads = <double>[
-        0,
-        maximum * .25,
-        maximum * .5,
-        maximum * .75,
-        maximum,
-      ];
-      final loads = type == 'linearity'
-          ? (points.isEmpty
-                ? suggestedLoads.map(_formatSuggestion)
-                : points.map((point) => point['load'].toString()))
-          : const Iterable<String>.empty();
       return _CheckConfiguration(
         type: type,
         enabled: test != null || current == null,
@@ -147,21 +117,6 @@ class _EquipmentCheckConfigurationScreenState
         tolerance: TextEditingController(
           text: tolerances.length == 1 ? tolerances.single : '',
         ),
-        load: TextEditingController(
-          text: points.isNotEmpty
-              ? points.first['load'].toString()
-              : _formatSuggestion(
-                  type == 'eccentricity' ? maximum / 3 : maximum / 2,
-                ),
-        ),
-        count: points.isNotEmpty
-            ? points.length
-            : type == 'eccentricity'
-            ? (truck ? 3 : 5)
-            : (truck ? 3 : 5),
-        loads: loads
-            .map((value) => TextEditingController(text: value))
-            .toList(),
       );
     }
 
@@ -191,7 +146,7 @@ class _EquipmentCheckConfigurationScreenState
   }
 
   String label(String type) => switch (type) {
-    'linearity' => 'Error de indicación',
+    'linearity' => 'Linealidad',
     'repeatability' => 'Repetibilidad',
     'eccentricity' => truck ? 'Desplazamiento de carga' : 'Excentricidad',
     _ => testLabel(type),
@@ -224,40 +179,9 @@ class _EquipmentCheckConfigurationScreenState
     return false;
   }
 
-  bool _loadsAreValid() {
-    final linearity = checks['linearity']!;
-    if (linearity.enabled) {
-      if (linearity.loads.length < 5 ||
-          linearity.loads.any(
-            (controller) =>
-                decimalValidator(controller.text, zeroAllowed: true) != null,
-          )) {
-        setState(
-          () => error =
-              'Revisa las cargas de error de indicación. Deben ser al menos cinco y estar dentro de la capacidad.',
-        );
-        return false;
-      }
-      if (linearity.loads.map((c) => c.text.trim()).toSet().length !=
-          linearity.loads.length) {
-        setState(() => error = 'Las cargas de indicación no deben repetirse.');
-        return false;
-      }
-    }
-    for (final type in const ['repeatability', 'eccentricity']) {
-      final check = checks[type]!;
-      if (check.enabled && decimalValidator(check.load.text) != null) {
-        setState(() => error = 'Revisa la carga de ${label(type)}.');
-        return false;
-      }
-    }
-    return true;
-  }
-
   Future<void> next() async {
     FocusManager.instance.primaryFocus?.unfocus();
     if (step == 0 && !_selectedChecksAreValid()) return;
-    if (step == 1 && !_loadsAreValid()) return;
     setState(() {
       error = null;
       step++;
@@ -290,19 +214,13 @@ class _EquipmentCheckConfigurationScreenState
           'type': check.type,
           'frequencyDays': check.frequencyDays,
           'tolerance': check.tolerance.text.trim(),
-          if (check.type == 'linearity')
-            'loads': check.loads.map((value) => value.text.trim()).toList(),
-          if (check.type != 'linearity') 'load': check.load.text.trim(),
-          if (check.type == 'repeatability')
-            'repetitions': check.count.toString(),
-          if (check.type == 'eccentricity') 'positions': check.count.toString(),
         },
     ],
   };
 
   Future<void> save() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (busy || !_selectedChecksAreValid() || !_loadsAreValid()) return;
+    if (busy || !_selectedChecksAreValid()) return;
     if (!form.currentState!.validate()) {
       setState(() => error = 'Revisa los límites antes de guardar.');
       return;
@@ -394,7 +312,7 @@ class _EquipmentCheckConfigurationScreenState
         key: form,
         child: Column(
           children: [
-            LinearProgressIndicator(value: (step + 1) / 3),
+            LinearProgressIndicator(value: (step + 1) / 2),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
               child: Row(
@@ -402,11 +320,10 @@ class _EquipmentCheckConfigurationScreenState
                   Expanded(
                     child: Text(switch (step) {
                       0 => '1. Pruebas y periodicidad',
-                      1 => '2. Cargas y mediciones',
-                      _ => '3. Límites y confirmación',
+                      _ => '2. Errores permisibles y confirmación',
                     }, style: Theme.of(context).textTheme.titleMedium),
                   ),
-                  Text('${step + 1} de 3'),
+                  Text('${step + 1} de 2'),
                 ],
               ),
             ),
@@ -424,7 +341,7 @@ class _EquipmentCheckConfigurationScreenState
               child: PageView(
                 controller: pages,
                 physics: const NeverScrollableScrollPhysics(),
-                children: [_testsStep(), _loadsStep(), _limitsStep()],
+                children: [_testsStep(), _limitsStep()],
               ),
             ),
             SafeArea(
@@ -445,13 +362,13 @@ class _EquipmentCheckConfigurationScreenState
                     child: FilledButton(
                       onPressed: busy
                           ? null
-                          : step < 2
+                          : step < 1
                           ? next
                           : save,
                       child: Text(
                         busy
                             ? 'Guardando…'
-                            : step < 2
+                            : step < 1
                             ? 'Continuar'
                             : pending != null
                             ? 'Reintentar guardado'
@@ -587,128 +504,6 @@ class _EquipmentCheckConfigurationScreenState
     return value;
   }
 
-  Widget _loadsStep() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-    children: [
-      const Notice(
-        'IvMET propone cargas a partir de la capacidad. Confírmalas según tus patrones disponibles y el rango de trabajo real.',
-      ),
-      if (checks['linearity']!.enabled) _linearityLoads(),
-      if (checks['repeatability']!.enabled)
-        _singleLoad(checks['repeatability']!),
-      if (checks['eccentricity']!.enabled) _singleLoad(checks['eccentricity']!),
-    ],
-  );
-
-  Widget _linearityLoads() {
-    final check = checks['linearity']!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label(check.type),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            const Text('Mínimo cinco cargas diferentes.'),
-            const SizedBox(height: 12),
-            for (final (index, controller) in check.loads.indexed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: controller,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Carga ${index + 1} ($unit)',
-                        ),
-                        validator: (value) => check.enabled
-                            ? decimalValidator(value, zeroAllowed: true)
-                            : null,
-                        onChanged: (_) => changed(),
-                      ),
-                    ),
-                    if (check.loads.length > 5)
-                      IconButton(
-                        tooltip: 'Quitar carga',
-                        onPressed: () {
-                          setState(() => check.loads.removeAt(index).dispose());
-                          changed();
-                        },
-                        icon: const Icon(Icons.remove_circle_outline),
-                      ),
-                  ],
-                ),
-              ),
-            OutlinedButton.icon(
-              onPressed: check.loads.length >= 60
-                  ? null
-                  : () {
-                      setState(() => check.loads.add(TextEditingController()));
-                      changed();
-                    },
-              icon: const Icon(Icons.add),
-              label: const Text('Agregar carga'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _singleLoad(_CheckConfiguration check) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label(check.type),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: check.load,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Carga ($unit)'),
-            validator: (value) =>
-                check.enabled ? decimalValidator(value) : null,
-            onChanged: (_) => changed(),
-          ),
-          const SizedBox(height: 12),
-          if (check.type == 'repeatability')
-            DropdownButtonFormField<int>(
-              key: ValueKey('repeat-${check.count}'),
-              initialValue: check.count,
-              decoration: const InputDecoration(labelText: 'N.º de mediciones'),
-              items: [
-                for (final count in truck ? const [3, 5, 10] : const [5, 10])
-                  DropdownMenuItem(value: count, child: Text('$count')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                check.count = value;
-                changed();
-              },
-            )
-          else
-            Notice(
-              truck
-                  ? 'Se utilizarán tres posiciones: inicio, centro y final.'
-                  : 'Se utilizarán cinco posiciones: referencia central y cuatro posiciones de la plataforma.',
-            ),
-        ],
-      ),
-    ),
-  );
-
   Widget _limitsStep() => ListView(
     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
     children: [
@@ -738,7 +533,9 @@ class _EquipmentCheckConfigurationScreenState
                     decimal: true,
                   ),
                   decoration: InputDecoration(
-                    labelText: 'Límite de aceptación ($unit)',
+                    labelText: check.type == 'linearity'
+                        ? 'Error permisible de las indicaciones ($unit)'
+                        : 'Error permisible ($unit)',
                     helperText:
                         'Se aplicará a todos los puntos de esta prueba.',
                   ),
