@@ -213,6 +213,166 @@ final fixtureWizardBundle = {
   ],
 };
 
+final fixtureVerificationData = <String, dynamic>{
+  'verification': {
+    'id': 'verification-fixture',
+    'realizado_at': '2026-09-04T14:30:00Z',
+    'recibido_at': '2026-09-04T14:31:00Z',
+    'alcance': 'complete',
+    'veredicto_global': 'pass',
+    'trazabilidad': 'traceable',
+    'temperatura_c': '21.500',
+    'humedad_relativa_pct': '48.000',
+    'observaciones': 'La balanza se encontraba limpia, nivelada y estable.',
+    'estado': 'ACTIVE',
+    'alcance_declaracion': 'INTERNAL_CHECK_ONLY',
+    'motor_version': 'ivmet-internal-2.0.0',
+    'regla_decision_resumen': 'direct',
+    'app_version': '1.0.0',
+    'equipo_snapshot': {
+      'equipment': {
+        'cod_metrica': '0001-01-001',
+        'cod_interno': 'BAL-014',
+        'instrumento': 'Balanza electrónica',
+        'tipo_balanza': 'Plataforma',
+        'marca': 'Marca',
+        'modelo': 'Modelo X',
+        'serie': 'SERIE-1',
+        'ubicacion': 'Producción',
+        'clase': 'III',
+        'plataforma': 'Rectangular',
+      },
+      'ranges': [
+        {
+          'numero_rango': 1,
+          'unidad': 'kg',
+          'capacidad_max': '20.000000000',
+          'division_escala': '0.010000000',
+          'intervalo_verificacion': '0.010000000',
+          'cantidad_decimales': 2,
+        },
+        {
+          'numero_rango': 2,
+          'unidad': 'kg',
+          'capacidad_max': '50.000000000',
+          'division_escala': '0.100000000',
+          'intervalo_verificacion': '0.100000000',
+          'cantidad_decimales': 1,
+        },
+      ],
+    },
+    'plan_snapshot': {
+      'name': 'Control interno de balanza de plataforma',
+      'version': 3,
+      'procedure': 'IVMET-CONTROL-INTERNO-PLATAFORMA-V1',
+    },
+  },
+  'users': {
+    'capture': 'Operador de producción',
+    'finalization': 'Jefe de calidad',
+  },
+  'patterns': [
+    {
+      'snapshot': {
+        'pattern': {'codigo': 'JP-001', 'descripcion': 'Juego de pesas patrón'},
+        'certificate': {
+          'numero': 'CERT-2026-001',
+          'laboratorio': 'Laboratorio acreditado',
+          'calibrado_el': '2026-01-15',
+          'vence_el': '2027-01-15',
+        },
+        'validAtMeasurement': true,
+      },
+    },
+  ],
+  'tests': [
+    {
+      'tipo': 'eccentricity',
+      'estado_ejecucion': 'executed',
+      'metodo_evaluacion': 'range',
+      'metodo_codigo': 'EURAMET-CG18-V4-ECCENTRICITY',
+      'unidad': 'kg',
+      'regla_decision': 'direct',
+      'fuente_tolerancia': 'configured',
+      'tolerancia': '0.100000000',
+      'veredicto': 'pass',
+      'error_max_abs': '0.050000000',
+      'rango': '0.080000000',
+      'valor_metrica': '0.080000000',
+      'readings': [
+        for (var i = 0; i < 5; i++)
+          {
+            'grupo': 1,
+            'orden': i + 1,
+            'etiqueta': 'Posición ${i + 1}',
+            'carga_nominal': '15.000000000',
+            'indicacion': ['15.000', '15.020', '14.970', '15.050', '14.990'][i],
+            'retorno_cero': '0.000000000',
+            'error': ['0', '0.02', '-0.03', '0.05', '-0.01'][i],
+            'tolerancia': '0.100000000',
+            'veredicto': 'pass',
+          },
+      ],
+    },
+    {
+      'tipo': 'repeatability',
+      'estado_ejecucion': 'executed',
+      'metodo_evaluacion': 'sample_standard_deviation',
+      'metodo_codigo': 'EURAMET-CG18-V4-REPEATABILITY',
+      'unidad': 'kg',
+      'regla_decision': 'direct',
+      'fuente_tolerancia': 'configured',
+      'tolerancia': '0.050000000',
+      'veredicto': 'pass',
+      'media': '10.006000000',
+      'desviacion_estandar': '0.015165751',
+      'rango': '0.040000000',
+      'valor_metrica': '0.015165751',
+      'readings': [
+        for (var i = 0; i < 5; i++)
+          {
+            'grupo': 1,
+            'orden': i + 1,
+            'etiqueta': 'Medición ${i + 1}',
+            'carga_nominal': '10.000000000',
+            'indicacion': ['10.000', '10.010', '10.020', '9.990', '10.010'][i],
+            'retorno_cero': '0.000000000',
+            'error': ['0', '0.01', '0.02', '-0.01', '0.01'][i],
+            'tolerancia': '0.050000000',
+            'veredicto': 'pass',
+          },
+      ],
+    },
+    {
+      'tipo': 'linearity',
+      'estado_ejecucion': 'executed',
+      'metodo_evaluacion': 'absolute_error',
+      'metodo_codigo': 'EURAMET-CG18-V4-ERROR-INDICATION',
+      'unidad': 'kg',
+      'regla_decision': 'direct',
+      'fuente_tolerancia': 'configured',
+      'tolerancia': '0.100000000',
+      'veredicto': 'pass',
+      'error_max_abs': '0.060000000',
+      'valor_metrica': '0.060000000',
+      'readings': [
+        for (var i = 0; i < 5; i++)
+          {
+            'grupo': 1,
+            'orden': i + 1,
+            'etiqueta': 'Punto ${i + 1}',
+            'carga_nominal': ['0', '10', '20', '30', '50'][i],
+            'indicacion': ['0.00', '10.02', '19.97', '30.04', '50.06'][i],
+            'retorno_cero': '0.000000000',
+            'error': ['0', '0.02', '-0.03', '0.04', '0.06'][i],
+            'tolerancia': '0.100000000',
+            'veredicto': 'pass',
+          },
+      ],
+    },
+  ],
+};
+
 class FixtureServer {
   Json bundle = {...fixtureBundle};
   final recovery = DraftRecovery(MemoryDraftStore());
@@ -365,6 +525,8 @@ class FixtureServer {
         return (200, savedDrafts.values.first);
       case 'history':
         return (200, {'total': 0, 'items': []});
+      case 'verification':
+        return (200, fixtureVerificationData);
       default:
         return (400, {'message': 'UNEXPECTED_FIXTURE_REQUEST'});
     }

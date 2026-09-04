@@ -10,6 +10,43 @@ import 'package:ivmet/features/online/history_screen.dart';
 import 'fakes.dart';
 
 void main() {
+  testWidgets('una verificación histórica permite generar su informe PDF', (
+    tester,
+  ) async {
+    final server = FixtureServer();
+    final session = MobileSession(server.api, recovery: server.recovery);
+    await tester.runAsync(() => session.login('operador', 'fixture-password'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: VerificationScreen(session: session, id: 'verification-fixture'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Generar informe PDF'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('generate-verification-pdf')),
+      findsOneWidget,
+    );
+    expect(find.text('Conforme'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Excentricidad'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Excentricidad'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Linealidad'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Repetibilidad'), findsOneWidget);
+    expect(find.text('Linealidad'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    session.dispose();
+  });
+
   testWidgets(
     'compartir requiere mensaje y consentimiento para el snapshot exacto',
     (tester) async {

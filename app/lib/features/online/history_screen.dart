@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import '../../core/domain/compliance_status.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
@@ -7,6 +8,7 @@ import 'draft_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'verification_report.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({
@@ -275,7 +277,31 @@ class VerificationScreen extends StatefulWidget {
 class _VerificationScreenState extends State<VerificationScreen> {
   int revision = 0;
   bool busy = false;
+  bool reporting = false;
   String? error;
+
+  Future<void> generateReport(Json data) async {
+    if (reporting) return;
+    setState(() {
+      reporting = true;
+      error = null;
+    });
+    try {
+      final bytes = await buildVerificationReport(data);
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: verificationReportFilename(data),
+        subject: 'Informe de verificación intermedia IvMET',
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = 'No se pudo generar el informe PDF.');
+      }
+    } finally {
+      if (mounted) setState(() => reporting = false);
+    }
+  }
+
   Future<void> action(String name, Json args, {String? question}) async {
     if (busy) return;
     if (question != null) {
@@ -323,6 +349,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
               'Resultado de una comprobación interna. No constituye certificado de calibración ni verificación legal.',
               icon: Icons.science_outlined,
             ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const ValueKey('generate-verification-pdf'),
+              onPressed: reporting ? null : () => generateReport(data),
+              icon: reporting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(
+                reporting ? 'Generando informe…' : 'Generar informe PDF',
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               verdictLabel(v['veredicto_global']),
               style: Theme.of(context).textTheme.headlineSmall,

@@ -110,4 +110,5 @@ app/ios/ServiceDefinitions.json
 *.log
 tmp/
 temp/
+/output/
 legacy-api/
