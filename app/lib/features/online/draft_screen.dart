@@ -121,6 +121,7 @@ class _DraftWizardState extends State<_DraftWizard>
   bool allowPop = false;
   bool restoringScroll = false;
   bool confirming = false;
+  late bool headerHidden;
 
   @override
   void initState() {
@@ -153,6 +154,7 @@ class _DraftWizardState extends State<_DraftWizard>
     }
     scroll = ScrollController(initialScrollOffset: capture.offset)
       ..addListener(_scrolled);
+    headerHidden = capture.offset > 12;
     capture.addListener(_updated);
     capture.start();
   }
@@ -174,7 +176,12 @@ class _DraftWizardState extends State<_DraftWizard>
   }
 
   void _scrolled() {
-    if (!restoringScroll && scroll.hasClients) capture.setOffset(scroll.offset);
+    if (restoringScroll || !scroll.hasClients) return;
+    capture.setOffset(scroll.offset);
+    final hidden = scroll.offset > 12;
+    if (hidden != headerHidden && mounted) {
+      setState(() => headerHidden = hidden);
+    }
   }
 
   @override
@@ -202,7 +209,10 @@ class _DraftWizardState extends State<_DraftWizard>
     restoringScroll = true;
     await capture.goTo(target);
     if (!mounted) return;
-    setState(() => navigating = false);
+    setState(() {
+      navigating = false;
+      headerHidden = capture.offset > 12;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && scroll.hasClients) {
         scroll.jumpTo(capture.offset.clamp(0, scroll.position.maxScrollExtent));
@@ -401,103 +411,108 @@ class _DraftWizardState extends State<_DraftWizard>
           title: Text(
             'Comprobación · ${customerEquipmentCode(capture.equipment)}',
           ),
-          actions: [
-            IconButton(
-              tooltip: 'Guardar borrador',
-              onPressed: capture.finalizing ? null : _save,
-              icon: const Icon(Icons.save_outlined),
-            ),
-          ],
         ),
         body: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        for (var index = 0; index < 5; index++) ...[
-                          if (index > 0)
-                            Expanded(
-                              child: Divider(
-                                color: index <= step
-                                    ? palette.accentInk
-                                    : palette.divider,
+              ClipRect(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: headerHidden
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          key: const ValueKey('draft-step-header'),
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  for (var index = 0; index < 5; index++) ...[
+                                    if (index > 0)
+                                      Expanded(
+                                        child: Divider(
+                                          color: index <= step
+                                              ? palette.accentInk
+                                              : palette.divider,
+                                        ),
+                                      ),
+                                    Semantics(
+                                      selected: index == step,
+                                      label:
+                                          'Paso ${index + 1}: ${draftStepTitles[index]}',
+                                      child: IconButton.filledTonal(
+                                        tooltip: draftStepTitles[index],
+                                        onPressed:
+                                            index < step &&
+                                                !capture.locked &&
+                                                !navigating
+                                            ? () => _go(index)
+                                            : null,
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: index == step
+                                              ? palette.accentInk
+                                              : palette.surface,
+                                          disabledBackgroundColor: index == step
+                                              ? palette.accentInk
+                                              : palette.surface,
+                                          foregroundColor: palette.text,
+                                          disabledForegroundColor: index == step
+                                              ? palette.surface
+                                              : palette.muted,
+                                        ),
+                                        icon: Text(
+                                          '${index + 1}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ),
-                          Semantics(
-                            selected: index == step,
-                            label:
-                                'Paso ${index + 1}: ${draftStepTitles[index]}',
-                            child: IconButton.filledTonal(
-                              tooltip: draftStepTitles[index],
-                              onPressed:
-                                  index < step && !capture.locked && !navigating
-                                  ? () => _go(index)
-                                  : null,
-                              style: IconButton.styleFrom(
-                                backgroundColor: index == step
-                                    ? palette.accentInk
-                                    : palette.surface,
-                                disabledBackgroundColor: index == step
-                                    ? palette.accentInk
-                                    : palette.surface,
-                                foregroundColor: palette.text,
-                                disabledForegroundColor: index == step
-                                    ? palette.surface
-                                    : palette.muted,
+                              const SizedBox(height: 8),
+                              Text(
+                                'Paso ${step + 1} de 5',
+                                style: AppTextStyles.caption(context, size: 12),
                               ),
-                              icon: Text(
-                                '${index + 1}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Text(
+                                draftStepTitles[step],
+                                style: AppTextStyles.figure(context, size: 25),
                               ),
-                            ),
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    capture.localError != null
+                                        ? Icons.error_outline
+                                        : capture.dirty
+                                        ? Icons.save_outlined
+                                        : Icons.cloud_done_outlined,
+                                    size: 16,
+                                    color: capture.localError != null
+                                        ? palette.fail
+                                        : palette.muted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _saveStatus,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: palette.muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Paso ${step + 1} de 5',
-                      style: AppTextStyles.caption(context, size: 12),
-                    ),
-                    Text(
-                      draftStepTitles[step],
-                      style: AppTextStyles.figure(context, size: 25),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          capture.localError != null
-                              ? Icons.error_outline
-                              : capture.dirty
-                              ? Icons.save_outlined
-                              : Icons.cloud_done_outlined,
-                          size: 16,
-                          color: capture.localError != null
-                              ? palette.fail
-                              : palette.muted,
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            _saveStatus,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: palette.muted,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
               const Divider(height: 1),
@@ -505,6 +520,7 @@ class _DraftWizardState extends State<_DraftWizard>
                 child: Form(
                   key: form,
                   child: ListView(
+                    key: const ValueKey('draft-content'),
                     controller: scroll,
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                     children: [
@@ -888,16 +904,6 @@ class _DraftWizardState extends State<_DraftWizard>
                 'Plataforma',
                 platformLabels[trialSetup(input)['platform']],
               ),
-            if (test['type'] == 'linearity') ...[
-              DetailField(
-                'Aplicación de cargas',
-                loadingMethods[trialSetup(input)['loadingMethod']],
-              ),
-              DetailField(
-                'Sustitución',
-                substitutionMethods[trialSetup(input)['substitutionMethod']],
-              ),
-            ],
             for (final reading in activeReadings(input)) ...[
               const Divider(height: 20),
               Text(
@@ -909,8 +915,6 @@ class _DraftWizardState extends State<_DraftWizard>
               ),
               DetailField('Indicación', valueLabel(reading['indication'])),
               DetailField('Retorno a cero', valueLabel(reading['zero'])),
-              if (reading['substitution'] != null)
-                const Text('Carga calculada por sustitución.'),
             ],
             DetailField(
               'Observaciones',

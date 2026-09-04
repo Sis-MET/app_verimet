@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ivmet/features/online/draft_controller.dart';
 import 'package:ivmet/features/online/draft_screen.dart';
 import 'package:ivmet/features/online/flexible_trial_fields.dart';
+import 'package:ivmet/features/online/measurement_suggestions.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/trial_capture.dart';
@@ -12,6 +13,22 @@ import 'fakes.dart';
 
 Json flexibleBundle() => {
   ...fixtureNormativeBundle,
+  'ranges': [
+    {
+      'numero_rango': 1,
+      'unidad': 'kg',
+      'capacidad_max': '20',
+      'division_escala': '0.01',
+      'cantidad_decimales': 2,
+    },
+    {
+      'numero_rango': 2,
+      'unidad': 'kg',
+      'capacidad_max': '100',
+      'division_escala': '0.1',
+      'cantidad_decimales': 1,
+    },
+  ],
   'plan': {
     ...object(fixtureNormativeBundle['plan']),
     'captureVersion': 2,
@@ -65,6 +82,24 @@ void main() {
     controllers.add(c);
     return c;
   }
+
+  test('el retorno a cero inicia en cero en las tres pruebas', () {
+    final c = create();
+    for (final plan in c.tests) {
+      final trial = c.testInput(plan['id'] as String);
+      expect(
+        activeReadings(trial).map((reading) => reading['zero']),
+        everyElement('0'),
+      );
+    }
+
+    final linearity = c.testInput('linearity');
+    activeReadings(linearity).first['zero'] = '0.01';
+    trialSetup(linearity)['pointCount'] = 6;
+    resizeTrial(linearity, c.tests.last);
+    expect(activeReadings(linearity).first['zero'], '0.01');
+    expect(activeReadings(linearity).last['zero'], '0');
+  });
 
   test(
     'suggestions never become measurements; resize and restart preserve exact input',
@@ -160,30 +195,6 @@ void main() {
     },
   );
 
-  test(
-    'substitution uses exact decimals and refreshes dependants without replacing indications',
-    () {
-      final c = create();
-      final lin = c.testInput('linearity');
-      final rows = activeReadings(lin);
-      rows[0].addAll({'load': '10.000000001', 'indication': '10.100000001'});
-      rows[1].addAll({'load': '20.000000001', 'indication': '20.2'});
-      rows[2]['substitution'] = {
-        'basePointId': rows[1]['pointId'],
-        'referencePointId': rows[0]['pointId'],
-        'indication': '15.100000001',
-      };
-      rows[2]['indication'] = '35,2';
-      refreshSubstitutions(lin);
-      expect(rows[2]['load'], '35.000000002');
-      rows[0]['indication'] = '10.200000001';
-      refreshSubstitutions(lin);
-      expect(rows[2]['load'], '34.900000002');
-      expect(rows[2]['indication'], '35,2');
-      expect(indicationError('35.000000003', '35.000000002'), '0.000000001');
-    },
-  );
-
   testWidgets(
     'all trials accept custom loads and suggestions preserve measured indications at 320px',
     (tester) async {
@@ -220,6 +231,17 @@ void main() {
         await tester.ensureVisible(load);
         await tester.enterText(load, '17,25');
         await tester.pump();
+        expect(activeReadings(input).first['indication'], '17.25');
+        if (plan['type'] != 'linearity') {
+          expect(
+            activeReadings(
+              input,
+            ).every((reading) => reading['indication'] == '17.25'),
+            true,
+          );
+        }
+        expect(find.byKey(ValueKey('$id:suggestions')), findsOneWidget);
+        expect(find.text('Precisión: 2 decimales · d = 0.01 kg'), findsWidgets);
         final indication = find.byKey(ValueKey('$id:indication'));
         await tester.ensureVisible(indication);
         await tester.enterText(indication, '17,251');
@@ -230,7 +252,11 @@ void main() {
         await tester.pump();
         expect(
           activeReadings(input).first['load'],
-          activeReadings(input).first['suggestedLoad'],
+          indicationFromLoad(
+            objects(server.bundle['ranges']),
+            activeReadings(input).first['suggestedLoad'] as String,
+            plan['unit'] as String,
+          ),
         );
         expect(activeReadings(input).first['indication'], '17,251');
         await tester.enterText(load, '17,25');
@@ -245,22 +271,17 @@ void main() {
   );
 
   testWidgets(
-    'restart restores a partial substitution dialog and wizard step, then shows actual-load summary',
+    'linearity omits loading and substitution methods in capture and summary',
     (tester) async {
       final c = create();
       for (final plan in c.tests) {
-        for (final r in activeReadings(c.testInput(plan['id'] as String))) {
-          r['load'] = r['suggestedLoad'];
-          r['indication'] = r['suggestedLoad'];
+        for (final reading in activeReadings(
+          c.testInput(plan['id'] as String),
+        )) {
+          reading['load'] = reading['suggestedLoad'];
+          reading['indication'] = reading['suggestedLoad'];
         }
       }
-      final lin = c.testInput('linearity');
-      trialSetup(lin)['substitutionMethod'] = 'method_1';
-      lin['substitutionDraft'] = {
-        'referencePointId': 'linearity-1',
-        'basePointId': 'linearity-2',
-        'indication': '15,',
-      };
       await tester.runAsync(() => c.goTo(3));
       c.dispose();
       controllers.remove(c);
@@ -274,43 +295,21 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Agregar carga por sustitución'), findsOneWidget);
-      expect(find.text('15,'), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const ValueKey('substitution-indication')),
-        '15,123456789',
-      );
-      await tester.pumpAndSettle();
-      await tester.pumpWidget(const SizedBox());
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: DraftScreen(session: session, bundle: server.bundle),
-        ),
-      );
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('15,123456789'), findsOneWidget);
-      await tester.tap(find.widgetWithText(TextButton, 'Agregar'));
-      await tester.pumpAndSettle();
-      expect(find.text('Paso 4 de 5'), findsOneWidget);
-      final local = await tester.runAsync(
-        () => server.recovery.active(session.recoveryOwner),
-      );
-      final added = objects(
-        objects(object(local!['raw'])['tests']).last['readings'],
-      ).last;
-      expect(added['load'], '35.123456789');
-      final id = added['pointId'];
-      final indication = find.byKey(ValueKey('$id:indication'));
-      await tester.ensureVisible(indication);
-      await tester.enterText(indication, '35,123456789');
+
+      expect(find.text('Aplicación de las cargas'), findsNothing);
+      expect(find.text('Método de sustitución'), findsNothing);
+      expect(find.text('Agregar por sustitución'), findsNothing);
+      expect(find.text('Método 1'), findsNothing);
+      expect(find.text('Método 2'), findsNothing);
+      expect(find.byKey(const ValueKey('linearity-1:load')), findsOneWidget);
+
       await tester.tap(find.text('Siguiente'));
       await tester.pumpAndSettle();
-      expect(find.text('Paso 5 de 5'), findsOneWidget);
-      expect(find.text('35.123456789'), findsWidgets);
+      expect(find.text('Guardar borrador privado'), findsOneWidget);
+      expect(find.text('Aplicación de cargas'), findsNothing);
+      expect(find.text('Sustitución'), findsNothing);
+      expect(find.text('Carga calculada por sustitución.'), findsNothing);
+      expect(find.text('Carga utilizada (kg)'), findsWidgets);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

@@ -13,17 +13,6 @@ const platformLabels = {
   'circular': 'Circular',
   'triangular': 'Triangular',
 };
-const loadingMethods = {
-  'none': 'Sin método de carga',
-  'return_zero': 'Ascenso con retorno a cero',
-  'continuous': 'Ascenso continuo por pasos',
-};
-const substitutionMethods = {
-  'none': 'Sin sustitución',
-  'method_1': 'Método 1',
-  'method_2': 'Método 2',
-};
-
 List<int> eccentricityCounts(String platform) => switch (platform) {
   'rectangular' => [3, 5],
   'circular' => [4, 5],
@@ -34,43 +23,59 @@ List<int> eccentricityCounts(String platform) => switch (platform) {
 /// A reading keeps its identity and raw text even when temporarily removed.
 /// Suggestions never replace indications or become declared loads implicitly.
 Json restoreFlexibleTrial(Json plan, Json? saved) {
+  late final Json trial;
   if (saved?['setup'] != null) {
-    return {
+    trial = {
       ...saved!,
       'setup': object(saved['setup']),
       'readings': objects(saved['readings']),
       'retainedReadings': objects(saved['retainedReadings']),
     };
+  } else {
+    final points = objects(plan['points']);
+    final type = plan['type'];
+    final count = points.length;
+    trial = <String, dynamic>{
+      'id': plan['id'],
+      'omitted': saved?['omitted'] ?? false,
+      'reason': saved?['reason'] ?? '',
+      'setup': {
+        'source': 'process',
+        'description': '',
+        'notes': '',
+        'platform': count == 3
+            ? 'rectangular'
+            : count == 4
+            ? 'circular'
+            : 'square',
+        'indicatorPosition': 'front',
+        'groupCount': 1,
+        'measurementCount': [3, 5, 10].contains(count) ? count : 3,
+        'pointCount': type == 'eccentricity'
+            ? (count.clamp(3, 5))
+            : count.clamp(2, 60),
+        // Kept internally for compatibility with the current server contract.
+        'loadingMethod': 'none',
+        'substitutionMethod': 'none',
+      },
+      'readings': <Json>[],
+      'retainedReadings': <Json>[],
+    };
+    resizeTrial(trial, plan);
   }
-  final points = objects(plan['points']);
-  final type = plan['type'];
-  final count = points.length;
-  final trial = <String, dynamic>{
-    'id': plan['id'],
-    'omitted': saved?['omitted'] ?? false,
-    'reason': saved?['reason'] ?? '',
-    'setup': {
-      'source': 'process',
-      'description': '',
-      'notes': '',
-      'platform': count == 3
-          ? 'rectangular'
-          : count == 4
-          ? 'circular'
-          : 'square',
-      'indicatorPosition': 'front',
-      'groupCount': 1,
-      'measurementCount': [3, 5, 10].contains(count) ? count : 3,
-      'pointCount': type == 'eccentricity'
-          ? (count.clamp(3, 5))
-          : count.clamp(2, 60),
-      'loadingMethod': 'none',
-      'substitutionMethod': 'none',
-    },
-    'readings': <Json>[],
-    'retainedReadings': <Json>[],
-  };
-  resizeTrial(trial, plan);
+  if (plan['type'] == 'linearity') {
+    final setup = trialSetup(trial);
+    setup['loadingMethod'] = 'none';
+    setup['substitutionMethod'] = 'none';
+    trial.remove('substitutionDraft');
+    for (final reading in [
+      ...activeReadings(trial),
+      ...objects(trial['retainedReadings']),
+    ]) {
+      // A legacy calculated load remains as an editable manual load.
+      reading.remove('substitution');
+    }
+  }
   return trial;
 }
 
@@ -116,7 +121,7 @@ void resizeTrial(Json trial, Json plan) {
               '',
           'load': repeat || plan['type'] == 'eccentricity' ? groupLoad : '',
           'indication': '',
-          'zero': '',
+          'zero': '0',
         });
       }
     }
@@ -162,32 +167,31 @@ String? canonicalTrialDecimal(String value) {
   return number == null ? null : _format(number);
 }
 
-/// ServiceMET: accumulated load = base + substitution indication - reference error.
-/// Exact fixed-point arithmetic; the server independently derives this again.
-String? substitutionLoad(List<Json> readings, Json substitution) {
-  final reference = readings
-      .where((r) => r['pointId'] == substitution['referencePointId'])
-      .firstOrNull;
-  final base = readings
-      .where((r) => r['pointId'] == substitution['basePointId'])
-      .firstOrNull;
-  final b = _decimal(base?['load'] as String?);
-  final l = _decimal(reference?['load'] as String?);
-  final i = _decimal(reference?['indication'] as String?);
-  final s = _decimal(substitution['indication'] as String?);
-  return b == null || l == null || i == null || s == null
-      ? null
-      : _format(b + s - (i - l));
-}
-
-void refreshSubstitutions(Json trial) {
-  final preceding = <Json>[];
-  for (final reading in activeReadings(trial)) {
-    if (reading['substitution'] != null) {
-      reading['load'] =
-          substitutionLoad(preceding, object(reading['substitution'])) ?? '';
+/// Updates the declared load and prefills matching indications. An indication
+/// that the operator already changed is never replaced by a later load edit.
+void setLoadAndInheritIndication(
+  Json trial,
+  Json reading,
+  String value, {
+  required bool grouped,
+  required String Function(String load) indicationFormatter,
+}) {
+  final targets = grouped
+      ? [
+          ...activeReadings(trial),
+          ...(trial['retainedReadings'] as List).cast<Json>(),
+        ].where((item) => item['group'] == reading['group'])
+      : <Json>[reading];
+  for (final target in targets) {
+    final oldLoad = target['load'] as String;
+    final inherited = indicationFormatter(oldLoad);
+    final followsLoad =
+        (target['indication'] as String).isEmpty ||
+        target['indication'] == inherited;
+    target['load'] = value;
+    if (followsLoad) {
+      target['indication'] = indicationFormatter(value);
     }
-    preceding.add(reading);
   }
 }
 
@@ -196,21 +200,12 @@ Json flexibleTrialPayload(Json trial, String Function(String) normalize) {
     for (final key in ['pointId', 'group', 'slot']) key: reading[key],
     for (final key in ['load', 'indication', 'zero'])
       key: retained ? reading[key] : normalize(reading[key] as String),
-    if (reading['substitution'] != null)
-      'substitution': {
-        ...object(reading['substitution']),
-        'indication': normalize(
-          object(reading['substitution'])['indication'] as String,
-        ),
-      },
   };
   return {
     'id': trial['id'],
     'omitted': trial['omitted'],
     'reason': trial['reason'],
     'setup': {...trialSetup(trial)},
-    if (trial['substitutionDraft'] != null)
-      'substitutionDraft': {...object(trial['substitutionDraft'])},
     'readings': [
       for (final r in activeReadings(trial))
         readingPayload(r, retained: trial['omitted'] == true),

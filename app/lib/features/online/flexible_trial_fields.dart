@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/blueprint_card.dart';
 import 'draft_controller.dart';
+import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'online_widgets.dart';
 import 'trial_capture.dart';
@@ -27,16 +28,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
   String get type => widget.plan['type'] as String;
   String get unit => widget.plan['unit'] as String;
   bool get locked => widget.capture.locked;
-
-  @override
-  void initState() {
-    super.initState();
-    if (trial['substitutionDraft'] != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !locked) addSubstitution();
-      });
-    }
-  }
+  List<Json> get ranges => objects(widget.capture.bundle['ranges']);
 
   @override
   void dispose() {
@@ -47,7 +39,6 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
   }
 
   void changed() {
-    refreshSubstitutions(trial);
     widget.capture.changed();
   }
 
@@ -61,6 +52,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
     String? hint,
     bool readOnly = false,
     int? maxLength,
+    Widget? suffixIcon,
   }) {
     final controller = fields.putIfAbsent(
       id,
@@ -96,6 +88,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
           labelText: label,
           helperText: hint,
           helperMaxLines: 3,
+          suffixIcon: suffixIcon,
         ),
         validator: (text) => required && (text ?? '').trim().isEmpty
             ? 'Completa este dato.'
@@ -173,14 +166,16 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
           .toString();
 
   Widget loadField(Json r, {bool grouped = false}) {
-    final hint = suggestion(r);
-    final substituted = r['substitution'] != null;
+    final rawHint = suggestion(r);
+    final hint = indicationFromLoad(ranges, rawHint, unit);
     void update(String value) {
-      if (grouped) {
-        setGroupLoad(trial, r['group'] as int, value);
-      } else {
-        r['load'] = value;
-      }
+      setLoadAndInheritIndication(
+        trial,
+        r,
+        value,
+        grouped: grouped,
+        indicationFormatter: (load) => indicationFromLoad(ranges, load, unit),
+      );
     }
 
     return Column(
@@ -192,14 +187,11 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
           'Carga utilizada ($unit)',
           update,
           required: true,
-          readOnly: substituted,
-          hint: substituted
-              ? 'Carga acumulada calculada por sustitución.'
-              : hint.isEmpty
+          hint: rawHint.isEmpty
               ? null
               : 'Sugerida: $hint $unit. Puedes utilizar otra carga.',
         ),
-        if (!substituted && hint.isNotEmpty)
+        if (rawHint.isNotEmpty)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
@@ -212,23 +204,90 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
               child: const Text('Usar sugerencia'),
             ),
           ),
-        if (substituted) ...[
-          Text(
-            'Indicación de sustitución: ${object(r['substitution'])['indication']} $unit',
-            style: const TextStyle(fontSize: 12),
-          ),
-          TextButton(
-            onPressed: locked
-                ? null
-                : () {
-                    r.remove('substitution');
-                    changed();
-                  },
-            child: const Text('Usar carga manual'),
-          ),
-        ],
       ],
     );
+  }
+
+  String? _precisionHint(String load) {
+    final precision = indicationPrecisionForLoad(ranges, load, unit);
+    if (precision == null) return null;
+    final decimalLabel = precision.decimals == 1 ? 'decimal' : 'decimales';
+    return 'Precisión: ${precision.decimals} $decimalLabel · '
+        'd = ${precision.divisionLabel} $unit';
+  }
+
+  Widget? _suggestionButton(Json reading) {
+    final suggestions = indicationSuggestions(
+      ranges,
+      reading['load'] as String,
+      unit,
+    );
+    if (locked || suggestions.isEmpty) return null;
+    return IconButton(
+      key: ValueKey('${reading['pointId']}:suggestions'),
+      tooltip: 'Sugerir indicación según la división de escala',
+      onPressed: () => _showIndicationSuggestions(reading),
+      icon: const Icon(Icons.unfold_more_rounded),
+    );
+  }
+
+  Future<void> _showIndicationSuggestions(Json reading) async {
+    final load = reading['load'] as String;
+    final precision = indicationPrecisionForLoad(ranges, load, unit);
+    final suggestions = indicationSuggestions(ranges, load, unit);
+    if (precision == null || suggestions.isEmpty) return;
+    final base = indicationFromLoad(ranges, load, unit);
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.65,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sugerir indicación',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Carga $load $unit · d = ${precision.divisionLabel} $unit',
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: suggestions.length,
+                  itemBuilder: (context, index) {
+                    final value = suggestions[index];
+                    return ListTile(
+                      leading: value == base
+                          ? const Icon(Icons.arrow_forward_rounded)
+                          : const SizedBox(width: 24),
+                      title: Text('$value $unit'),
+                      subtitle: value == base ? const Text('Carga base') : null,
+                      onTap: () => Navigator.pop(context, value),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    reading['indication'] = selected;
+    changed();
   }
 
   Widget readingFields(Json r) => Column(
@@ -240,6 +299,8 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         'Indicación ($unit)',
         (v) => r['indication'] = v,
         required: true,
+        hint: _precisionHint(r['load'] as String),
+        suffixIcon: _suggestionButton(r),
       ),
       field(
         '${r['pointId']}:zero',
@@ -259,181 +320,6 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         ),
     ],
   );
-
-  Future<void> addSubstitution() async {
-    final valid = readings
-        .where(
-          (r) =>
-              indicationError(r['indication'] as String, r['load'] as String) !=
-              null,
-        )
-        .toList();
-    if (valid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Primero registra una carga y su indicación como referencia.',
-          ),
-        ),
-      );
-      return;
-    }
-    final draft =
-        trial.putIfAbsent(
-              'substitutionDraft',
-              () => <String, dynamic>{
-                'referencePointId': valid.last['pointId'],
-                'basePointId': valid.last['pointId'],
-                'indication': '',
-              },
-            )
-            as Json;
-    var reference = valid.any((r) => r['pointId'] == draft['referencePointId'])
-        ? draft['referencePointId'] as String
-        : valid.last['pointId'] as String;
-    var base = valid.any((r) => r['pointId'] == draft['basePointId'])
-        ? draft['basePointId'] as String
-        : reference;
-    var indication = draft['indication'] as String;
-    widget.capture.changed();
-    final key = GlobalKey<FormState>();
-    final result = await showDialog<Json>(
-      context: context,
-      useRootNavigator: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, update) {
-          void updateDraft(VoidCallback change) {
-            update(change);
-            draft.addAll({
-              'referencePointId': reference,
-              'basePointId': base,
-              'indication': indication,
-            });
-            widget.capture.changed();
-          }
-
-          final substitution = <String, dynamic>{
-            'basePointId': base,
-            'referencePointId': reference,
-            'indication': indication,
-          };
-          final calculated = substitutionLoad(readings, substitution);
-          Widget pointSelect(
-            String label,
-            String value,
-            ValueChanged<String> change,
-          ) => DropdownButtonFormField<String>(
-            initialValue: value,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: label),
-            items: [
-              for (final r in valid)
-                DropdownMenuItem(
-                  value: r['pointId'] as String,
-                  child: Text('Punto ${r['slot']} · ${r['load']} $unit'),
-                ),
-            ],
-            onChanged: (v) => updateDraft(() => change(v!)),
-          );
-          return AlertDialog(
-            title: const Text('Agregar carga por sustitución'),
-            content: SizedBox(
-              width: 480,
-              child: SingleChildScrollView(
-                child: Form(
-                  key: key,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Registra la indicación de la carga sustituta. Se corrige con el error de la referencia y se suma a la carga base.',
-                      ),
-                      const SizedBox(height: 16),
-                      pointSelect(
-                        'Referencia para corregir el error',
-                        reference,
-                        (v) => reference = v,
-                      ),
-                      const SizedBox(height: 16),
-                      pointSelect(
-                        'Carga base acumulada',
-                        base,
-                        (v) => base = v,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: indication,
-                        key: const ValueKey('substitution-indication'),
-                        decoration: InputDecoration(
-                          labelText: 'Indicación de la sustitución ($unit)',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        validator: (v) => (v ?? '').trim().isEmpty
-                            ? 'Ingresa la indicación.'
-                            : decimalError(v),
-                        onChanged: (v) => updateDraft(() => indication = v),
-                      ),
-                      const SizedBox(height: 16),
-                      Text('Carga acumulada: ${calculated ?? '—'} $unit'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  trial.remove('substitutionDraft');
-                  widget.capture.changed();
-                  Navigator.pop(context);
-                },
-                child: const Text('Descartar sustitución'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Continuar después'),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (key.currentState!.validate() && calculated != null) {
-                    Navigator.pop(context, substitution);
-                  }
-                },
-                child: const Text('Agregar'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    if (result == null || !mounted) return;
-    // Append without reusing a retained row that could contain measured data.
-    final occupied = [
-      ...readings,
-      ...objects(trial['retainedReadings']),
-    ].map((r) => r['slot'] as int).fold(0, (a, b) => a > b ? a : b);
-    if (occupied >= 60) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Recupera o revisa los puntos retirados antes de agregar una sustitución.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-    setup['pointCount'] = occupied + 1;
-    resizeTrial(trial, widget.plan);
-    readings.last['substitution'] = result;
-    trial.remove('substitutionDraft');
-    if (setup['source'] == 'standard') setup['source'] = 'mixed';
-    changed();
-  }
 
   @override
   Widget build(BuildContext context) => Column(
@@ -555,20 +441,6 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
           ),
       ],
       if (type == 'linearity') ...[
-        select('loadingMethod', 'Aplicación de las cargas', loadingMethods),
-        if (setup['loadingMethod'] == 'return_zero')
-          const Notice(
-            'Retira la carga y registra el retorno a cero entre puntos.',
-          ),
-        if (setup['loadingMethod'] == 'continuous')
-          const Notice(
-            'Añade cargas de forma progresiva. El retorno a cero intermedio puede quedar vacío.',
-          ),
-        select(
-          'substitutionMethod',
-          'Método de sustitución',
-          substitutionMethods,
-        ),
         for (final r in readings)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -613,16 +485,6 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
             ),
           ],
         ),
-        if (setup['substitutionMethod'] != 'none')
-          TextButton.icon(
-            onPressed: locked || readings.length >= 60 ? null : addSubstitution,
-            icon: const Icon(Icons.add),
-            label: Text(
-              trial['substitutionDraft'] == null
-                  ? 'Agregar por sustitución'
-                  : 'Continuar sustitución pendiente',
-            ),
-          ),
       ],
       if (objects(trial['retainedReadings']).isNotEmpty)
         Notice(

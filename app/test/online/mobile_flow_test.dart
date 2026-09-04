@@ -208,6 +208,44 @@ void main() {
     expect(server.bootstrapCalls, 0);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets(
+    'el encabezado de pasos se oculta al desplazar y el AppBar no duplica guardado',
+    (tester) async {
+      final server = FixtureServer();
+      final session = MobileSession(server.api, recovery: server.recovery);
+      await tester.runAsync(
+        () => session.login('operador', 'fixture-password'),
+      );
+      tester.view.physicalSize = const Size(430, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DraftScreen(session: session, bundle: fixtureWizardBundle),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Guardar borrador'), findsNothing);
+      expect(find.byKey(const ValueKey('draft-step-header')), findsOneWidget);
+      await tester.drag(
+        find.byKey(const ValueKey('draft-content')),
+        const Offset(0, -250),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('draft-step-header')), findsNothing);
+
+      await tester.drag(
+        find.byKey(const ValueKey('draft-content')),
+        const Offset(0, 1000),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('draft-step-header')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+    },
+  );
   testWidgets('el borrador guarda strings exactos y no finaliza ni comparte', (
     tester,
   ) async {

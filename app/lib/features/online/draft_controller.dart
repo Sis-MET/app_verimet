@@ -124,7 +124,7 @@ class DraftController extends ChangeNotifier {
                 readings
                     .where((r) => r['pointId'] == point['id'])
                     .firstOrNull?['zero'] ??
-                '',
+                '0',
           },
       ],
     };
@@ -327,12 +327,6 @@ class DraftController extends ChangeNotifier {
   String? get completionIssue {
     if (draftIssue != null) return draftIssue;
     final inputs = objects(raw['tests']);
-    if (flexible &&
-        inputs.any(
-          (t) => t['omitted'] != true && t['substitutionDraft'] != null,
-        )) {
-      return 'Completa o descarta la sustitución pendiente antes de finalizar.';
-    }
     if (inputs.isEmpty || !inputs.every(testComplete)) {
       return flexible
           ? 'Completa las cargas utilizadas y las indicaciones, o justifica la omisión de cada prueba.'
