@@ -5,7 +5,7 @@ import '../../../../core/constants/app_config.dart';
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
 import '../../../../shared/widgets/app_shell.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../../shared/widgets/section_label.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../sync/presentation/providers/sync_providers.dart';
@@ -35,27 +35,41 @@ class SettingsScreen extends ConsumerWidget {
         padding: kShellContentPadding,
         children: [
           Text('Ajustes', style: AppTextStyles.figure(context, size: 29)),
-          const SectionLabel('Apariencia', padding: EdgeInsets.only(top: 16, bottom: 6)),
-          _SettingRow(
-            title: 'Tema oscuro',
-            subtitle: 'Para planta con poca luz',
-            trailing: OutlinedButton(
-              onPressed: ref.read(themeModeProvider.notifier).toggleDark,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(96, 44)),
-              child: Text(isDark ? 'Activado' : 'Desactivado'),
-            ),
+          const SectionLabel(
+            'Apariencia',
+            padding: EdgeInsets.only(top: 16, bottom: 10),
           ),
-          _SettingRow(
-            title: 'Texto grande',
-            subtitle: 'Lecturas a un brazo de distancia',
-            trailing: OutlinedButton(
-              onPressed: ref.read(largeTextProvider.notifier).toggle,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(96, 44)),
-              child: Text(largeText ? 'Activado' : 'Desactivado'),
-            ),
+          SurfaceList(
+            children: [
+              _SettingRow(
+                title: 'Tema oscuro',
+                subtitle: 'Para planta con poca luz',
+                trailing: OutlinedButton(
+                  onPressed: ref.read(themeModeProvider.notifier).toggleDark,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(96, 42),
+                  ),
+                  child: Text(isDark ? 'Activado' : 'Desactivado'),
+                ),
+              ),
+              _SettingRow(
+                title: 'Texto grande',
+                subtitle: 'Lecturas a un brazo de distancia',
+                trailing: OutlinedButton(
+                  onPressed: ref.read(largeTextProvider.notifier).toggle,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(96, 42),
+                  ),
+                  child: Text(largeText ? 'Activado' : 'Desactivado'),
+                ),
+              ),
+            ],
           ),
-          const SectionLabel('Conexión', padding: EdgeInsets.only(top: 24, bottom: 6)),
-          BlueprintCard(
+          const SectionLabel(
+            'Conexión',
+            padding: EdgeInsets.only(top: 24, bottom: 10),
+          ),
+          SurfaceCard(
             padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -72,58 +86,88 @@ class SettingsScreen extends ConsumerWidget {
                   onPressed: connection == ConnectionCheck.testing
                       ? null
                       : ref.read(connectionCheckProvider.notifier).run,
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                  ),
                   child: Text(connection.label),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   connection.hint,
-                  style: TextStyle(fontSize: 12, height: 1.45, color: palette.muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: palette.muted,
+                  ),
                 ),
               ],
             ),
           ),
-          const SectionLabel('Datos sin enviar', padding: EdgeInsets.only(top: 24, bottom: 6)),
-          _SettingRow(
-            title: pendientes.isEmpty
-                ? 'Nada pendiente de envío'
-                : '${pendientes.length} verificaciones en cola',
-            subtitle: pendientes.isEmpty ? 'Todo sincronizado con Métrica' : codigos,
-            trailing: OutlinedButton(
-              onPressed: pendientes.isEmpty ? null : ref.read(syncQueueProvider.notifier).sendAll,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-              child: const Text('Enviar'),
-            ),
+          const SectionLabel(
+            'Datos sin enviar',
+            padding: EdgeInsets.only(top: 24, bottom: 10),
           ),
-          const SectionLabel('Cuenta', padding: EdgeInsets.only(top: 24, bottom: 6)),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: palette.divider)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(user?.nombre ?? '—', style: const TextStyle(fontSize: 14.5)),
-                Text(
-                  user == null ? '' : '${user.role.label} · ${user.empresaNombre ?? 'Métrica'}',
-                  style: TextStyle(fontSize: 11.5, color: palette.muted),
+          SurfaceList(
+            children: [
+              _SettingRow(
+                title: pendientes.isEmpty
+                    ? 'Nada pendiente de envío'
+                    : '${pendientes.length} verificaciones en cola',
+                subtitle: pendientes.isEmpty
+                    ? 'Todo sincronizado con Métrica'
+                    : codigos,
+                trailing: OutlinedButton(
+                  onPressed: pendientes.isEmpty
+                      ? null
+                      : ref.read(syncQueueProvider.notifier).sendAll,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 42),
+                  ),
+                  child: const Text('Enviar'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          _SettingRow(
-            title: 'Versión',
-            trailing: Text(
-              '1.0.0 (build 1)',
-              style: TextStyle(fontSize: 13.5, color: palette.muted),
-            ),
+          const SectionLabel(
+            'Cuenta',
+            padding: EdgeInsets.only(top: 24, bottom: 10),
           ),
-          const SizedBox(height: 18),
+          SurfaceList(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      user?.nombre ?? '—',
+                      style: const TextStyle(fontSize: 14.5),
+                    ),
+                    Text(
+                      user == null
+                          ? ''
+                          : '${user.role.label} · ${user.empresaNombre ?? 'Métrica'}',
+                      style: TextStyle(fontSize: 11.5, color: palette.muted),
+                    ),
+                  ],
+                ),
+              ),
+              _SettingRow(
+                title: 'Versión',
+                trailing: Text(
+                  '1.0.0 (build 1)',
+                  style: TextStyle(fontSize: 13.5, color: palette.muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           OutlinedButton(
             onPressed: ref.read(authProvider.notifier).signOut,
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+            ),
             child: const Text('Cerrar sesión'),
           ),
         ],
@@ -137,7 +181,11 @@ class SettingsScreen extends ConsumerWidget {
 
 /// Fila de ajuste: titulo, apoyo opcional y un control a la derecha.
 class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.title, required this.trailing, this.subtitle});
+  const _SettingRow({
+    required this.title,
+    required this.trailing,
+    this.subtitle,
+  });
 
   final String title;
   final String? subtitle;
@@ -147,11 +195,8 @@ class _SettingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
           Expanded(
@@ -161,7 +206,14 @@ class _SettingRow extends StatelessWidget {
               children: [
                 Text(title, style: const TextStyle(fontSize: 14.5)),
                 if (subtitle case final String value when value.isNotEmpty)
-                  Text(value, style: TextStyle(fontSize: 11.5, height: 1.35, color: palette.muted)),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: palette.muted,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -174,7 +226,11 @@ class _SettingRow extends StatelessWidget {
 }
 
 class _ConnectionRow extends StatelessWidget {
-  const _ConnectionRow({required this.label, required this.value, this.mono = false});
+  const _ConnectionRow({
+    required this.label,
+    required this.value,
+    this.mono = false,
+  });
 
   final String label;
   final String value;
@@ -189,7 +245,10 @@ class _ConnectionRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: TextStyle(fontSize: 13.5, color: palette.muted)),
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13.5, color: palette.muted),
+            ),
           ),
           Text(
             value,

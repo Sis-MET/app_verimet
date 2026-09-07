@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/theme/industry_palette.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../../shared/widgets/industry_icons.dart';
 import '../../../../shared/widgets/labeled_field.dart';
 import '../providers/verification_wizard_provider.dart';
@@ -129,13 +129,17 @@ class _StandardsStepState extends ConsumerState<StandardsStep> {
           ],
         ),
         const SizedBox(height: 18),
-        BlueprintCard(
+        SurfaceCard(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 1),
-                child: IndustryIconView(IndustryIcon.info, size: 19, color: palette.accent),
+                child: IndustryIconView(
+                  IndustryIcon.info,
+                  size: 19,
+                  color: palette.accent,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -143,7 +147,11 @@ class _StandardsStepState extends ConsumerState<StandardsStep> {
                   'El certificado del patrón vence en ${conditions.diasParaVencimiento} días. '
                   'Si venciera antes de la próxima verificación, la app la marcará como no '
                   'trazable.',
-                  style: TextStyle(fontSize: 12.5, height: 1.45, color: palette.mutedStrong),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color: palette.mutedStrong,
+                  ),
                 ),
               ),
             ],

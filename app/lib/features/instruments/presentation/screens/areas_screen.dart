@@ -6,7 +6,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
 import '../../../../shared/widgets/app_shell.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../../shared/widgets/industry_icons.dart';
 import '../../../../shared/widgets/proportion_bar.dart';
 import '../../../../shared/widgets/section_label.dart';
@@ -55,7 +55,7 @@ class _AreaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return BlueprintCard(
+    return SurfaceCard(
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
       onTap: () => context.go(AppRoutes.areaDetail(area.nombre)),
       child: Column(
@@ -69,15 +69,25 @@ class _AreaCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(area.nombre, style: AppTextStyles.figure(context, size: 21)),
-                    Text(area.resumen, style: TextStyle(fontSize: 12.5, color: palette.muted)),
+                    Text(
+                      area.nombre,
+                      style: AppTextStyles.figure(context, size: 21),
+                    ),
+                    Text(
+                      area.resumen,
+                      style: TextStyle(fontSize: 12.5, color: palette.muted),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 '${area.total}',
-                style: AppTextStyles.figure(context, size: 28, color: palette.accentInk),
+                style: AppTextStyles.figure(
+                  context,
+                  size: 28,
+                  color: palette.accentInk,
+                ),
               ),
               const SizedBox(width: 8),
               IndustryIconView(
@@ -106,7 +116,7 @@ class _StatusBar extends StatelessWidget {
     final palette = IndustryPalette.of(context);
 
     return ProportionBar(
-      gap: 1,
+      gap: 3,
       segments: <(int, Color)>[
         (area.conformes, palette.accentMid),
         (area.observados, palette.accentStrong),

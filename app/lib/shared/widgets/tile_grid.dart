@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_shapes.dart';
 import '../theme/app_typography.dart';
 import '../theme/industry_palette.dart';
-import 'blueprint_card.dart';
+import 'surface_card.dart';
 
 /// Mosaico de modulos: el patron de "plano de planta" del sistema.
 ///
@@ -18,8 +19,8 @@ class TileGrid extends StatelessWidget {
     required this.cells,
     this.columns = 2,
     this.gap = 12,
-    this.minTileHeight = 124,
-    this.wideTileHeight = 96,
+    this.minTileHeight = 128,
+    this.wideTileHeight = 100,
     super.key,
   });
 
@@ -157,37 +158,64 @@ class ActionTile extends StatelessWidget {
 
     final Color ink;
     if (primary) {
-      ink = palette.bg;
+      ink = palette.card;
     } else if (enabled) {
       ink = palette.text;
     } else {
       ink = palette.muted;
     }
     final Color subInk = primary
-        ? palette.bg.withValues(alpha: 0.78)
+        ? palette.card.withValues(alpha: 0.80)
         : palette.muted;
 
     return Opacity(
       // Lo deshabilitado no se esconde: se apaga. El operario tiene que ver
       // que la funcion existe y que ahora mismo no le toca.
       opacity: enabled ? 1 : 0.55,
-      child: BlueprintCard(
+      child: SurfaceCard(
         onTap: onTap,
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+        padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
         background: primary ? palette.accent : null,
-        markColor: primary ? palette.accent : null,
+        borderColor: primary ? palette.accent : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(icon, size: 26, color: ink),
-                if (badge != null) ...[const Spacer(), badge!],
+                // El icono va sobre una pastilla del mismo acero rebajado: da
+                // un punto de apoyo al modulo sin sumar otro contorno.
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: primary
+                        ? palette.card.withValues(alpha: 0.16)
+                        : palette.accentSoft,
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    size: 21,
+                    color: primary ? palette.card : palette.accentInk,
+                  ),
+                ),
+                // El badge cede ancho antes que desbordar: el rotulo del
+                // modulo manda y la etiqueta es contexto.
+                if (badge != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: badge!,
+                    ),
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -240,9 +268,9 @@ class MetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return BlueprintCard(
+    return SurfaceCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -255,14 +283,22 @@ class MetricTile extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: AppTextStyles.figure(context, size: 40, color: valueColor),
+                style: AppTextStyles.figure(
+                  context,
+                  size: 40,
+                  color: valueColor,
+                ),
               ),
               if (caption != null)
                 Text(
                   caption!,
-                  style: TextStyle(fontSize: 11.5, height: 1.3, color: palette.muted),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.3,
+                    color: palette.muted,
+                  ),
                 ),
-              if (footer != null) ...[const SizedBox(height: 6), footer!],
+              if (footer != null) ...[const SizedBox(height: 8), footer!],
             ],
           ),
         ],

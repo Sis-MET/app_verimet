@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../shared/widgets/blueprint_card.dart';
+import '../../shared/widgets/surface_card.dart';
+import '../../shared/widgets/labeled_field.dart';
 import 'draft_controller.dart';
 import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
@@ -75,30 +76,35 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
     }
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: TextFormField(
-        key: ValueKey(id),
-        controller: controller,
-        enabled: !locked,
-        readOnly: readOnly,
-        maxLength: maxLength,
-        keyboardType: number
-            ? const TextInputType.numberWithOptions(decimal: true, signed: true)
-            : TextInputType.text,
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: hint,
-          helperMaxLines: 3,
-          suffixIcon: suffixIcon,
+      child: LabeledInput(
+        label: label,
+        child: TextFormField(
+          key: ValueKey(id),
+          controller: controller,
+          enabled: !locked,
+          readOnly: readOnly,
+          maxLength: maxLength,
+          keyboardType: number
+              ? const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                )
+              : TextInputType.text,
+          decoration: InputDecoration(
+            helperText: hint,
+            helperMaxLines: 3,
+            suffixIcon: suffixIcon,
+          ),
+          validator: (text) => required && (text ?? '').trim().isEmpty
+              ? 'Completa este dato.'
+              : number
+              ? decimalError(text)
+              : null,
+          onChanged: (text) {
+            update(text);
+            changed();
+          },
         ),
-        validator: (text) => required && (text ?? '').trim().isEmpty
-            ? 'Completa este dato.'
-            : number
-            ? decimalError(text)
-            : null,
-        onChanged: (text) {
-          update(text);
-          changed();
-        },
       ),
     );
   }
@@ -110,22 +116,24 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
     VoidCallback? after,
   }) => Padding(
     padding: const EdgeInsets.only(top: 12),
-    child: DropdownButtonFormField<String>(
-      key: ValueKey('$name:${setup[name]}'),
-      initialValue: setup[name] as String,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: [
-        for (final e in choices.entries)
-          DropdownMenuItem(value: e.key, child: Text(e.value, maxLines: 2)),
-      ],
-      onChanged: locked
-          ? null
-          : (value) {
-              setup[name] = value!;
-              after?.call();
-              changed();
-            },
+    child: LabeledInput(
+      label: label,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('$name:${setup[name]}'),
+        initialValue: setup[name] as String,
+        isExpanded: true,
+        items: [
+          for (final e in choices.entries)
+            DropdownMenuItem(value: e.key, child: Text(e.value, maxLines: 2)),
+        ],
+        onChanged: locked
+            ? null
+            : (value) {
+                setup[name] = value!;
+                after?.call();
+                changed();
+              },
+      ),
     ),
   );
 
@@ -391,7 +399,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         for (final r in readings)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: BlueprintCard(
+            child: SurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -416,7 +424,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         for (var group = 1; group <= setup['groupCount']; group++)
           Padding(
             padding: const EdgeInsets.only(top: 16),
-            child: BlueprintCard(
+            child: SurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -444,7 +452,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         for (final r in readings)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: BlueprintCard(
+            child: SurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

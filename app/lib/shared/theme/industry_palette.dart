@@ -11,9 +11,12 @@ import 'app_colors.dart';
 class IndustryPalette extends ThemeExtension<IndustryPalette> {
   const IndustryPalette({
     required this.bg,
+    required this.card,
     required this.surface,
     required this.text,
     required this.divider,
+    required this.hairline,
+    required this.shadow,
     required this.accent,
     required this.accentSoft,
     required this.accentMid,
@@ -39,9 +42,12 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
   /// Variante clara: la de planta con luz de dia.
   factory IndustryPalette.light() => const IndustryPalette(
     bg: AppColors.bg,
+    card: AppColors.card,
     surface: AppColors.surface,
     text: AppColors.text,
-    divider: Color(0x291D1F20), // text al 16%
+    divider: Color(0x141D1F20), // text al 8%
+    hairline: Color(0x0F1D1F20), // text al 6%
+    shadow: Color(0x0F1D1F20),
     accent: AppColors.accent,
     accentSoft: AppColors.accent100,
     accentMid: AppColors.accent300,
@@ -59,17 +65,20 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     failSurface: AppColors.failSurface,
     failInk: AppColors.failInk,
     failBadgeSurface: AppColors.failBadgeSurface,
-    navBackground: Color(0xC2FFFFFF), // blanco al 76%
-    tagNeutralSurface: AppColors.neutral100,
+    navBackground: Color(0xF0FFFFFF), // tarjeta al 94%
+    tagNeutralSurface: AppColors.neutral200,
     tagNeutralInk: AppColors.neutral800,
   );
 
   /// Variante oscura: pedida para naves con poca luz.
   factory IndustryPalette.dark() => const IndustryPalette(
     bg: AppColors.bgDark,
+    card: AppColors.cardDark,
     surface: AppColors.surfaceDark,
     text: AppColors.textDark,
-    divider: Color(0x33E8EAEB), // text al 20%
+    divider: Color(0x1FE8EAEB), // text al 12%
+    hairline: Color(0x14E8EAEB), // text al 8%
+    shadow: Color(0x59000000),
     accent: AppColors.accentDark,
     accentSoft: AppColors.accent100Dark,
     accentMid: AppColors.accent500,
@@ -87,22 +96,33 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     failSurface: Color(0xFF3A241E),
     failInk: Color(0xFFF0B9AB),
     failBadgeSurface: Color(0xFF33201A),
-    navBackground: Color(0xDB1F2325), // surface al 86%
-    tagNeutralSurface: Color(0xFF2A2F31),
+    navBackground: Color(0xF01E2225), // tarjeta al 94%
+    tagNeutralSurface: Color(0xFF2C3134),
     tagNeutralInk: AppColors.textDark,
   );
 
-  /// Fondo de la app.
+  /// Fondo de la app. Va un escalon por debajo de [card] para que un modulo se
+  /// lea como pieza levantada y no necesite un borde marcado.
   final Color bg;
 
-  /// Segundo plano: teclado numerico, campos de formulario.
+  /// Plano de una tarjeta, un modulo o una lista agrupada.
+  final Color card;
+
+  /// Segundo plano dentro de una tarjeta: campos de formulario, celdas.
   final Color surface;
 
   /// Tinta principal.
   final Color text;
 
-  /// Hairline de tarjetas, filas y separadores.
+  /// Contorno de tarjetas y controles. Apoya al contraste de valor, ya no es
+  /// el recurso que separa: por eso es mucho mas suave que antes.
   final Color divider;
+
+  /// Separador entre filas de una misma lista agrupada.
+  final Color hairline;
+
+  /// Sombra difusa de lo que flota o se apoya.
+  final Color shadow;
 
   /// Acero. Es el unico color de marca y marca lo activo.
   final Color accent;
@@ -171,9 +191,12 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
   @override
   IndustryPalette copyWith({
     Color? bg,
+    Color? card,
     Color? surface,
     Color? text,
     Color? divider,
+    Color? hairline,
+    Color? shadow,
     Color? accent,
     Color? accentSoft,
     Color? accentMid,
@@ -197,9 +220,12 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
   }) {
     return IndustryPalette(
       bg: bg ?? this.bg,
+      card: card ?? this.card,
       surface: surface ?? this.surface,
       text: text ?? this.text,
       divider: divider ?? this.divider,
+      hairline: hairline ?? this.hairline,
+      shadow: shadow ?? this.shadow,
       accent: accent ?? this.accent,
       accentSoft: accentSoft ?? this.accentSoft,
       accentMid: accentMid ?? this.accentMid,
@@ -229,9 +255,12 @@ class IndustryPalette extends ThemeExtension<IndustryPalette> {
     Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
     return IndustryPalette(
       bg: mix(bg, other.bg),
+      card: mix(card, other.card),
       surface: mix(surface, other.surface),
       text: mix(text, other.text),
       divider: mix(divider, other.divider),
+      hairline: mix(hairline, other.hairline),
+      shadow: mix(shadow, other.shadow),
       accent: mix(accent, other.accent),
       accentSoft: mix(accentSoft, other.accentSoft),
       accentMid: mix(accentMid, other.accentMid),

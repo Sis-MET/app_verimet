@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../shared/theme/app_shapes.dart';
+import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
 import 'mobile_api.dart';
 
@@ -28,6 +30,14 @@ class OnlinePage extends StatelessWidget {
 /// izquierda y cuerpo pequeno, sin relleno. Antes iba en caja rellena y con
 /// 16 px de aire: apiladas de tres en tres tapaban la pantalla y competian
 /// con las acciones.
+///
+/// La regla se dibuja como una pastilla propia y no como borde del bloque:
+/// asi tiene las puntas redondeadas del sistema en vez de cortarse en angulo
+/// recto contra el texto.
+///
+/// Reserva su propio aire arriba y abajo. Solo llevaba relleno superior, y
+/// como casi siempre precede a un campo, el aviso terminaba apoyado en la caja
+/// del campo: los dos bloques se leian como uno solo.
 class Notice extends StatelessWidget {
   const Notice(
     this.text, {
@@ -44,28 +54,45 @@ class Notice extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
     final rule = alert ? palette.fail : palette.accent;
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: rule, width: 2)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 17, color: alert ? palette.fail : palette.muted),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                color: palette.muted,
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 14),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: rule,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    icon,
+                    size: 17,
+                    color: alert ? palette.fail : palette.muted,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: palette.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -182,20 +209,78 @@ String dateLabel(Object? value) {
   return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
+/// Ficha de solo lectura: rotulo pequeno arriba, valor debajo.
+///
+/// El aire de dentro del par y el de fuera estaban casi igualados (3 px contra
+/// 12 px, y el interlineado del valor se comia la diferencia): el rotulo
+/// quedaba tan cerca del valor de la ficha anterior como del suyo propio y la
+/// pantalla se leia como un bloque continuo. Ahora la separacion entre fichas
+/// es varias veces la de dentro de la ficha, que es lo que agrupa cada par.
 class DetailField extends StatelessWidget {
   const DetailField(this.label, this.value, {super.key});
   final String label;
   final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: AppTextStyles.caption(context, size: 11)),
+          const SizedBox(height: 3),
+          SelectableText(
+            valueLabel(value),
+            style: TextStyle(
+              fontSize: 14.5,
+              // Interlinea corta: el valor casi siempre es una linea, y con la
+              // del cuerpo (1,55) el par se separaba por dentro tanto como por
+              // fuera.
+              height: 1.3,
+              color: palette.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Apartado plegable del expediente.
+///
+/// `ExpansionTile` no admite margen y el sistema le da contorno redondeado:
+/// apiladas quedaban pegadas borde con borde y se leian como una sola caja
+/// partida. Este envoltorio les pone el aire que les falta.
+class EvidenceSection extends StatelessWidget {
+  const EvidenceSection({
+    required this.title,
+    required this.children,
+    this.subtitle,
+    this.initiallyExpanded = false,
+    super.key,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelMedium),
-        const SizedBox(height: 3),
-        SelectableText(valueLabel(value)),
-      ],
+    padding: const EdgeInsets.only(top: 12),
+    child: ExpansionTile(
+      title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+      initiallyExpanded: initiallyExpanded,
+      childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     ),
   );
 }
@@ -210,38 +295,61 @@ class EvidenceTree extends StatelessWidget {
     if (value is Map) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           for (final entry in (value as Map).entries)
             if (entry.value is Map || entry.value is List)
-              ExpansionTile(
-                title: Text(entry.key.toString().replaceAll('_', ' ')),
-                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              EvidenceSection(
+                title: _fieldLabel(entry.key),
                 children: [EvidenceTree(entry.value)],
               )
             else
-              DetailField(
-                entry.key.toString().replaceAll('_', ' '),
-                entry.value,
-              ),
+              DetailField(_fieldLabel(entry.key), entry.value),
         ],
       );
     }
     if (value is List) {
+      final palette = IndustryPalette.of(context);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < (value as List).length; i++) ...[
-            Text(
-              'Registro ${i + 1}',
-              style: Theme.of(context).textTheme.titleSmall,
+            Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 8 : 20, bottom: 2),
+              child: Text(
+                'REGISTRO ${i + 1}',
+                style: AppTextStyles.caption(context, size: 10.5),
+              ),
             ),
             EvidenceTree((value as List)[i]),
-            const Divider(),
+            if (i < (value as List).length - 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Divider(height: 1, color: palette.hairline),
+              ),
           ],
-          if ((value as List).isEmpty) const Text('Sin registros'),
+          if ((value as List).isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Sin registros',
+                style: TextStyle(fontSize: 13.5, color: palette.muted),
+              ),
+            ),
         ],
       );
     }
     return SelectableText(valueLabel(value));
   }
+}
+
+/// Clave cruda del expediente convertida en rotulo: `area_id` -> `Area id`.
+///
+/// Solo toca el rotulo. El valor se muestra tal cual llega, porque el
+/// expediente es lo que se consiente enviar y no puede reescribirse.
+String _fieldLabel(Object? key) {
+  final words = key.toString().replaceAll('_', ' ').trim();
+  if (words.isEmpty) return words;
+  return words[0].toUpperCase() + words.substring(1);
 }

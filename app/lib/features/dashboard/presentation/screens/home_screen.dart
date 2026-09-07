@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/domain/compliance_status.dart';
+import '../../../../shared/theme/app_shapes.dart';
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
 import '../../../../shared/widgets/app_shell.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../../shared/widgets/industry_icons.dart';
 import '../../../../shared/widgets/proportion_bar.dart';
 import '../../../../shared/widgets/section_label.dart';
@@ -44,7 +45,10 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Kicker(cliente),
                     const SizedBox(height: 2),
-                    Text('Estado del parque', style: AppTextStyles.figure(context, size: 29)),
+                    Text(
+                      'Estado del parque',
+                      style: AppTextStyles.figure(context, size: 29),
+                    ),
                   ],
                 ),
               ),
@@ -82,14 +86,28 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SectionLabel('Alertas críticas', padding: EdgeInsets.only(top: 26, bottom: 8)),
+          const SectionLabel(
+            'Alertas críticas',
+            padding: EdgeInsets.only(top: 26, bottom: 10),
+          ),
+          // Las alertas siguen sueltas: cada una es un equipo parado y tiene
+          // que poder mirarse por separado. Lo demas va agrupado.
           for (final alerta in overview.alertas) _AlertRow(alerta: alerta),
           const SectionLabel('Vencidas y por vencer'),
-          for (final vencimiento in overview.vencimientos) _DueRow(item: vencimiento),
+          SurfaceList(
+            children: [
+              for (final vencimiento in overview.vencimientos)
+                _DueRow(item: vencimiento),
+            ],
+          ),
           const SectionLabel('Últimas verificaciones'),
-          for (final ultima in overview.ultimas) _RecentRow(item: ultima),
+          SurfaceList(
+            children: [
+              for (final ultima in overview.ultimas) _RecentRow(item: ultima),
+            ],
+          ),
           const SectionLabel('Próximas calibraciones externas'),
-          BlueprintCard(
+          SurfaceCard(
             child: Column(
               children: [
                 for (final calibracion in overview.calibraciones)
@@ -131,7 +149,7 @@ class _EquiposCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlueprintCard(
+    return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -140,7 +158,10 @@ class _EquiposCard extends StatelessWidget {
           Text('${summary.equipos}', style: AppTextStyles.figure(context)),
           Text(
             'en ${summary.areas} áreas',
-            style: TextStyle(fontSize: 11.5, color: IndustryPalette.of(context).muted),
+            style: TextStyle(
+              fontSize: 11.5,
+              color: IndustryPalette.of(context).muted,
+            ),
           ),
         ],
       ),
@@ -157,7 +178,7 @@ class _ConformidadCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return BlueprintCard(
+    return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -191,41 +212,57 @@ class _AlertRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: palette.divider),
-          right: BorderSide(color: palette.divider),
-          bottom: BorderSide(color: palette.divider),
-          left: BorderSide(color: palette.fail, width: 3),
-        ),
-      ),
-      child: Row(
-        children: [
-          IndustryIconView(IndustryIcon.warning, size: 20, color: palette.fail),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(alerta.equipo, style: AppTextStyles.figure(context, size: 16)),
-                Text(
-                  alerta.detalle,
-                  style: TextStyle(fontSize: 12, height: 1.35, color: palette.muted),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SurfaceCard(
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+        child: Row(
+          children: [
+            // La marca de urgencia es una pastilla de oxido, no un borde: el
+            // borde grueso a la izquierda cortaba la esquina redondeada.
+            Container(
+              width: 4,
+              height: 34,
+              decoration: BoxDecoration(
+                color: palette.fail,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          IndustryIconView(
-            IndustryIcon.chevronRight,
-            size: 18,
-            color: palette.text.withValues(alpha: 0.45),
-          ),
-        ],
+            const SizedBox(width: 12),
+            IndustryIconView(
+              IndustryIcon.warning,
+              size: 20,
+              color: palette.fail,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    alerta.equipo,
+                    style: AppTextStyles.figure(context, size: 16),
+                  ),
+                  Text(
+                    alerta.detalle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: palette.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IndustryIconView(
+              IndustryIcon.chevronRight,
+              size: 18,
+              color: palette.text.withValues(alpha: 0.45),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -240,11 +277,8 @@ class _DueRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
@@ -253,15 +287,27 @@ class _DueRow extends StatelessWidget {
             width: 66,
             child: Text(
               item.codigo,
-              style: AppTextStyles.reading(context, size: 12, color: palette.accentInk),
+              style: AppTextStyles.reading(
+                context,
+                size: 12,
+                color: palette.accentInk,
+              ),
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(item.descripcion, style: const TextStyle(fontSize: 13.5))),
+          Expanded(
+            child: Text(
+              item.descripcion,
+              style: const TextStyle(fontSize: 13.5),
+            ),
+          ),
           const SizedBox(width: 10),
           Text(
             item.plazo,
-            style: TextStyle(fontSize: 12, color: item.vencida ? palette.fail : palette.muted),
+            style: TextStyle(
+              fontSize: 12,
+              color: item.vencida ? palette.fail : palette.muted,
+            ),
           ),
         ],
       ),
@@ -279,18 +325,18 @@ class _RecentRow extends StatelessWidget {
     final palette = IndustryPalette.of(context);
     final isFail = item.veredicto == ComplianceStatus.noConforme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
         children: [
           SizedBox(
             width: 66,
-            child: Text(item.codigo, style: AppTextStyles.reading(context, size: 12)),
+            child: Text(
+              item.codigo,
+              style: AppTextStyles.reading(context, size: 12),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(

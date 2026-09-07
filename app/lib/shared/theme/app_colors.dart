@@ -7,14 +7,20 @@ import 'package:flutter/material.dart';
 /// UI lee [IndustryPalette] desde el tema, que elige la variante clara u
 /// oscura. Estos constantes son la fuente de la que salen esas dos variantes.
 abstract final class AppColors {
-  // — fondo y tinta, tema claro —
-  static const Color bg = Color(0xFFF2F2F3);
-  static const Color surface = Color(0xFFE9E9EA);
+  // — fondo, tarjeta y tinta, tema claro —
+  //
+  // El fondo es un gris apenas mas profundo que la tarjeta: asi un modulo se
+  // levanta del plano por diferencia de valor y no hace falta encerrarlo en un
+  // borde marcado.
+  static const Color bg = Color(0xFFEFEFF1);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color surface = Color(0xFFF3F3F5);
   static const Color text = Color(0xFF1D1F20);
 
-  // — fondo y tinta, tema oscuro (planta con poca luz) —
-  static const Color bgDark = Color(0xFF15181A);
-  static const Color surfaceDark = Color(0xFF1F2325);
+  // — fondo, tarjeta y tinta, tema oscuro (planta con poca luz) —
+  static const Color bgDark = Color(0xFF141719);
+  static const Color cardDark = Color(0xFF1E2225);
+  static const Color surfaceDark = Color(0xFF262B2E);
   static const Color textDark = Color(0xFFE8EAEB);
 
   // — rampa neutra —

@@ -46,7 +46,8 @@ class _ReadingsCaptureState extends State<ReadingsCapture> {
   void initState() {
     super.initState();
     _controllers = <TextEditingController>[
-      for (final reading in widget.readings) TextEditingController(text: reading.rawValue),
+      for (final reading in widget.readings)
+        TextEditingController(text: reading.rawValue),
     ];
   }
 
@@ -62,7 +63,8 @@ class _ReadingsCaptureState extends State<ReadingsCapture> {
         controller.dispose();
       }
       _controllers = <TextEditingController>[
-        for (final reading in widget.readings) TextEditingController(text: reading.rawValue),
+        for (final reading in widget.readings)
+          TextEditingController(text: reading.rawValue),
       ];
       return;
     }
@@ -93,7 +95,10 @@ class _ReadingsCaptureState extends State<ReadingsCapture> {
           children: [
             Expanded(child: widget.loadDescription),
             const SizedBox(width: 10),
-            Text(widget.toleranceLabel, style: TextStyle(fontSize: 11.5, color: palette.muted)),
+            Text(
+              widget.toleranceLabel,
+              style: TextStyle(fontSize: 11.5, color: palette.muted),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -111,7 +116,11 @@ class _ReadingsCaptureState extends State<ReadingsCapture> {
 }
 
 class _ReadingRow extends StatelessWidget {
-  const _ReadingRow({required this.reading, required this.controller, required this.onChanged});
+  const _ReadingRow({
+    required this.reading,
+    required this.controller,
+    required this.onChanged,
+  });
 
   final ReadingEvaluation reading;
   final TextEditingController controller;
@@ -124,11 +133,13 @@ class _ReadingRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 7),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
+        border: Border(bottom: BorderSide(color: palette.hairline)),
       ),
       child: Row(
         children: [
-          Expanded(child: Text(reading.label, style: const TextStyle(fontSize: 13.5))),
+          Expanded(
+            child: Text(reading.label, style: const TextStyle(fontSize: 13.5)),
+          ),
           const SizedBox(width: 10),
           ReadingField(controller: controller, onChanged: onChanged),
           const SizedBox(width: 10),
@@ -139,7 +150,9 @@ class _ReadingRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: AppTextStyles.reading(
                 context,
-                color: reading.isOutOfTolerance ? palette.fail : palette.mutedStrong,
+                color: reading.isOutOfTolerance
+                    ? palette.fail
+                    : palette.mutedStrong,
               ),
             ),
           ),
@@ -163,7 +176,10 @@ class ReadingsFooter extends StatelessWidget {
         Expanded(
           child: Text(
             summary,
-            style: TextStyle(fontSize: 12.5, color: IndustryPalette.of(context).muted),
+            style: TextStyle(
+              fontSize: 12.5,
+              color: IndustryPalette.of(context).muted,
+            ),
           ),
         ),
         const SizedBox(width: 10),

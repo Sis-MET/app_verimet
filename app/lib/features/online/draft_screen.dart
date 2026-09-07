@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
-import '../../shared/widgets/blueprint_card.dart';
+import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
+import '../../shared/widgets/labeled_field.dart';
 import 'draft_controller.dart';
 import 'flexible_trial_fields.dart';
 import 'history_screen.dart';
@@ -436,7 +437,7 @@ class _DraftWizardState extends State<_DraftWizard>
                                         child: Divider(
                                           color: index <= step
                                               ? palette.accentInk
-                                              : palette.divider,
+                                              : palette.track,
                                         ),
                                       ),
                                     Semantics(
@@ -458,9 +459,11 @@ class _DraftWizardState extends State<_DraftWizard>
                                           disabledBackgroundColor: index == step
                                               ? palette.accentInk
                                               : palette.surface,
-                                          foregroundColor: palette.text,
+                                          foregroundColor: index == step
+                                              ? palette.card
+                                              : palette.text,
                                           disabledForegroundColor: index == step
-                                              ? palette.surface
+                                              ? palette.card
                                               : palette.muted,
                                         ),
                                         icon: Text(
@@ -635,55 +638,67 @@ class _DraftWizardState extends State<_DraftWizard>
         'No hay pesas patrón disponibles para esta planta. Puedes continuar con productos o cargas de trabajo e identificar su origen en cada prueba.',
       ),
     for (final pattern in objects(capture.bundle['patterns']))
-      ExpansionTile(
-        key: PageStorageKey('pattern-${pattern['id']}'),
-        initiallyExpanded: true,
-        tilePadding: EdgeInsets.zero,
-        title: Text('${pattern['code']} · ${pattern['description']}'),
-        children: [
-          if (objects(pattern['certificates']).isEmpty)
-            const Notice('Sin certificados disponibles.'),
-          for (final cert in objects(pattern['certificates']))
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(valueLabel(cert['number'])),
-              subtitle: Text(
-                '${cert['laboratory']} · vence ${dateLabel(cert['expiresOn'])}${cert['expired'] == true ? ' · VENCIDO' : ''}',
+      // El apartado lleva contorno redondeado: sin margen propio dos pesas
+      // seguidas quedaban pegadas, y con `tilePadding` a cero el titulo se
+      // apoyaba en el borde.
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: ExpansionTile(
+          key: PageStorageKey('pattern-${pattern['id']}'),
+          initiallyExpanded: true,
+          title: Text('${pattern['code']} · ${pattern['description']}'),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          children: [
+            if (objects(pattern['certificates']).isEmpty)
+              const Notice('Sin certificados disponibles.'),
+            for (final cert in objects(pattern['certificates']))
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(valueLabel(cert['number'])),
+                subtitle: Text(
+                  '${cert['laboratory']} · vence ${dateLabel(cert['expiresOn'])}${cert['expired'] == true ? ' · VENCIDO' : ''}',
+                ),
+                value: (capture.raw['certificates'] as List).contains(
+                  cert['id'],
+                ),
+                onChanged: capture.locked
+                    ? null
+                    : (checked) {
+                        final selected = capture.raw['certificates'] as List;
+                        for (final certificate in objects(
+                          pattern['certificates'],
+                        )) {
+                          selected.remove(certificate['id']);
+                        }
+                        if (checked == true) selected.add(cert['id']);
+                        capture.changed();
+                      },
               ),
-              value: (capture.raw['certificates'] as List).contains(cert['id']),
-              onChanged: capture.locked
-                  ? null
-                  : (checked) {
-                      final selected = capture.raw['certificates'] as List;
-                      for (final certificate in objects(
-                        pattern['certificates'],
-                      )) {
-                        selected.remove(certificate['id']);
-                      }
-                      if (checked == true) selected.add(cert['id']);
-                      capture.changed();
-                    },
-            ),
-        ],
+          ],
+        ),
       ),
     const SectionLabel('Condiciones ambientales'),
-    TextFormField(
-      controller: fields['temperature'],
-      enabled: !capture.locked,
-      decoration: const InputDecoration(labelText: 'Temperatura (°C)'),
-      keyboardType: const TextInputType.numberWithOptions(
-        decimal: true,
-        signed: true,
+    LabeledInput(
+      label: 'Temperatura (°C)',
+      child: TextFormField(
+        controller: fields['temperature'],
+        enabled: !capture.locked,
+        keyboardType: const TextInputType.numberWithOptions(
+          decimal: true,
+          signed: true,
+        ),
+        validator: (v) => decimalError(v, environment: true),
       ),
-      validator: (v) => decimalError(v, environment: true),
     ),
     const SizedBox(height: 12),
-    TextFormField(
-      controller: fields['humidity'],
-      enabled: !capture.locked,
-      decoration: const InputDecoration(labelText: 'Humedad relativa (%)'),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      validator: (v) => decimalError(v, environment: true, humidity: true),
+    LabeledInput(
+      label: 'Humedad relativa (%)',
+      child: TextFormField(
+        controller: fields['humidity'],
+        enabled: !capture.locked,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (v) => decimalError(v, environment: true, humidity: true),
+      ),
     ),
     const Notice(
       'Los datos se guardan automáticamente. Un certificado vencido no aporta trazabilidad a la comprobación.',
@@ -731,15 +746,17 @@ class _DraftWizardState extends State<_DraftWizard>
               },
       ),
       if (input['omitted'] == true)
-        TextFormField(
-          controller: fields['${test['id']}:reason'],
-          enabled: !capture.locked,
-          maxLength: 500,
-          maxLines: 3,
-          decoration: const InputDecoration(labelText: 'Motivo de omisión'),
-          validator: (value) => (value ?? '').trim().isEmpty
-              ? 'Debes justificar la omisión.'
-              : null,
+        LabeledInput(
+          label: 'Motivo de omisión',
+          child: TextFormField(
+            controller: fields['${test['id']}:reason'],
+            enabled: !capture.locked,
+            maxLength: 500,
+            maxLines: 3,
+            validator: (value) => (value ?? '').trim().isEmpty
+                ? 'Debes justificar la omisión.'
+                : null,
+          ),
         )
       else if (capture.flexible)
         FlexibleTrialFields(
@@ -751,7 +768,7 @@ class _DraftWizardState extends State<_DraftWizard>
         for (final point in objects(test['points']))
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: BlueprintCard(
+            child: SurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -770,32 +787,34 @@ class _DraftWizardState extends State<_DraftWizard>
                       style: const TextStyle(fontSize: 12),
                     ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    key: ValueKey('${point['id']}:indication'),
-                    controller:
-                        fields['${test['id']}:${point['id']}:indication'],
-                    enabled: !capture.locked,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
+                  LabeledInput(
+                    label: 'Indicación',
+                    child: TextFormField(
+                      key: ValueKey('${point['id']}:indication'),
+                      controller:
+                          fields['${test['id']}:${point['id']}:indication'],
+                      enabled: !capture.locked,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                      validator: (value) => (value ?? '').trim().isEmpty
+                          ? 'Ingresa la indicación.'
+                          : decimalError(value),
                     ),
-                    decoration: const InputDecoration(labelText: 'Indicación'),
-                    validator: (value) => (value ?? '').trim().isEmpty
-                        ? 'Ingresa la indicación.'
-                        : decimalError(value),
                   ),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: fields['${test['id']}:${point['id']}:zero'],
-                    enabled: !capture.locked,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
+                  LabeledInput(
+                    label: 'Retorno a cero (opcional)',
+                    child: TextFormField(
+                      controller: fields['${test['id']}:${point['id']}:zero'],
+                      enabled: !capture.locked,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                        signed: true,
+                      ),
+                      validator: decimalError,
                     ),
-                    decoration: const InputDecoration(
-                      labelText: 'Retorno a cero (opcional)',
-                    ),
-                    validator: decimalError,
                   ),
                 ],
               ),
@@ -818,7 +837,7 @@ class _DraftWizardState extends State<_DraftWizard>
       'Revisa las condiciones, las pesas patrón y todas las lecturas antes de finalizar.',
     ),
     _summaryHeading('Condiciones y pesas patrón', 0),
-    BlueprintCard(
+    SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -853,12 +872,14 @@ class _DraftWizardState extends State<_DraftWizard>
         _trialSummary(test),
     ],
     const SectionLabel('Observaciones'),
-    TextFormField(
-      controller: fields['observations'],
-      enabled: !capture.locked,
-      maxLength: 4000,
-      maxLines: 3,
-      decoration: const InputDecoration(labelText: 'Observaciones'),
+    LabeledInput(
+      label: 'Observaciones',
+      child: TextFormField(
+        controller: fields['observations'],
+        enabled: !capture.locked,
+        maxLength: 4000,
+        maxLines: 3,
+      ),
     ),
     if (capture.completionIssue != null) Notice(capture.completionIssue!),
     const Notice(
@@ -876,7 +897,7 @@ class _DraftWizardState extends State<_DraftWizard>
   ];
   Widget _trialSummary(Json test) {
     final input = capture.testInput(test['id'] as String);
-    return BlueprintCard(
+    return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/domain/test_verdict.dart';
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../sync/domain/entities/pending_verification.dart';
 import '../../../sync/presentation/providers/sync_providers.dart';
 import '../providers/verification_wizard_provider.dart';
@@ -27,7 +27,7 @@ class ResultStep extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        BlueprintCard(
+        SurfaceCard(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +48,7 @@ class ResultStep extends ConsumerWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Container(height: 1, color: palette.divider),
+                child: Container(height: 1, color: palette.hairline),
               ),
               _TestRow(
                 label: 'Excentricidad',
@@ -69,7 +69,7 @@ class ResultStep extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        BlueprintCard(
+        SurfaceCard(
           padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,13 +77,16 @@ class ResultStep extends ConsumerWidget {
             children: [
               Text(
                 'ACCIÓN SUGERIDA',
-                style: AppTextStyles.caption(
-                  context,
-                  size: 10.5,
-                ).copyWith(color: palette.accentInk, letterSpacing: 10.5 * 0.12),
+                style: AppTextStyles.caption(context, size: 10.5).copyWith(
+                  color: palette.accentInk,
+                  letterSpacing: 10.5 * 0.12,
+                ),
               ),
               const SizedBox(height: 4),
-              Text(draft.accionSugerida, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+              Text(
+                draft.accionSugerida,
+                style: const TextStyle(fontSize: 13.5, height: 1.45),
+              ),
             ],
           ),
         ),
@@ -112,7 +115,9 @@ class ResultStep extends ConsumerWidget {
           // TODO(IvMET-reports): generar el PDF del informe con los datos del
           // borrador y abrirlo desde `verification_reports`.
           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('El informe PDF llega con la feature reports.')),
+            const SnackBar(
+              content: Text('El informe PDF llega con la feature reports.'),
+            ),
           ),
           child: const Text('Ver informe PDF'),
         ),
@@ -137,14 +142,22 @@ class ResultStep extends ConsumerWidget {
     ref.read(verificationWizardProvider.notifier).reset();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Verificación de $instrumentCode guardada y puesta en cola.')),
+      SnackBar(
+        content: Text(
+          'Verificación de $instrumentCode guardada y puesta en cola.',
+        ),
+      ),
     );
   }
 }
 
 /// Una prueba en el resumen: su veredicto y la cifra que lo justifica.
 class _TestRow extends StatelessWidget {
-  const _TestRow({required this.label, required this.verdict, required this.detail});
+  const _TestRow({
+    required this.label,
+    required this.verdict,
+    required this.detail,
+  });
 
   final String label;
   final TestVerdict verdict;

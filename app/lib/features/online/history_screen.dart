@@ -4,6 +4,8 @@ import '../../core/domain/compliance_status.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/status_tag.dart';
+import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/surface_card.dart';
 import 'draft_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
@@ -69,47 +71,56 @@ class _HistoryScreenState extends State<HistoryScreen> {
               '$total registros',
               style: AppTextStyles.caption(context, size: 12),
             ),
-            const SizedBox(height: 4),
-            for (final local in localDrafts)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.edit_note),
-                title: Text(
-                  customerEquipmentCode(
-                    object(object(local['bundle'])['equipment']),
-                  ),
-                ),
-                subtitle: Text(
-                  'En este dispositivo · paso ${(local['step'] as num).toInt() + 1} de 5',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  await openPage(
-                    context,
-                    RecoveredDraftScreen(
-                      session: widget.session,
-                      snapshot: local,
+            const SizedBox(height: 10),
+            SurfaceList(
+              children: [
+                for (final local in localDrafts)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    leading: const Icon(Icons.edit_note),
+                    title: Text(
+                      customerEquipmentCode(
+                        object(object(local['bundle'])['equipment']),
+                      ),
                     ),
-                  );
-                  if (mounted) setState(() => revision++);
-                },
-              ),
+                    subtitle: Text(
+                      'En este dispositivo · paso ${(local['step'] as num).toInt() + 1} de 5',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await openPage(
+                        context,
+                        RecoveredDraftScreen(
+                          session: widget.session,
+                          snapshot: local,
+                        ),
+                      );
+                      if (mounted) setState(() => revision++);
+                    },
+                  ),
+              ],
+            ),
+            if (localDrafts.isNotEmpty) const SizedBox(height: 10),
             if (items.isEmpty && localDrafts.isEmpty)
               Notice(
                 widget.drafts
                     ? 'No tienes borradores guardados.'
                     : 'Todavía no hay verificaciones finalizadas. Las capturas sin evaluación están en Mis borradores.',
               ),
-            for (final item in items.where(
-              (item) => !localDrafts.any(
-                (d) => d['requestId'] == item['request_uuid'],
-              ),
-            ))
-              _HistoryRow(
-                item: item,
-                draft: widget.drafts,
-                onTap: () => _open(item),
-              ),
+            SurfaceList(
+              children: [
+                for (final item in items.where(
+                  (item) => !localDrafts.any(
+                    (d) => d['requestId'] == item['request_uuid'],
+                  ),
+                ))
+                  _HistoryRow(
+                    item: item,
+                    draft: widget.drafts,
+                    onTap: () => _open(item),
+                  ),
+              ],
+            ),
             if (total > 25)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -194,68 +205,62 @@ class _HistoryRow extends StatelessWidget {
                   : 'Trazable'} · '
               '${item['alcance'] == 'partial' ? 'Parcial' : 'Completa'}';
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: palette.divider)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      valueLabel(item['cod_metrica']),
-                      style: AppTextStyles.reading(
-                        context,
-                        size: 15,
-                        color: palette.accentInk,
-                      ),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    valueLabel(item['cod_metrica']),
+                    style: AppTextStyles.reading(
+                      context,
+                      size: 15,
+                      color: palette.accentInk,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      meta,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: palette.muted,
-                      ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    meta,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: palette.muted,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              if (draft)
-                StatusTag('Borrador')
-              else
-                StatusTag(
-                  verdictLabel(item['veredicto_global']),
-                  status: annulled
-                      ? ComplianceStatus.conforme
-                      : failed
-                      ? ComplianceStatus.noConforme
-                      : verdict == 'pass'
-                      ? ComplianceStatus.conforme
-                      : ComplianceStatus.observado,
-                ),
-              const SizedBox(width: 6),
-              Icon(
-                item['alerta_id'] == null
-                    ? Icons.chevron_right
-                    : Icons.warning_amber_outlined,
-                size: 20,
-                color: item['alerta_id'] == null
-                    ? palette.text.withValues(alpha: 0.45)
-                    : palette.fail,
+            ),
+            const SizedBox(width: 10),
+            if (draft)
+              StatusTag('Borrador')
+            else
+              StatusTag(
+                verdictLabel(item['veredicto_global']),
+                status: annulled
+                    ? ComplianceStatus.conforme
+                    : failed
+                    ? ComplianceStatus.noConforme
+                    : verdict == 'pass'
+                    ? ComplianceStatus.conforme
+                    : ComplianceStatus.observado,
               ),
-            ],
-          ),
+            const SizedBox(width: 6),
+            Icon(
+              item['alerta_id'] == null
+                  ? Icons.chevron_right
+                  : Icons.warning_amber_outlined,
+              size: 20,
+              color: item['alerta_id'] == null
+                  ? palette.text.withValues(alpha: 0.45)
+                  : palette.fail,
+            ),
+          ],
         ),
       ),
     );
@@ -373,8 +378,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
               'Finalizado por',
               object(data['users'])['finalization'],
             ),
-            DetailField('Fecha de medición', v['realizado_at']),
-            DetailField('Fecha de recepción', v['recibido_at']),
+            // La marca ISO cruda queda en el expediente de abajo; aqui va la
+            // fecha como la lee quien revisa la verificacion.
+            DetailField('Fecha de medición', dateLabel(v['realizado_at'])),
+            DetailField('Fecha de recepción', dateLabel(v['recibido_at'])),
             DetailField(
               'Alcance',
               v['alcance'] == 'partial' ? 'Parcial' : 'Completa',
@@ -389,22 +396,20 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ),
             if (v['motivo_anulacion'] != null)
               DetailField('Motivo de anulación', v['motivo_anulacion']),
-            ExpansionTile(
-              title: const Text('Equipo, plan y condiciones históricas'),
+            EvidenceSection(
+              title: 'Equipo, plan y condiciones históricas',
               children: [EvidenceTree(v)],
             ),
-            ExpansionTile(
-              title: const Text('Patrones utilizados'),
+            EvidenceSection(
+              title: 'Patrones utilizados',
               children: [EvidenceTree(data['patterns'])],
             ),
             for (final t in objects(data['tests']))
-              ExpansionTile(
-                title: Text(testLabel(t['tipo'])),
-                subtitle: Text(
-                  t['estado_ejecucion'] == 'omitted'
-                      ? 'Omitida: ${t['motivo_omision']}'
-                      : verdictLabel(t['veredicto']),
-                ),
+              EvidenceSection(
+                title: testLabel(t['tipo']),
+                subtitle: t['estado_ejecucion'] == 'omitted'
+                    ? 'Omitida: ${t['motivo_omision']}'
+                    : verdictLabel(t['veredicto']),
                 children: [EvidenceTree(t)],
               ),
             if (error != null) Notice(error!, icon: Icons.error_outline),
@@ -459,8 +464,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       ),
                       DetailField('Seguimiento', shared['state']),
                       DetailField('Mensaje enviado', shared['message']),
-                      ExpansionTile(
-                        title: const Text('Actividad del caso'),
+                      EvidenceSection(
+                        title: 'Actividad del caso',
                         children: [EvidenceTree(shared['events'])],
                       ),
                       if (widget.session.quality &&
@@ -526,12 +531,14 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         children: [
           Text(widget.question),
           const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            maxLength: 2000,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Motivo'),
-            onChanged: (_) => setState(() {}),
+          LabeledInput(
+            label: 'Motivo',
+            child: TextField(
+              controller: controller,
+              maxLength: 2000,
+              maxLines: 3,
+              onChanged: (_) => setState(() {}),
+            ),
           ),
         ],
       ),
@@ -617,15 +624,15 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
           ),
           EvidenceTree(preview['snapshot']),
           const SizedBox(height: 16),
-          TextField(
-            controller: message,
-            enabled: !busy,
-            maxLength: 2000,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Mensaje para Métrica',
+          LabeledInput(
+            label: 'Mensaje para Métrica',
+            child: TextField(
+              controller: message,
+              enabled: !busy,
+              maxLength: 2000,
+              maxLines: 3,
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,

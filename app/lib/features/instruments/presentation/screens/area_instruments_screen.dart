@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/domain/compliance_status.dart';
 import '../../../../app/router/app_routes.dart';
+import '../../../../shared/theme/app_shapes.dart';
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
 import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/status_tag.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../domain/entities/instrument.dart';
 import '../providers/instruments_providers.dart';
 
@@ -35,7 +37,9 @@ class AreaInstrumentsScreen extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: TextButton(
               onPressed: () => context.go(AppRoutes.areas),
-              style: TextButton.styleFrom(padding: const EdgeInsets.only(right: 8)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.only(right: 8),
+              ),
               child: const Text('← Áreas'),
             ),
           ),
@@ -47,11 +51,17 @@ class AreaInstrumentsScreen extends ConsumerWidget {
             style: TextStyle(fontSize: 12.5, color: palette.muted),
           ),
           const SizedBox(height: 16),
-          for (final instrument in instruments)
-            _InstrumentRow(
-              instrument: instrument,
-              onTap: () => context.go(AppRoutes.instrumentHistory(area, instrument.codigo)),
-            ),
+          SurfaceList(
+            children: [
+              for (final instrument in instruments)
+                _InstrumentRow(
+                  instrument: instrument,
+                  onTap: () => context.go(
+                    AppRoutes.instrumentHistory(area, instrument.codigo),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -76,14 +86,20 @@ class _InstrumentRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: palette.divider)),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
         child: Row(
           children: [
-            Container(width: 4, height: 34, color: barColor),
+            // La barra de estado es una pastilla: en una lista agrupada un
+            // rectangulo recto es lo unico que quedaria en angulo vivo.
+            Container(
+              width: 4,
+              height: 34,
+              decoration: BoxDecoration(
+                color: barColor,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -96,7 +112,11 @@ class _InstrumentRow extends StatelessWidget {
                   ),
                   Text(
                     instrument.detalle,
-                    style: TextStyle(fontSize: 12, height: 1.35, color: palette.muted),
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: palette.muted,
+                    ),
                   ),
                 ],
               ),

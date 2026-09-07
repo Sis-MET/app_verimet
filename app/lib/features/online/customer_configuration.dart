@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/theme/app_typography.dart';
+import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/tile_grid.dart';
 import 'mobile_api.dart';
@@ -194,10 +195,19 @@ class _CustomerFormState extends State<CustomerForm> {
                                     }),
                             ),
                             if (state.hasError)
-                              Text(
-                                state.errorText!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
+                              // Mismo trato que el `errorText` de Material:
+                              // cuerpo pequeno y separado del control. A
+                              // tamano completo y pegado al checkbox se leia
+                              // como una opcion mas de la lista.
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6, left: 2),
+                                child: Text(
+                                  state.errorText!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
                                 ),
                               ),
                           ],
@@ -235,78 +245,93 @@ class _CustomerFormState extends State<CustomerForm> {
                                       }),
                               ),
                             if (state.hasError)
-                              Text(
-                                state.errorText!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
+                              // Mismo trato que el `errorText` de Material:
+                              // cuerpo pequeno y separado del control. A
+                              // tamano completo y pegado al checkbox se leia
+                              // como una opcion mas de la lista.
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6, left: 2),
+                                child: Text(
+                                  state.errorText!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
                                 ),
                               ),
                           ],
                         ),
                       )
                     : field.kind == 'select'
-                    ? DropdownButtonFormField<String>(
-                        initialValue: values[field.keyName]?.toString() ?? '',
-                        isExpanded: true,
-                        decoration: InputDecoration(labelText: field.label),
-                        items: field.options.entries
-                            .map(
-                              (e) => DropdownMenuItem(
-                                value: e.key,
-                                child: Text(
-                                  e.value,
-                                  overflow: TextOverflow.ellipsis,
+                    ? LabeledInput(
+                        label: field.label,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: values[field.keyName]?.toString() ?? '',
+                          isExpanded: true,
+                          items: field.options.entries
+                              .map(
+                                (e) => DropdownMenuItem(
+                                  value: e.key,
+                                  child: Text(
+                                    e.value,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: busy || pending != null
-                            ? null
-                            : (v) => setState(() {
-                                values[field.keyName] = v;
-                                dirty = true;
-                              }),
-                        validator: (v) =>
-                            field.required && (v == null || v.isEmpty)
-                            ? 'Selecciona una opción.'
-                            : null,
-                      )
-                    : TextFormField(
-                        initialValue: values[field.keyName]?.toString() ?? '',
-                        readOnly: field.readOnly || busy || pending != null,
-                        maxLength: field.max,
-                        keyboardType: field.kind == 'decimal'
-                            ? const TextInputType.numberWithOptions(
-                                decimal: true,
                               )
-                            : TextInputType.text,
-                        decoration: InputDecoration(
-                          labelText: field.label,
-                          hintText: field.kind == 'date' ? 'AAAA-MM-DD' : null,
+                              .toList(),
+                          onChanged: busy || pending != null
+                              ? null
+                              : (v) => setState(() {
+                                  values[field.keyName] = v;
+                                  dirty = true;
+                                }),
+                          validator: (v) =>
+                              field.required && (v == null || v.isEmpty)
+                              ? 'Selecciona una opción.'
+                              : null,
                         ),
-                        onChanged: (v) {
-                          values[field.keyName] = v;
-                          if (!dirty) setState(() => dirty = true);
-                        },
-                        validator: (v) {
-                          if (field.required && (v ?? '').trim().isEmpty) {
-                            return 'Completa este campo.';
-                          }
-                          if (field.kind == 'decimal' &&
-                              (v ?? '').isNotEmpty &&
-                              !RegExp(
-                                r'^(0|[1-9]\d{0,9})(\.\d{1,9})?$',
-                              ).hasMatch(v!)) {
-                            return 'Usa punto decimal y hasta 9 decimales.';
-                          }
-                          if (field.kind == 'date' &&
-                              !RegExp(
-                                r'^\d{4}-\d{2}-\d{2}$',
-                              ).hasMatch(v ?? '')) {
-                            return 'Usa AAAA-MM-DD.';
-                          }
-                          return null;
-                        },
+                      )
+                    : LabeledInput(
+                        label: field.label,
+                        child: TextFormField(
+                          initialValue: values[field.keyName]?.toString() ?? '',
+                          readOnly: field.readOnly || busy || pending != null,
+                          maxLength: field.max,
+                          keyboardType: field.kind == 'decimal'
+                              ? const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                )
+                              : TextInputType.text,
+                          decoration: InputDecoration(
+                            hintText: field.kind == 'date'
+                                ? 'AAAA-MM-DD'
+                                : null,
+                          ),
+                          onChanged: (v) {
+                            values[field.keyName] = v;
+                            if (!dirty) setState(() => dirty = true);
+                          },
+                          validator: (v) {
+                            if (field.required && (v ?? '').trim().isEmpty) {
+                              return 'Completa este campo.';
+                            }
+                            if (field.kind == 'decimal' &&
+                                (v ?? '').isNotEmpty &&
+                                !RegExp(
+                                  r'^(0|[1-9]\d{0,9})(\.\d{1,9})?$',
+                                ).hasMatch(v!)) {
+                              return 'Usa punto decimal y hasta 9 decimales.';
+                            }
+                            if (field.kind == 'date' &&
+                                !RegExp(
+                                  r'^\d{4}-\d{2}-\d{2}$',
+                                ).hasMatch(v ?? '')) {
+                              return 'Usa AAAA-MM-DD.';
+                            }
+                            return null;
+                          },
+                        ),
                       ),
               ),
             if (widget.afterFields != null)
@@ -525,24 +550,24 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
           if (section == 'patterns')
             Padding(
               padding: const EdgeInsets.all(16),
-              child: DropdownButtonFormField<String>(
-                initialValue: plantId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Filtrar patrones por planta',
+              child: LabeledInput(
+                label: 'Filtrar patrones por planta',
+                child: DropdownButtonFormField<String>(
+                  initialValue: plantId,
+                  isExpanded: true,
+                  items: plants.entries
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: p.key,
+                          child: Text(p.value, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() {
+                    plantId = v;
+                    page = 1;
+                  }),
                 ),
-                items: plants.entries
-                    .map(
-                      (p) => DropdownMenuItem(
-                        value: p.key,
-                        child: Text(p.value, overflow: TextOverflow.ellipsis),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  plantId = v;
-                  page = 1;
-                }),
               ),
             ),
           if (plantId == null && (section == 'areas' || section == 'patterns'))
@@ -711,10 +736,8 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
                                       'Comentario de Métrica',
                                       item['comentario'],
                                     ),
-                                    ExpansionTile(
-                                      title: const Text(
-                                        'Información autorizada',
-                                      ),
+                                    EvidenceSection(
+                                      title: 'Información autorizada',
                                       children: [
                                         EquipmentUpdatePreview(
                                           snapshot: object(item['snapshot']),

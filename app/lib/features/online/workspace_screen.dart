@@ -5,7 +5,7 @@ import '../settings/presentation/providers/settings_providers.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/app_shell.dart';
-import '../../shared/widgets/blueprint_card.dart';
+import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/tile_grid.dart';
 import 'catalog_screen.dart';
@@ -467,7 +467,7 @@ class _Settings extends ConsumerWidget {
           subtitle: session.quality ? 'Jefe de calidad' : 'Operador',
         ),
         const SectionLabel('Sesión y licencia'),
-        BlueprintCard(
+        SurfaceCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

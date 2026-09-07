@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../theme/app_shapes.dart';
 import '../theme/app_typography.dart';
 import '../theme/industry_palette.dart';
 import 'industry_icons.dart';
@@ -30,10 +31,10 @@ enum AppSection {
 /// Marco de la app con sesion iniciada: contenido a pantalla completa y la
 /// barra flotante encima.
 ///
-/// La barra es la unica excepcion consentida a la regla de esquinas rectas del
-/// sistema: flota, es redondeada y translucida. Se decidio asi porque va
-/// encima del contenido y necesita leerse como capa aparte, no como una fila
-/// mas del plano.
+/// La barra es la capa mas alta de la app: flota sobre el contenido, se apoya
+/// en una sombra difusa y repite el redondeo del sistema un escalon por
+/// encima de las tarjetas, para que se lea como capa aparte y no como una
+/// tarjeta mas pegada al borde.
 class AppShell extends StatelessWidget {
   const AppShell({required this.navigationShell, super.key});
 
@@ -50,7 +51,7 @@ class AppShell extends StatelessWidget {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 26,
+            bottom: 24,
             child: FloatingNavBar(
               current: AppSection.values[navigationShell.currentIndex],
               onSelect: (section) => navigationShell.goBranch(
@@ -68,6 +69,10 @@ class AppShell extends StatelessWidget {
 }
 
 /// Barra de navegacion flotante con icono y etiqueta.
+///
+/// El aire interior y el radio de la pastilla activa estan atados: la pastilla
+/// usa [AppRadius.nested] sobre el radio de la barra, para que las dos curvas
+/// sean concentricas y la esquina no se vea torcida.
 class FloatingNavBar extends StatelessWidget {
   const FloatingNavBar({
     required this.current,
@@ -75,44 +80,47 @@ class FloatingNavBar extends StatelessWidget {
     super.key,
   });
 
+  /// Aire entre el borde de la barra y las pastillas.
+  static const double _inset = 6;
+
   final AppSection current;
   final ValueChanged<AppSection> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
+    final corners = BorderRadius.circular(AppRadius.lg);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: palette.navBackground,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: palette.divider),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: const Color(0xFF2B2B2D).withValues(alpha: 0.16),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              for (final section in AppSection.values) ...[
-                if (section.index > 0) const SizedBox(width: 4),
-                Expanded(
-                  child: _NavButton(
-                    section: section,
-                    isActive: section == current,
-                    onTap: () => onSelect(section),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: corners,
+        boxShadow: AppShadows.floating(palette.shadow),
+      ),
+      child: ClipRRect(
+        borderRadius: corners,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.all(_inset),
+            decoration: BoxDecoration(
+              color: palette.navBackground,
+              borderRadius: corners,
+              border: Border.all(color: palette.divider),
+            ),
+            child: Row(
+              children: [
+                for (final section in AppSection.values) ...[
+                  if (section.index > 0) const SizedBox(width: 2),
+                  Expanded(
+                    child: _NavButton(
+                      section: section,
+                      isActive: section == current,
+                      onTap: () => onSelect(section),
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -134,7 +142,10 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
-    final foreground = isActive ? palette.bg : palette.text;
+    final foreground = isActive ? palette.card : palette.muted;
+    final corners = BorderRadius.circular(
+      AppRadius.nested(AppRadius.lg, FloatingNavBar._inset),
+    );
 
     return Semantics(
       button: true,
@@ -142,17 +153,18 @@ class _NavButton extends StatelessWidget {
       label: section.label,
       child: Material(
         color: isActive ? palette.accent : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: corners,
           child: SizedBox(
-            height: 56,
+            height: 54,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IndustryIconView(section.icon, color: foreground),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   section.label,
                   style: TextStyle(

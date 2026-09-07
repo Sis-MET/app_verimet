@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_shapes.dart';
 import '../theme/app_typography.dart';
 import '../theme/industry_palette.dart';
 
@@ -13,8 +14,11 @@ class SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: padding ?? const EdgeInsets.only(top: 22, bottom: 8),
-      child: Text(text.toUpperCase(), style: AppTextStyles.sectionLabel(context)),
+      padding: padding ?? const EdgeInsets.only(top: 24, bottom: 10),
+      child: Text(
+        text.toUpperCase(),
+        style: AppTextStyles.sectionLabel(context),
+      ),
     );
   }
 }
@@ -32,10 +36,12 @@ class Kicker extends StatelessWidget {
   }
 }
 
-/// Fila de celdas con cifra y pie, separadas por el hairline del sistema.
+/// Fila de celdas con cifra y pie, dentro de una sola tarjeta.
 ///
-/// Es el patron de "41 conformes / 5 observados / 2 no conformes": las celdas
-/// se separan dejando ver 1 px del fondo divisor, no con bordes propios.
+/// Es el patron de "41 conformes / 5 observados / 2 no conformes". Antes eran
+/// celdas sueltas puestas sobre un fondo divisor que asomaba 1 px entre ellas;
+/// ahora comparten tarjeta y las separa un hairline corto, sin lineas que
+/// lleguen al borde.
 class StatStrip extends StatelessWidget {
   const StatStrip({required this.cells, super.key});
 
@@ -44,8 +50,14 @@ class StatStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
-    return Container(
-      color: palette.divider,
+
+    return Material(
+      color: palette.card,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.card,
+        side: BorderSide(color: palette.divider),
+      ),
       // Las celdas comparten altura para que el hairline que las separa llegue
       // de arriba abajo aunque una etiqueta ocupe dos lineas.
       child: IntrinsicHeight(
@@ -53,7 +65,14 @@ class StatStrip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var i = 0; i < cells.length; i++) ...[
-              if (i > 0) const SizedBox(width: 1),
+              if (i > 0)
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  indent: 12,
+                  endIndent: 12,
+                  color: palette.hairline,
+                ),
               Expanded(child: cells[i]),
             ],
           ],
@@ -65,7 +84,12 @@ class StatStrip extends StatelessWidget {
 
 /// Celda de [StatStrip]: una cifra grande y su etiqueta en versalitas.
 class StatCell extends StatelessWidget {
-  const StatCell({required this.value, required this.label, this.valueColor, super.key});
+  const StatCell({
+    required this.value,
+    required this.label,
+    this.valueColor,
+    super.key,
+  });
 
   final String value;
   final String label;
@@ -73,17 +97,21 @@ class StatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = IndustryPalette.of(context);
-    return Container(
-      color: palette.bg,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(value, style: AppTextStyles.figure(context, size: 24, color: valueColor)),
-          const SizedBox(height: 2),
-          Text(label.toUpperCase(), style: AppTextStyles.caption(context, size: 10.5)),
+          Text(
+            value,
+            style: AppTextStyles.figure(context, size: 24, color: valueColor),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label.toUpperCase(),
+            style: AppTextStyles.caption(context, size: 10.5),
+          ),
         ],
       ),
     );

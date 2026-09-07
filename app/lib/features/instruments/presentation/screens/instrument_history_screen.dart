@@ -10,6 +10,7 @@ import '../../../../shared/theme/industry_palette.dart';
 import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/section_label.dart';
 import '../../../../shared/widgets/status_tag.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../domain/entities/verification_history_entry.dart';
 import '../providers/instruments_providers.dart';
 
@@ -19,7 +20,11 @@ import '../providers/instruments_providers.dart';
 /// yendo. Por eso el historico guarda el error de cada prueba y no solo el
 /// veredicto.
 class InstrumentHistoryScreen extends ConsumerWidget {
-  const InstrumentHistoryScreen({required this.area, required this.codigo, super.key});
+  const InstrumentHistoryScreen({
+    required this.area,
+    required this.codigo,
+    super.key,
+  });
 
   final String area;
   final String codigo;
@@ -30,7 +35,9 @@ class InstrumentHistoryScreen extends ConsumerWidget {
     final instrument = ref.watch(instrumentByCodeProvider(codigo));
     final history = ref.watch(instrumentHistoryProvider(codigo));
 
-    final conformes = history.where((entry) => entry.veredicto == ComplianceStatus.conforme).length;
+    final conformes = history
+        .where((entry) => entry.veredicto == ComplianceStatus.conforme)
+        .length;
 
     return SafeArea(
       bottom: false,
@@ -41,7 +48,9 @@ class InstrumentHistoryScreen extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: TextButton(
               onPressed: () => context.go(AppRoutes.areaDetail(area)),
-              style: TextButton.styleFrom(padding: const EdgeInsets.only(right: 8)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.only(right: 8),
+              ),
               child: Text('← $area'),
             ),
           ),
@@ -62,8 +71,13 @@ class InstrumentHistoryScreen extends ConsumerWidget {
               StatCell(value: _maxError(history), label: 'Err. máx'),
             ],
           ),
-          const SectionLabel('Histórico', padding: EdgeInsets.only(top: 20, bottom: 8)),
-          for (final entry in history) _HistoryRow(entry: entry),
+          const SectionLabel(
+            'Histórico',
+            padding: EdgeInsets.only(top: 22, bottom: 10),
+          ),
+          SurfaceList(
+            children: [for (final entry in history) _HistoryRow(entry: entry)],
+          ),
         ],
       ),
     );
@@ -96,16 +110,16 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
       child: Row(
         children: [
           SizedBox(
             width: 72,
-            child: Text(entry.fecha, style: AppTextStyles.reading(context, size: 12)),
+            child: Text(
+              entry.fecha,
+              style: AppTextStyles.reading(context, size: 12),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(

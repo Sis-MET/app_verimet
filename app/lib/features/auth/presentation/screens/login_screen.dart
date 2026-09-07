@@ -35,7 +35,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _submitting = true);
     await ref
         .read(authProvider.notifier)
-        .signIn(email: _emailController.text, password: _passwordController.text);
+        .signIn(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
     if (mounted) setState(() => _submitting = false);
   }
 
@@ -78,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       Padding(
                         padding: const EdgeInsets.only(top: 26, bottom: 24),
-                        child: Container(height: 1, color: palette.divider),
+                        child: Container(height: 1, color: palette.hairline),
                       ),
                       LabeledField(
                         label: 'Usuario',
@@ -94,7 +97,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 22),
                       FilledButton(
                         onPressed: _submitting ? null : _submit,
-                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                        ),
                         child: Text(_submitting ? 'Ingresando…' : 'Ingresar'),
                       ),
                       const SizedBox(height: 16),
@@ -108,7 +113,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-            const Padding(padding: EdgeInsets.fromLTRB(30, 0, 30, 34), child: _VpnHint()),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(30, 0, 30, 34),
+              child: _VpnHint(),
+            ),
           ],
         ),
       ),
@@ -129,7 +137,14 @@ class _VpnHint extends StatelessWidget {
 
     return Row(
       children: [
-        Container(width: 7, height: 7, color: palette.accent),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: palette.accent,
+            shape: BoxShape.circle,
+          ),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

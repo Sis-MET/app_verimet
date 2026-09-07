@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/theme/app_typography.dart';
 import '../../../../shared/theme/industry_palette.dart';
-import '../../../../shared/widgets/blueprint_card.dart';
+import '../../../../shared/widgets/surface_card.dart';
 import '../../../../shared/widgets/status_tag.dart';
 import '../../../instruments/domain/entities/instrument.dart';
 import '../providers/verification_wizard_provider.dart';
@@ -24,7 +24,7 @@ class InstrumentStep extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        BlueprintCard(
+        SurfaceCard(
           padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +35,10 @@ class InstrumentStep extends ConsumerWidget {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Expanded(
-                    child: Text(instrument.codigo, style: AppTextStyles.figure(context, size: 22)),
+                    child: Text(
+                      instrument.codigo,
+                      style: AppTextStyles.figure(context, size: 22),
+                    ),
                   ),
                   StatusTag(instrument.area),
                 ],
@@ -61,7 +64,11 @@ class InstrumentStep extends ConsumerWidget {
           // TODO(IvMET-instruments): abrir el lector de QR y cargar el equipo
           // por codigo de placa.
           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('El lector de QR llega con la feature instruments.')),
+            const SnackBar(
+              content: Text(
+                'El lector de QR llega con la feature instruments.',
+              ),
+            ),
           ),
           child: const Text('Escanear otro equipo'),
         ),
@@ -119,7 +126,10 @@ class _PlateEntry extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(entry.$1.toUpperCase(), style: AppTextStyles.caption(context, size: 10.5)),
+        Text(
+          entry.$1.toUpperCase(),
+          style: AppTextStyles.caption(context, size: 10.5),
+        ),
         Text(entry.$2, style: const TextStyle(fontSize: 13)),
       ],
     );

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../shared/widgets/labeled_field.dart';
+
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -427,33 +429,33 @@ class _EquipmentCheckConfigurationScreenState
                 ? const SizedBox.shrink()
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('${check.type}-${check.frequencyDays}'),
-                      initialValue: check.frequencyDays,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Periodicidad',
-                      ),
-                      items: [
-                        for (final option in options.entries)
-                          DropdownMenuItem(
-                            value: option.key,
-                            child: Text(option.value),
+                    child: LabeledInput(
+                      label: 'Periodicidad',
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('${check.type}-${check.frequencyDays}'),
+                        initialValue: check.frequencyDays,
+                        isExpanded: true,
+                        items: [
+                          for (final option in options.entries)
+                            DropdownMenuItem(
+                              value: option.key,
+                              child: Text(option.value),
+                            ),
+                          const DropdownMenuItem(
+                            value: 'custom',
+                            child: Text('Personalizada…'),
                           ),
-                        const DropdownMenuItem(
-                          value: 'custom',
-                          child: Text('Personalizada…'),
-                        ),
-                      ],
-                      onChanged: (value) async {
-                        if (value == null) return;
-                        final selected = value == 'custom'
-                            ? await _customFrequency(check.frequencyDays)
-                            : value;
-                        if (selected == null || !mounted) return;
-                        setState(() => check.frequencyDays = selected);
-                        changed();
-                      },
+                        ],
+                        onChanged: (value) async {
+                          if (value == null) return;
+                          final selected = value == 'custom'
+                              ? await _customFrequency(check.frequencyDays)
+                              : value;
+                          if (selected == null || !mounted) return;
+                          setState(() => check.frequencyDays = selected);
+                          changed();
+                        },
+                      ),
                     ),
                   ),
           ),
@@ -471,17 +473,19 @@ class _EquipmentCheckConfigurationScreenState
         title: const Text('Periodicidad personalizada'),
         content: Form(
           key: dialogForm,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Días entre pruebas'),
-            validator: (value) {
-              final days = int.tryParse(value ?? '');
-              return days == null || days < 1 || days > 3650
-                  ? 'Ingresa entre 1 y 3650 días.'
-                  : null;
-            },
+          child: LabeledInput(
+            label: 'Días entre pruebas',
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                final days = int.tryParse(value ?? '');
+                return days == null || days < 1 || days > 3650
+                    ? 'Ingresa entre 1 y 3650 días.'
+                    : null;
+              },
+            ),
           ),
         ),
         actions: [
@@ -527,22 +531,24 @@ class _EquipmentCheckConfigurationScreenState
                   'Periodicidad: ${_frequencyOptions[check.frequencyDays] ?? 'cada ${check.frequencyDays} días'}',
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: check.tolerance,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                LabeledInput(
+                  label: check.type == 'linearity'
+                      ? 'Error permisible de las indicaciones ($unit)'
+                      : 'Error permisible ($unit)',
+                  child: TextFormField(
+                    controller: check.tolerance,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      helperText:
+                          'Se aplicará a todos los puntos de esta prueba.',
+                    ),
+                    validator: (value) => check.enabled
+                        ? decimalValidator(value, zeroAllowed: false)
+                        : null,
+                    onChanged: (_) => changed(),
                   ),
-                  decoration: InputDecoration(
-                    labelText: check.type == 'linearity'
-                        ? 'Error permisible de las indicaciones ($unit)'
-                        : 'Error permisible ($unit)',
-                    helperText:
-                        'Se aplicará a todos los puntos de esta prueba.',
-                  ),
-                  validator: (value) => check.enabled
-                      ? decimalValidator(value, zeroAllowed: false)
-                      : null,
-                  onChanged: (_) => changed(),
                 ),
               ],
             ),

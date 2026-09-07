@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../shared/widgets/labeled_field.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -302,69 +303,71 @@ class _AccessFormState extends State<AccessForm> {
                           'Tu contraseña temporal debe cambiarse antes de acceder. Usa al menos 12 caracteres.',
                         )
                       else
-                        TextFormField(
-                          controller: username,
-                          enabled: !busy,
-                          autocorrect: false,
-                          autofillHints: const [AutofillHints.username],
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Usuario',
+                        LabeledInput(
+                          label: 'Usuario',
+                          child: TextFormField(
+                            controller: username,
+                            enabled: !busy,
+                            autocorrect: false,
+                            autofillHints: const [AutofillHints.username],
+                            textInputAction: TextInputAction.next,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Ingresa tu usuario.'
+                                : null,
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Ingresa tu usuario.'
-                              : null,
                         ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: password,
-                        enabled: !busy,
-                        obscureText: hidden,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        autofillHints: [
-                          widget.changingPassword
-                              ? AutofillHints.newPassword
-                              : AutofillHints.password,
-                        ],
-                        decoration: InputDecoration(
-                          labelText: widget.changingPassword
-                              ? 'Nueva contraseña'
-                              : 'Contraseña',
-                          suffixIcon: IconButton(
-                            tooltip: hidden
-                                ? 'Mostrar contraseña'
-                                : 'Ocultar contraseña',
-                            onPressed: () => setState(() => hidden = !hidden),
-                            icon: Icon(
-                              hidden
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                      LabeledInput(
+                        label: widget.changingPassword
+                            ? 'Nueva contraseña'
+                            : 'Contraseña',
+                        child: TextFormField(
+                          controller: password,
+                          enabled: !busy,
+                          obscureText: hidden,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          autofillHints: [
+                            widget.changingPassword
+                                ? AutofillHints.newPassword
+                                : AutofillHints.password,
+                          ],
+                          decoration: InputDecoration(
+                            suffixIcon: IconButton(
+                              tooltip: hidden
+                                  ? 'Mostrar contraseña'
+                                  : 'Ocultar contraseña',
+                              onPressed: () => setState(() => hidden = !hidden),
+                              icon: Icon(
+                                hidden
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
                             ),
                           ),
+                          validator: (v) =>
+                              (v?.length ?? 0) <
+                                      (widget.changingPassword ? 12 : 1) ||
+                                  (v?.length ?? 0) > 200
+                              ? 'Revisa la longitud de la contraseña.'
+                              : null,
+                          onFieldSubmitted: (_) {
+                            if (!widget.changingPassword) unawaited(submit());
+                          },
                         ),
-                        validator: (v) =>
-                            (v?.length ?? 0) <
-                                    (widget.changingPassword ? 12 : 1) ||
-                                (v?.length ?? 0) > 200
-                            ? 'Revisa la longitud de la contraseña.'
-                            : null,
-                        onFieldSubmitted: (_) {
-                          if (!widget.changingPassword) unawaited(submit());
-                        },
                       ),
                       if (widget.changingPassword) ...[
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: confirmation,
-                          enabled: !busy,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirmar contraseña',
+                        LabeledInput(
+                          label: 'Confirmar contraseña',
+                          child: TextFormField(
+                            controller: confirmation,
+                            enabled: !busy,
+                            obscureText: true,
+                            validator: (v) => v != password.text
+                                ? 'Las contraseñas no coinciden.'
+                                : null,
                           ),
-                          validator: (v) => v != password.text
-                              ? 'Las contraseñas no coinciden.'
-                              : null,
                         ),
                       ],
                       if (error ?? widget.session.error

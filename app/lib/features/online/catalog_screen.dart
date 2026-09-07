@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
-import '../../shared/widgets/blueprint_card.dart';
+import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/status_tag.dart';
+import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/tile_grid.dart';
 import 'draft_screen.dart';
 import 'history_screen.dart';
@@ -136,17 +137,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
     },
   );
 
-  Widget _searchField({required String label}) => TextField(
-    decoration: InputDecoration(
-      labelText: label,
-      prefixIcon: const Icon(Icons.search),
-      helperText: 'Pulsa buscar en el teclado para consultar.',
+  Widget _searchField({required String label}) => LabeledInput(
+    label: label,
+    child: TextField(
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search),
+        helperText: 'Pulsa buscar en el teclado para consultar.',
+      ),
+      textInputAction: TextInputAction.search,
+      onSubmitted: (value) => setState(() {
+        search = value.trim();
+        page = 1;
+      }),
     ),
-    textInputAction: TextInputAction.search,
-    onSubmitted: (value) => setState(() {
-      search = value.trim();
-      page = 1;
-    }),
   );
 
   @override
@@ -301,7 +304,7 @@ class _EquipmentTile extends StatelessWidget {
     final marca = valueLabel(equipment['marca']);
     final modelo = valueLabel(equipment['modelo']);
 
-    return BlueprintCard(
+    return SurfaceCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
       child: Column(
@@ -374,7 +377,7 @@ class _EquipmentListRow extends StatelessWidget {
     final brand = valueLabel(equipment['marca']);
     final model = valueLabel(equipment['modelo']);
 
-    return BlueprintCard(
+    return SurfaceCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       child: Row(
@@ -492,7 +495,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            BlueprintCard(
+            SurfaceCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -625,7 +628,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               )
             else ...[
               const SectionLabel('Comprobaciones activas'),
-              BlueprintCard(
+              SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -655,8 +658,12 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               ),
               if (objects(data['schedule']).isNotEmpty) ...[
                 const SectionLabel('Vigencia por prueba'),
-                for (final due in objects(data['schedule']))
-                  _ScheduleRow(due: due),
+                SurfaceList(
+                  children: [
+                    for (final due in objects(data['schedule']))
+                      _ScheduleRow(due: due),
+                  ],
+                ),
               ],
               const Notice(
                 'Control interno privado. IvMET recalcula el resultado en Supabase al finalizar y deriva el próximo vencimiento de cada prueba trazable.',
@@ -685,11 +692,8 @@ class _ScheduleRow extends StatelessWidget {
         ? palette.accentInk
         : palette.muted;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.divider)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
       child: Row(
         children: [
           Icon(

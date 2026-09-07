@@ -2,23 +2,22 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_shapes.dart';
 import 'app_typography.dart';
 import 'industry_palette.dart';
 
 /// Tema de la app segun el sistema visual "Industry".
 ///
-/// Tres reglas heredadas del sistema, y una excepcion:
+/// El sistema se reviso para quitarle ruido. Las reglas hoy son:
 ///
-/// - esquinas rectas (`radius 0`) en todo control: cada componente es un
-///   objeto de plano, no una pastilla;
-/// - hairline de 1 px en vez de sombras para separar;
+/// - esquinas redondeadas en una sola escala ([AppRadius]): nada de cajas
+///   rectas ni de marcas de registro asomando fuera del borde;
+/// - la separacion la hace el valor — la tarjeta es mas clara que el fondo —
+///   y el contorno queda como apoyo suave, no como el recurso principal;
 /// - acero como unico color de marca, oxido reservado al fuera de tolerancia.
 ///
-/// La excepcion es la barra de navegacion inferior, que si es flotante y
-/// redondeada — se pidio explicitamente en el diseno.
-///
 /// La UI se usa en planta, muchas veces con guantes y con mala iluminacion:
-/// por eso los controles llegan a 44-50 px de alto y el texto de captura a 16.
+/// por eso los controles llegan a 46-50 px de alto y el texto de captura a 16.
 abstract final class AppTheme {
   static ThemeData get light => _base(Brightness.light);
   static ThemeData get dark => _base(Brightness.dark);
@@ -28,19 +27,30 @@ abstract final class AppTheme {
         ? IndustryPalette.dark()
         : IndustryPalette.light();
 
+    // Contorno de los controles que no llevan relleno. El divisor de las
+    // tarjetas es demasiado tenue para un boton, que tiene que leerse como
+    // area tocable aun sin fondo.
+    final outline = palette.text.withValues(alpha: 0.16);
+
     final scheme = ColorScheme(
       brightness: brightness,
       primary: palette.accent,
-      onPrimary: palette.bg,
+      onPrimary: brightness == Brightness.dark
+          ? AppColors.bgDark
+          : AppColors.card,
       secondary: palette.accentInk,
-      onSecondary: palette.bg,
+      onSecondary: palette.card,
       error: palette.fail,
-      onError: brightness == Brightness.dark ? AppColors.bgDark : AppColors.bg,
+      onError: brightness == Brightness.dark
+          ? AppColors.bgDark
+          : AppColors.card,
       surface: palette.bg,
       onSurface: palette.text,
+      surfaceContainer: palette.card,
       surfaceContainerHighest: palette.surface,
-      outline: palette.divider,
+      outline: outline,
       outlineVariant: palette.divider,
+      shadow: palette.shadow,
     );
 
     return ThemeData(
@@ -52,6 +62,7 @@ abstract final class AppTheme {
       fontFamily: AppFonts.body,
       fontFamilyFallback: AppFonts.fallback,
       visualDensity: VisualDensity.comfortable,
+      splashFactory: InkSparkle.splashFactory,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
@@ -65,7 +76,7 @@ abstract final class AppTheme {
       extensions: <ThemeExtension<dynamic>>[palette],
       textTheme: _textTheme(palette),
       dividerTheme: DividerThemeData(
-        color: palette.divider,
+        color: palette.hairline,
         thickness: 1,
         space: 1,
       ),
@@ -74,6 +85,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: palette.bg,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: palette.text,
         titleTextStyle: TextStyle(
           fontFamily: AppFonts.heading,
@@ -83,45 +95,54 @@ abstract final class AppTheme {
           color: palette.text,
         ),
       ),
+      // Campo relleno y sin caja dura: el contorno solo aparece con fuerza
+      // cuando el campo tiene el foco.
+      //
+      // Aqui no se configura el rotulo: en este sistema va *encima* de la caja
+      // y lo pone `LabeledInput`, no `InputDecoration.labelText`. Un label
+      // flotante desaparece o se encoge justo cuando el campo esta relleno,
+      // que es cuando hay que comprobar que se escribio donde tocaba.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: palette.surface,
         isDense: false,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 12,
+          horizontal: 14,
+          vertical: 14,
         ),
         labelStyle: TextStyle(
           fontSize: 12,
           color: palette.text.withValues(alpha: 0.7),
         ),
-        floatingLabelBehavior: FloatingLabelBehavior.never,
+        helperStyle: TextStyle(fontSize: 11.5, color: palette.muted),
         border: _inputBorder(palette.divider),
         enabledBorder: _inputBorder(palette.divider),
-        focusedBorder: _inputBorder(palette.accent),
+        focusedBorder: _inputBorder(palette.accent, width: 1.5),
         errorBorder: _inputBorder(palette.fail),
-        focusedErrorBorder: _inputBorder(palette.fail),
+        focusedErrorBorder: _inputBorder(palette.fail, width: 1.5),
       ),
-      // Primario del sistema: relleno acero, borde del mismo acero.
+      // Primario del sistema: relleno acero, sin contorno ni sombra.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
-          minimumSize: const Size.fromHeight(48),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
-            side: BorderSide(color: palette.accent),
-          ),
+          foregroundColor: brightness == Brightness.dark
+              ? AppColors.bgDark
+              : AppColors.card,
+          disabledBackgroundColor: palette.text.withValues(alpha: 0.08),
+          disabledForegroundColor: palette.text.withValues(alpha: 0.32),
+          elevation: 0,
+          minimumSize: const Size.fromHeight(50),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.control),
           textStyle: _buttonTextStyle(),
         ),
       ),
-      // Secundario: solo el hairline.
+      // Secundario: contorno suave, sin relleno.
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: palette.text,
-          minimumSize: const Size.fromHeight(44),
-          side: BorderSide(color: palette.divider),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          minimumSize: const Size.fromHeight(46),
+          side: BorderSide(color: outline),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.control),
           textStyle: _buttonTextStyle(),
         ),
       ),
@@ -129,41 +150,107 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: palette.accent,
-          minimumSize: const Size(0, 40),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          minimumSize: const Size(0, 42),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.control),
           textStyle: _buttonTextStyle(),
         ),
       ),
+      // Los IconButton se quedan redondos: son el unico control circular del
+      // sistema y cuadrarlos los confundiria con un boton pequeno.
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(foregroundColor: palette.text),
+      ),
       cardTheme: CardThemeData(
-        color: Colors.transparent,
+        color: palette.card,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.zero,
+          borderRadius: AppRadius.card,
+          side: BorderSide(color: palette.divider),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.control),
+        iconColor: palette.muted,
+      ),
+      expansionTileTheme: ExpansionTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
+          side: BorderSide(color: palette.divider),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
+          side: BorderSide(color: palette.divider),
+        ),
+        iconColor: palette.accent,
+        collapsedIconColor: palette.muted,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: palette.surface,
+        selectedColor: palette.accentSoft,
+        side: BorderSide(color: palette.divider),
+        shape: const StadiumBorder(),
+        labelStyle: TextStyle(fontSize: 12.5, color: palette.text),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        side: BorderSide(color: outline, width: 1.5),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: palette.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.floating),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: palette.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.lg),
+          ),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: palette.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
           side: BorderSide(color: palette.divider),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: palette.accent,
         linearTrackColor: palette.track,
-        linearMinHeight: 3,
+        linearMinHeight: 5,
+        borderRadius: BorderRadius.circular(3),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: palette.accentDeep,
         contentTextStyle: TextStyle(
-          color: palette.bg,
+          color: brightness == Brightness.dark
+              ? AppColors.bgDark
+              : AppColors.card,
           fontFamily: AppFonts.body,
         ),
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.control),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  static OutlineInputBorder _inputBorder(Color color) => OutlineInputBorder(
-    borderRadius: BorderRadius.zero,
-    borderSide: BorderSide(color: color),
-  );
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: AppRadius.control,
+        borderSide: BorderSide(color: color, width: width),
+      );
 
   static TextStyle _buttonTextStyle() => const TextStyle(
     fontFamily: AppFonts.heading,

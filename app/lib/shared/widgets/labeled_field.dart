@@ -4,11 +4,61 @@ import 'package:flutter/services.dart';
 import '../theme/app_typography.dart';
 import '../theme/industry_palette.dart';
 
-/// Campo del sistema: rotulo encima, caja recta debajo.
+/// Envoltorio de campo del sistema: rotulo encima, control debajo.
 ///
-/// El rotulo va fuera y no flotando dentro del campo: con el equipo en la mano
-/// y el campo ya relleno, un label flotante deja de leerse justo cuando hay
-/// que comprobar que se escribio donde tocaba.
+/// Es el patron que fija el design system (`.field > label`, un bloque sobre
+/// el input) y vale para cualquier control: `TextFormField`, `DropdownButton`,
+/// lo que sea. El rotulo va fuera de la caja y no flotando dentro porque, con
+/// el equipo en la mano y el campo ya relleno, un label flotante deja de
+/// leerse justo cuando hay que comprobar que se escribio donde tocaba.
+///
+/// Por eso ningun campo de la app usa `InputDecoration.labelText`: el rotulo
+/// lo pone siempre este envoltorio, y asi esta en el mismo sitio en todas las
+/// pantallas, con el campo lleno o vacio.
+class LabeledInput extends StatelessWidget {
+  const LabeledInput({
+    required this.label,
+    required this.child,
+    this.padding,
+    super.key,
+  });
+
+  final String label;
+  final Widget child;
+
+  /// Aire alrededor del grupo. Los formularios lo usan para separar un campo
+  /// del siguiente sin repetir un `Padding` en cada uno.
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+
+    final Widget group = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            color: palette.text.withValues(alpha: 0.72),
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+
+    if (padding == null) return group;
+    return Padding(padding: padding!, child: group);
+  }
+}
+
+/// Campo de texto con el rotulo del sistema encima.
+///
+/// Es [LabeledInput] con un `TextField` ya montado, para el caso corriente.
 class LabeledField extends StatelessWidget {
   const LabeledField({
     required this.label,
@@ -39,27 +89,19 @@ class LabeledField extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, height: 1.3, color: palette.text.withValues(alpha: 0.7)),
+    return LabeledInput(
+      label: label,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: minHeight),
+        child: TextField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          textAlign: textAlign,
+          onChanged: onChanged,
+          style: TextStyle(fontSize: fontSize, color: palette.text),
         ),
-        const SizedBox(height: 5),
-        ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minHeight),
-          child: TextField(
-            controller: controller,
-            obscureText: obscureText,
-            keyboardType: keyboardType,
-            textAlign: textAlign,
-            onChanged: onChanged,
-            style: TextStyle(fontSize: fontSize, color: palette.text),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
