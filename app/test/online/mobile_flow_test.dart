@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ivmet/app/app.dart';
-import 'package:ivmet/features/online/catalog_screen.dart';
+import 'package:ivmet/features/online/equipment_screen.dart';
 import 'package:ivmet/features/online/draft_screen.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';

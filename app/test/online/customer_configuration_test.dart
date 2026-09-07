@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ivmet/features/online/customer_configuration.dart';
+import 'package:ivmet/features/online/equipment_validation.dart';
 import 'package:ivmet/features/online/equipment_check_configuration.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
