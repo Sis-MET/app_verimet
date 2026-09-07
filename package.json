@@ -29,6 +29,7 @@
     "app:gen": "cd app && dart run build_runner build --delete-conflicting-outputs",
     "app:run": "cd app && flutter run",
     "app:test": "cd app && flutter test",
+    "app:goldens": "cd app && flutter test --update-goldens",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
