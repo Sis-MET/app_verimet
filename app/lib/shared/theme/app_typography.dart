@@ -9,9 +9,13 @@ import 'industry_palette.dart';
 /// numeros de una verificacion se comparan en columna, y con proporcional no
 /// se alinean.
 ///
-/// Las dos primeras familias no vienen empaquetadas todavia. Mientras no se
-/// agreguen los .ttf a `app/fonts/` y su bloque `fonts:` en `pubspec.yaml`,
-/// Flutter cae a [fallback] y la app se ve correcta pero sin la condensada.
+/// Las dos primeras van empaquetadas en `assets/fonts/` y declaradas en el
+/// bloque `fonts:` del `pubspec.yaml`, solo en los cortes que el codigo pide:
+/// Condensed 600 y Barlow 400/700. Pedir un peso que no este empaquetado no
+/// falla — Flutter escoge el mas cercano — pero se ve distinto de lo previsto,
+/// asi que al usar uno nuevo hay que agregarlo alli.
+///
+/// [fallback] queda para el texto que no encuentra glifo en Barlow.
 abstract final class AppFonts {
   static const String heading = 'Barlow Condensed';
   static const String body = 'Barlow';

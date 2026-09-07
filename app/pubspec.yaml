@@ -79,8 +79,31 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Solo las de Roboto: las carga el generador de informes con `rootBundle`.
+  # Las de Barlow no van aqui sino en `fonts:` — declarar un .ttf en los dos
+  # sitios lo empaqueta dos veces.
   assets:
-    - assets/fonts/
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/Roboto-Italic.ttf
+
+  # Tipografia del sistema "Industry": condensada para titulos, normal para
+  # texto. Sin estos .ttf empaquetados Flutter caia en silencio al fallback
+  # (Roboto) y la app perdia la mitad de su caracter.
+  #
+  # Se empaquetan solo los cortes que el codigo pide: Condensed 600 para todo
+  # lo titular y Barlow 400/700 para el cuerpo. Barlow 500, que el design
+  # system tambien define, no se usa todavia.
+  fonts:
+    - family: Barlow
+      fonts:
+        - asset: assets/fonts/Barlow-Regular.ttf
+        - asset: assets/fonts/Barlow-Bold.ttf
+          weight: 700
+    - family: Barlow Condensed
+      fonts:
+        - asset: assets/fonts/BarlowCondensed-SemiBold.ttf
+          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:
