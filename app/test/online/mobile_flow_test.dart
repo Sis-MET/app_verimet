@@ -386,6 +386,27 @@ void main() {
     tester,
   ) async {
     final server = FixtureServer();
+    // Rangos con la escala completa que entrega Postgres, para comprobar como
+    // se muestran. El fixture compartido los deja vacios.
+    server.bundle = {
+      ...fixtureBundle,
+      'ranges': [
+        {
+          'numero_rango': 1,
+          'unidad': 'kg',
+          'capacidad_max': '20.000000000',
+          'division_escala': '0.010000000',
+          'cantidad_decimales': 2,
+        },
+        {
+          'numero_rango': 2,
+          'unidad': 'kg',
+          'capacidad_max': '50.000000000',
+          'division_escala': '0.100000000',
+          'cantidad_decimales': 1,
+        },
+      ],
+    };
     final session = MobileSession(server.api, recovery: server.recovery);
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     session.user!['role'] = 'cliente_jefe_calidad';
@@ -400,6 +421,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Compartir con Métrica'), findsNothing);
+
+    // El catalogo entrega `numeric` con toda su escala. En pantalla van los
+    // decimales que la balanza resuelve, no los nueve de Postgres.
+    expect(
+      find.text('20.00 kg · división 0.01 kg', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.text('50.0 kg · división 0.1 kg', skipOffstage: false),
+      findsOneWidget,
+    );
 
     server.customerUpdatePending = true;
     await tester.pumpWidget(const SizedBox());

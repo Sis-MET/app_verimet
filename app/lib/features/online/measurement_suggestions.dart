@@ -63,6 +63,46 @@ String _formatScaled(BigInt scaled, int decimals) {
   return '$sign${digits.substring(0, split)}.${digits.substring(split)}';
 }
 
+/// Decimales con los que se lee un rango del catalogo.
+///
+/// Manda `cantidad_decimales`, que es lo que declara la ficha del instrumento.
+/// Si no viene, se deduce de la division de escala: una balanza con d = 0,1 no
+/// resuelve mas de un decimal, por mucho que el catalogo entregue el numero con
+/// nueve.
+int rangeDecimals(Json range) {
+  final configured = int.tryParse(
+    range['cantidad_decimales']?.toString() ?? '',
+  );
+  if (configured != null && configured >= 0 && configured <= 9) {
+    return configured;
+  }
+  return _decimalPlaces(range['division_escala']);
+}
+
+/// Capacidad maxima del rango, con los decimales que el instrumento resuelve.
+///
+/// Postgres entrega `numeric` con toda su escala —"6100.000000000"— y pintarlo
+/// tal cual atribuye a la balanza una resolucion que no tiene.
+String rangeCapacityLabel(Json range) =>
+    _rangeLabel(range['capacidad_max'], rangeDecimals(range));
+
+/// Division de escala del rango.
+///
+/// Usa sus propios decimales y no los del rango: si el catalogo declarase menos
+/// de los que la division necesita, redondearla la haria desaparecer.
+String rangeDivisionLabel(Json range) => _rangeLabel(
+  range['division_escala'],
+  _decimalPlaces(range['division_escala']),
+);
+
+/// Nunca inventa: si el valor no es un numero reconocible se devuelve tal cual
+/// llego, que es lo unico honesto con un dato de catalogo incompleto.
+String _rangeLabel(Object? value, int decimals) {
+  final scaled = _scaledNumber(value);
+  if (scaled == null) return value?.toString().trim() ?? '';
+  return _formatScaled(scaled, decimals);
+}
+
 /// Selects the first weighing range whose capacity contains [load].
 /// This mirrors ServiceMET's range selection and falls back to the last range
 /// when the entered load exceeds all configured capacities.

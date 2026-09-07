@@ -168,4 +168,62 @@ void main() {
     expect(activeReadings(trial).last['indication'], '25,12');
     expect(activeReadings(trial).last.containsKey('substitution'), false);
   });
+
+  group('etiquetas de rango del catalogo', () {
+    // Postgres entrega `numeric` con toda su escala. Es lo que llegaba a
+    // pantalla: "6100.000000000 g · division 0.100000000".
+    const crudo = <String, dynamic>{
+      'numero_rango': 1,
+      'capacidad_max': '6100.000000000',
+      'division_escala': '0.100000000',
+      'cantidad_decimales': 1,
+      'unidad': 'g',
+    };
+
+    test('manda cantidad_decimales del catalogo', () {
+      expect(rangeDecimals(crudo), 1);
+      expect(rangeCapacityLabel(crudo), '6100.0');
+      expect(rangeDivisionLabel(crudo), '0.1');
+    });
+
+    test('sin cantidad_decimales, los decimales salen de la division', () {
+      const sinDeclarar = <String, dynamic>{
+        'capacidad_max': '6100.000000000',
+        'division_escala': '0.100000000',
+        'unidad': 'g',
+      };
+      expect(rangeDecimals(sinDeclarar), 1);
+      expect(rangeCapacityLabel(sinDeclarar), '6100.0');
+    });
+
+    test('una balanza sin decimales no gana ninguno', () {
+      const entera = <String, dynamic>{
+        'capacidad_max': '1500.000000000',
+        'division_escala': '5.000000000',
+        'cantidad_decimales': 0,
+      };
+      expect(rangeCapacityLabel(entera), '1500');
+      expect(rangeDivisionLabel(entera), '5');
+    });
+
+    test('la division conserva los suyos aunque el rango declare menos', () {
+      // Dato de catalogo incoherente: redondear la division la borraria.
+      const incoherente = <String, dynamic>{
+        'capacidad_max': '220.000000000',
+        'division_escala': '0.001000000',
+        'cantidad_decimales': 0,
+      };
+      expect(rangeCapacityLabel(incoherente), '220');
+      expect(rangeDivisionLabel(incoherente), '0.001');
+    });
+
+    test('lo que no es un numero se devuelve tal cual', () {
+      const roto = <String, dynamic>{
+        'capacidad_max': 'sin dato',
+        'division_escala': '',
+      };
+      expect(rangeCapacityLabel(roto), 'sin dato');
+      expect(rangeDivisionLabel(roto), '');
+    });
+  });
 }

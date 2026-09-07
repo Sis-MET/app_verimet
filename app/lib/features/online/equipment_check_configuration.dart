@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../shared/widgets/labeled_field.dart';
 
+import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -396,7 +397,9 @@ class _EquipmentCheckConfigurationScreenState
         valueLabel(equipment['cod_metrica']),
         style: Theme.of(context).textTheme.headlineSmall,
       ),
-      Text('Capacidad de referencia: ${largestRange['capacidad_max']} $unit'),
+      Text(
+        'Capacidad de referencia: ${rangeCapacityLabel(largestRange)} $unit',
+      ),
       const Notice(
         'Selecciona las verificaciones que necesita tu proceso. Puedes utilizar una periodicidad diferente para cada una.',
       ),

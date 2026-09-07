@@ -10,6 +10,7 @@ import 'draft_screen.dart';
 import 'equipment_check_configuration.dart';
 import 'equipment_validation.dart';
 import 'history_screen.dart';
+import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -96,7 +97,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                   for (final range in ranges)
                     DetailField(
                       'Rango ${range['numero_rango']}',
-                      '${range['capacidad_max']} ${range['unidad']} · división ${range['division_escala']}',
+                      '${rangeCapacityLabel(range)} ${range['unidad']}'
+                          ' · división ${rangeDivisionLabel(range)} ${range['unidad']}',
                     ),
                 ],
               ),
