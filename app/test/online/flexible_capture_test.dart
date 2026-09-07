@@ -231,17 +231,17 @@ void main() {
         await tester.ensureVisible(load);
         await tester.enterText(load, '17,25');
         await tester.pump();
-        expect(activeReadings(input).first['indication'], '17.25');
+        expect(activeReadings(input).first['indication'], '17,25');
         if (plan['type'] != 'linearity') {
           expect(
             activeReadings(
               input,
-            ).every((reading) => reading['indication'] == '17.25'),
+            ).every((reading) => reading['indication'] == '17,25'),
             true,
           );
         }
         expect(find.byKey(ValueKey('$id:suggestions')), findsOneWidget);
-        expect(find.text('Precisión: 2 decimales · d = 0.01 kg'), findsWidgets);
+        expect(find.text('Precisión: 2 decimales · d = 0,01 kg'), findsWidgets);
         final indication = find.byKey(ValueKey('$id:indication'));
         await tester.ensureVisible(indication);
         await tester.enterText(indication, '17,251');

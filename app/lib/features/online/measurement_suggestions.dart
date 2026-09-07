@@ -53,6 +53,13 @@ BigInt _divideRounded(BigInt numerator, BigInt denominator) {
       : quotient;
 }
 
+/// Sale con coma decimal, como todo lo que ve el operario: en planta se escribe
+/// con coma y es lo que teclea. El punto se reserva al transporte, donde
+/// `normalizedDecimal` lo pone antes de enviar.
+///
+/// Vale tambien para lo que rellena un campo de captura: una lectura sugerida
+/// tiene que verse igual que una tecleada, o la misma columna mezcla los dos
+/// separadores.
 String _formatScaled(BigInt scaled, int decimals) {
   final divisor = BigInt.from(10).pow(9 - decimals);
   final rounded = _divideRounded(scaled, divisor);
@@ -60,7 +67,7 @@ String _formatScaled(BigInt scaled, int decimals) {
   final sign = rounded.isNegative ? '-' : '';
   if (decimals == 0) return '$sign$digits';
   final split = digits.length - decimals;
-  return '$sign${digits.substring(0, split)}.${digits.substring(split)}';
+  return '$sign${digits.substring(0, split)},${digits.substring(split)}';
 }
 
 /// Decimales con los que se lee un rango del catalogo.

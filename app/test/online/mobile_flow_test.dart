@@ -425,11 +425,11 @@ void main() {
     // El catalogo entrega `numeric` con toda su escala. En pantalla van los
     // decimales que la balanza resuelve, no los nueve de Postgres.
     expect(
-      find.text('20.00 kg · división 0.01 kg', skipOffstage: false),
+      find.text('20,00 kg · división 0,01 kg', skipOffstage: false),
       findsOneWidget,
     );
     expect(
-      find.text('50.0 kg · división 0.1 kg', skipOffstage: false),
+      find.text('50,0 kg · división 0,1 kg', skipOffstage: false),
       findsOneWidget,
     );
 

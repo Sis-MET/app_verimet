@@ -206,6 +206,23 @@ retiró: dos palabras para lo mismo obligaban a elegir en cada texto nuevo, y la
 distinción real —intermedia frente a legal— la carga el calificativo, no el
 sustantivo.
 
+## Separador decimal
+
+Coma hacia la pantalla, punto hacia el servidor.
+
+En planta se escribe con coma, pero el teclado del telefono ofrece el punto: la
+entrada acepta los dos —`MeasurementFormat.parse`, `decimalError`— y todo lo
+que se muestra sale con coma, incluidas las lecturas que el propio sistema
+sugiere. Una lectura tecleada y una sugerida tienen que verse igual.
+
+`normalizedDecimal` pone el punto justo antes de enviar, que es el formato que
+espera Supabase. Un test lo fija: la misma lectura vale `45,123456789` en el
+borrador y viaja como `44.999999999` en el payload.
+
+La unica excepcion es `EvidenceTree`, la vista del expediente que se va a
+enviar. Ahi los valores van crudos, tal y como salen, porque lo que se
+consiente es exactamente eso.
+
 ---
 
 ## Features

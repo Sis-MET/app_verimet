@@ -33,6 +33,11 @@ String _value(Object? value, {String fallback = 'No informado'}) {
 double? _number(Object? value) =>
     double.tryParse(value?.toString().trim().replaceAll(',', '.') ?? '');
 
+/// Numero para el informe: sin los ceros de relleno que arrastra el `numeric`
+/// de Postgres y con coma decimal, como el resto de la app.
+///
+/// El servidor guarda los decimales con punto —es lo que
+/// `normalizedDecimal` envia— pero el informe lo lee un cliente en Bolivia.
 String _decimal(Object? value) {
   final text = _value(value, fallback: '-');
   if (text == '-') return text;
@@ -40,7 +45,8 @@ String _decimal(Object? value) {
   if (!normalized.contains('.')) return normalized;
   return normalized
       .replaceFirst(RegExp(r'0+$'), '')
-      .replaceFirst(RegExp(r'\.$'), '');
+      .replaceFirst(RegExp(r'\.$'), '')
+      .replaceFirst('.', ',');
 }
 
 String _date(Object? value, {bool time = true}) {
