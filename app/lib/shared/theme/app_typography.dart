@@ -16,7 +16,12 @@ abstract final class AppFonts {
   static const String heading = 'Barlow Condensed';
   static const String body = 'Barlow';
 
-  static const List<String> fallback = <String>['Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'];
+  static const List<String> fallback = <String>[
+    'Roboto',
+    'Helvetica Neue',
+    'Arial',
+    'sans-serif',
+  ];
 
   /// Familia de lecturas. `monospace` resuelve en Android, `Menlo` en iOS.
   static const String mono = 'monospace';
@@ -53,7 +58,11 @@ abstract final class AppTextStyles {
   }
 
   /// Lectura numerica: kilos, errores, codigos.
-  static TextStyle reading(BuildContext context, {double size = 13, Color? color}) {
+  static TextStyle reading(
+    BuildContext context, {
+    double size = 13,
+    Color? color,
+  }) {
     return TextStyle(
       fontFamily: AppFonts.mono,
       fontFamilyFallback: AppFonts.monoFallback,
@@ -64,7 +73,11 @@ abstract final class AppTextStyles {
   }
 
   /// Cifra grande de tarjeta (48 equipos, 91 %, error maximo).
-  static TextStyle figure(BuildContext context, {double size = 40, Color? color}) {
+  static TextStyle figure(
+    BuildContext context, {
+    double size = 40,
+    Color? color,
+  }) {
     return TextStyle(
       fontFamily: AppFonts.heading,
       fontFamilyFallback: AppFonts.fallback,

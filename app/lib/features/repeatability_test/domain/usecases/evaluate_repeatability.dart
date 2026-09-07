@@ -32,7 +32,8 @@ class RepeatabilityResult {
   final double tolerance;
   final TestVerdict verdict;
 
-  String get formattedStandardDeviation => MeasurementFormat.format(standardDeviation, decimals: 3);
+  String get formattedStandardDeviation =>
+      MeasurementFormat.format(standardDeviation, decimals: 3);
   String get formattedRange => MeasurementFormat.format(range);
   String get formattedTolerance => MeasurementFormat.format(tolerance);
 }
@@ -52,7 +53,9 @@ RepeatabilityResult evaluateRepeatability(List<ReadingEvaluation> readings) {
       if (reading.value case final double value) value,
   ];
 
-  final mean = values.isEmpty ? 0.0 : values.reduce((a, b) => a + b) / values.length;
+  final mean = values.isEmpty
+      ? 0.0
+      : values.reduce((a, b) => a + b) / values.length;
 
   var standardDeviation = 0.0;
   if (values.length > 1) {
@@ -63,7 +66,9 @@ RepeatabilityResult evaluateRepeatability(List<ReadingEvaluation> readings) {
     standardDeviation = math.sqrt(sumOfSquares / (values.length - 1));
   }
 
-  final range = values.isEmpty ? 0.0 : values.reduce(math.max) - values.reduce(math.min);
+  final range = values.isEmpty
+      ? 0.0
+      : values.reduce(math.max) - values.reduce(math.min);
 
   final TestVerdict verdict;
   if (values.length != readings.length || values.length < 2) {

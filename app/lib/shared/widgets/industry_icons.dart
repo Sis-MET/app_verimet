@@ -47,18 +47,27 @@ class IndustryIconView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolved = color ?? DefaultTextStyle.of(context).style.color ?? Colors.black;
+    final resolved =
+        color ?? DefaultTextStyle.of(context).style.color ?? Colors.black;
     return SizedBox.square(
       dimension: size,
       child: CustomPaint(
-        painter: _IndustryIconPainter(icon: icon, color: resolved, strokeWidth: strokeWidth),
+        painter: _IndustryIconPainter(
+          icon: icon,
+          color: resolved,
+          strokeWidth: strokeWidth,
+        ),
       ),
     );
   }
 }
 
 class _IndustryIconPainter extends CustomPainter {
-  const _IndustryIconPainter({required this.icon, required this.color, required this.strokeWidth});
+  const _IndustryIconPainter({
+    required this.icon,
+    required this.color,
+    required this.strokeWidth,
+  });
 
   final IndustryIcon icon;
   final Color color;

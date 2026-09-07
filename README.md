@@ -192,20 +192,31 @@ El detalle de firma y build para Play Store esta en
 
 ## Features
 
-Las mismas features existen en la app y en la API (`snake_case` en Dart,
-`kebab-case` en TypeScript):
+La API organiza el dominio en estas features (`snake_case` en Dart,
+`kebab-case` en TypeScript). La ultima columna dice donde vive cada una en la
+app movil:
 
-| Feature | Que resuelve |
-| --- | --- |
-| `auth` | Supabase Auth, sesion y cambio obligatorio de contraseña. |
-| `instruments` | Balanzas del cliente: listado, detalle, estado. |
-| `eccentricity_test` | Prueba de excentricidad. |
-| `repeatability_test` | Prueba de repetibilidad. |
-| `linearity_test` | Prueba de linealidad. |
-| `verification_reports` | Historial privado y expedientes compartidos; el PDF formal está pendiente. |
-| `clients` | Empresas cliente (tenants), sucursales y areas. |
-| `dashboard` | Resumen operativo del cliente. La gestion interna vive en RimMET. |
-| `sync` | Integracion servidor a servidor; no existe cola offline movil. |
+| Feature | Que resuelve | En la app |
+| --- | --- | --- |
+| `auth` | Supabase Auth, sesion y cambio obligatorio de contraseña. | `online/online_entry.dart` |
+| `instruments` | Balanzas del cliente: listado, detalle, estado. | `online/catalog_screen.dart` |
+| `eccentricity_test` | Prueba de excentricidad. | `eccentricity_test/domain/` |
+| `repeatability_test` | Prueba de repetibilidad. | `repeatability_test/domain/` |
+| `linearity_test` | Prueba de linealidad. | `linearity_test/domain/` |
+| `verification_reports` | Historial privado y expedientes compartidos. | `online/history_screen.dart`, `online/verification_report.dart` |
+| `clients` | Empresas cliente (tenants), sucursales y areas. | `online/customer_configuration.dart` |
+| `dashboard` | Resumen operativo del cliente. La gestion interna vive en RimMET. | `online/workspace_screen.dart` |
+| `sync` | Integracion servidor a servidor; no existe cola offline movil. | solo servidor |
+
+La app movil **no** espeja esa division en carpetas: todo el flujo con sesion
+vive en `app/lib/features/online/`, que habla con Supabase. Hubo un prototipo
+que si la espejaba, con datos de demostracion y un cliente HTTP contra la API
+antigua por VPN; se retiro al quedar sin ninguna ruta que lo alcanzara.
+
+Lo unico que sobrevive de aquella division son los `domain/usecases/` de las
+tres pruebas metrologicas. La app no evalua en el cliente —Supabase recalcula
+al finalizar—, asi que se conservan, con sus tests, como especificacion
+ejecutable de la matematica que el servidor debe replicar.
 
 ---
 

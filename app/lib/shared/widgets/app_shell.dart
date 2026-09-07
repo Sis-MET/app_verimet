@@ -1,21 +1,25 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../theme/app_shapes.dart';
 import '../theme/app_typography.dart';
 import '../theme/industry_palette.dart';
 import 'industry_icons.dart';
 
-/// Margen de las pantallas del marco.
+/// Margen de las pantallas que van bajo la barra flotante.
 ///
-/// Los 132 px de abajo son el hueco de la barra flotante mas su aire: la
-/// barra va encima del contenido, asi que cada pantalla se aparta ella misma
-/// en vez de que el marco le recorte el final del scroll.
+/// Los 132 px de abajo son el hueco de la barra mas su aire: la barra va
+/// encima del contenido, asi que cada pantalla se aparta ella misma en vez de
+/// que el marco le recorte el final del scroll.
 const EdgeInsets kShellContentPadding = EdgeInsets.fromLTRB(18, 16, 18, 132);
 
 /// Los cuatro apartados de la app.
+///
+/// El shell que los conmuta lo implementa `features/online/workspace_screen`,
+/// que mantiene el apartado activo en su propio estado. Antes existia aqui un
+/// `AppShell` montado sobre `StatefulNavigationShell` de go_router, para un
+/// arbol de rutas que la app nunca llego a declarar.
 enum AppSection {
   inicio('Inicio', IndustryIcon.home),
   verificar('Verificar', IndustryIcon.clipboardCheck),
@@ -26,46 +30,6 @@ enum AppSection {
 
   final String label;
   final IndustryIcon icon;
-}
-
-/// Marco de la app con sesion iniciada: contenido a pantalla completa y la
-/// barra flotante encima.
-///
-/// La barra es la capa mas alta de la app: flota sobre el contenido, se apoya
-/// en una sombra difusa y repite el redondeo del sistema un escalon por
-/// encima de las tarjetas, para que se lea como capa aparte y no como una
-/// tarjeta mas pegada al borde.
-class AppShell extends StatelessWidget {
-  const AppShell({required this.navigationShell, super.key});
-
-  final StatefulNavigationShell navigationShell;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // La barra tapa los ultimos 132 px: cada pantalla reserva ese espacio al
-      // final de su scroll en vez de que el marco recorte contenido.
-      body: Stack(
-        children: [
-          navigationShell,
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24,
-            child: FloatingNavBar(
-              current: AppSection.values[navigationShell.currentIndex],
-              onSelect: (section) => navigationShell.goBranch(
-                section.index,
-                // Volver a tocar el apartado activo devuelve a su raiz: es la
-                // salida rapida de un detalle sin buscar el boton Atras.
-                initialLocation: section.index == navigationShell.currentIndex,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// Barra de navegacion flotante con icono y etiqueta.
