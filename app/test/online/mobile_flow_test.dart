@@ -6,7 +6,7 @@ import 'package:ivmet/features/online/equipment_screen.dart';
 import 'package:ivmet/features/online/draft_screen.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
-import 'package:ivmet/features/online/history_screen.dart';
+import 'package:ivmet/features/online/verification_screen.dart';
 import 'fakes.dart';
 import 'finders.dart';
 
