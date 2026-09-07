@@ -112,3 +112,6 @@ tmp/
 temp/
 /output/
 legacy-api/
+
+# Configuración local de Claude Code
+.claude/

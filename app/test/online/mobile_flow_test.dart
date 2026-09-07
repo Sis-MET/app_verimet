@@ -8,6 +8,7 @@ import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/history_screen.dart';
 import 'fakes.dart';
+import 'finders.dart';
 
 void main() {
   testWidgets('una verificación histórica permite generar su informe PDF', (
@@ -104,14 +105,8 @@ void main() {
   }
 
   Future<void> login(WidgetTester tester) async {
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Usuario'),
-      'operador',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Contraseña'),
-      'fixture-password',
-    );
+    await tester.enterText(fieldLabeled('Usuario'), 'operador');
+    await tester.enterText(fieldLabeled('Contraseña'), 'fixture-password');
     await tester.tap(find.text('Ingresar'));
     await tester.pumpAndSettle();
   }
@@ -150,7 +145,7 @@ void main() {
       expect(find.text('Departamento · Producción'), findsOneWidget);
       expect(find.text('Métrica · 0001-01-001'), findsOneWidget);
       await tester.enterText(
-        find.widgetWithText(TextField, 'Código interno, departamento o marca'),
+        fieldLabeled('Código interno, departamento o marca', type: TextField),
         'Producción',
       );
       await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -302,7 +297,7 @@ void main() {
     await nextStep(tester);
     await nextStep(tester);
     await nextStep(tester);
-    final indication = find.widgetWithText(TextFormField, 'Indicación');
+    final indication = fieldLabeled('Indicación');
     await tester.ensureVisible(indication);
     await tester.enterText(indication, '0,123456789');
     await nextStep(tester);
@@ -354,7 +349,7 @@ void main() {
     await nextStep(tester);
     await nextStep(tester);
     await nextStep(tester);
-    final indication = find.widgetWithText(TextFormField, 'Indicación');
+    final indication = fieldLabeled('Indicación');
     await tester.ensureVisible(indication);
     await tester.enterText(indication, '10.1');
     await nextStep(tester);
@@ -441,33 +436,24 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byType(CheckboxListTile));
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Temperatura (°C)'),
-        '23,125',
-      );
-      final humidity = find.widgetWithText(
-        TextFormField,
-        'Humedad relativa (%)',
-      );
+      await tester.enterText(fieldLabeled('Temperatura (°C)'), '23,125');
+      final humidity = fieldLabeled('Humedad relativa (%)');
       await tester.ensureVisible(humidity);
       await tester.enterText(humidity, '48');
       await nextStep(tester);
       expect(find.text('Excentricidad'), findsOneWidget);
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Indicación'),
-        '10,001',
-      );
+      await tester.enterText(fieldLabeled('Indicación'), '10,001');
       await nextStep(tester);
       expect(find.text('Repetibilidad'), findsOneWidget);
       await tester.tap(find.byType(SwitchListTile));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Motivo de omisión'),
+        fieldLabeled('Motivo de omisión'),
         'Carga no disponible',
       );
       await nextStep(tester);
       expect(find.text('Paso 4 de 5'), findsOneWidget);
-      final indication = find.widgetWithText(TextFormField, 'Indicación');
+      final indication = fieldLabeled('Indicación');
       await tester.enterText(indication, '10,');
       await tester.pumpAndSettle();
       // Destroy both the widget tree and the session without saving or leaving.
@@ -484,9 +470,7 @@ void main() {
       );
       expect(
         tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Motivo de omisión'),
-            )
+            .widget<TextFormField>(fieldLabeled('Motivo de omisión'))
             .controller!
             .text,
         'Carga no disponible',
@@ -495,9 +479,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Temperatura (°C)'),
-            )
+            .widget<TextFormField>(fieldLabeled('Temperatura (°C)'))
             .controller!
             .text,
         '23,125',
@@ -515,12 +497,12 @@ void main() {
       await nextStep(tester);
       expect(find.text('Paso 5 de 5'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.widgetWithText(TextFormField, 'Observaciones'),
+        fieldLabeled('Observaciones'),
         250,
         scrollable: find.byType(Scrollable).last,
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Observaciones'),
+        fieldLabeled('Observaciones'),
         'Comprobación recuperada',
       );
       await tester.pumpAndSettle();

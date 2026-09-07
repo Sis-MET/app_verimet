@@ -6,6 +6,7 @@ import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/online_widgets.dart';
 import 'customer_fakes.dart';
+import 'finders.dart';
 
 void main() {
   Future<void> show(WidgetTester tester, Widget child) async {
@@ -51,7 +52,7 @@ void main() {
       EquipmentValidation(session: session, equipmentId: 'equipment-fixture'),
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Ubicación actual'),
+      fieldLabeled('Ubicación actual'),
       'Ubicación privada',
     );
     final confirm = find.byType(CheckboxListTile);
@@ -92,10 +93,7 @@ void main() {
           equipmentId: 'equipment-fixture',
         ),
       );
-      final message = find.widgetWithText(
-        TextFormField,
-        'Mensaje para Métrica',
-      );
+      final message = fieldLabeled('Mensaje para Métrica');
       await scrollTo(tester, message);
       await tester.enterText(message, 'Preparar la calibración');
       final send = find.text('Autorizar y enviar actualización');
