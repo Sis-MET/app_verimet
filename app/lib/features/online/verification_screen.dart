@@ -39,7 +39,17 @@ class _VerificationScreenState extends State<VerificationScreen> {
       error = null;
     });
     try {
-      final bytes = await buildVerificationReport(data);
+      // Quien pulsa el boton queda anotado en el informe: el PDF sale del
+      // dispositivo y circula fuera de la app, asi que tiene que decir quien lo
+      // saco y cuando.
+      final user = widget.session.user;
+      final bytes = await buildVerificationReport(
+        data,
+        generatedBy: user == null
+            ? null
+            : '${valueLabel(user['name'] ?? user['username'])}'
+                  ' (${valueLabel(user['username'])})',
+      );
       await Printing.sharePdf(
         bytes: bytes,
         filename: verificationReportFilename(data),

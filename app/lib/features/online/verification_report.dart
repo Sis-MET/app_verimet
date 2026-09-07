@@ -16,6 +16,8 @@ final _amber = PdfColor.fromHex('#9A6700');
 final _ink = PdfColor.fromHex('#24313A');
 final _muted = PdfColor.fromHex('#667782');
 final _line = PdfColor.fromHex('#D8E1E6');
+final _paleRed = PdfColor.fromHex('#FBEAEA');
+final _paleAmber = PdfColor.fromHex('#FBF3E2');
 final _paper = PdfColor.fromHex('#F7F9FA');
 
 ReportJson _map(Object? value) =>
@@ -106,6 +108,7 @@ String verificationReportFilename(ReportJson data) {
 Future<Uint8List> buildVerificationReport(
   ReportJson data, {
   DateTime? generatedAt,
+  String? generatedBy,
 }) async {
   final verification = _map(data['verification']);
   final users = _map(data['users']);
@@ -138,8 +141,17 @@ Future<Uint8List> buildVerificationReport(
     _reportTitle(verification, equipment, reportId),
     pw.SizedBox(height: 14),
     _notice(
-      'Este documento informa una verificación metrológica intermedia. No es un '
-      'certificado de calibración ni una verificación legal.',
+      'Este documento NO tiene validez legal. Es un informe de verificación '
+      'intermedia: un control interno que la propia empresa ejecuta entre '
+      'calibraciones formales, con la configuración que ella misma definió.'
+      '\n'
+      'No procede de un laboratorio acreditado, no es un certificado de '
+      'calibración y no acredita que la balanza funcione correctamente. No '
+      'sirve para demostrar conformidad ante IBMETRO ni ante ninguna otra '
+      'autoridad metrológica, ni sustituye la verificación reglamentaria ni la '
+      'calibración que esas instancias exijan.',
+      color: _red,
+      background: _paleRed,
     ),
     pw.SizedBox(height: 14),
     _statusSummary(verification),
@@ -205,9 +217,10 @@ Future<Uint8List> buildVerificationReport(
       ('Identificador de la verificación', verification['id']),
       ('Estado del registro', verification['estado']),
       (
-        'Generado el',
-        DateFormat('dd/MM/yyyy HH:mm').format(generated.toLocal()),
+        'Documento generado el',
+        DateFormat("dd/MM/yyyy 'a las' HH:mm").format(generated.toLocal()),
       ),
+      ('Documento generado por', generatedBy),
       ('Alcance declarado', verification['alcance_declaracion']),
     ]),
     if (verification['estado'] == 'ANNULLED') ...[
@@ -223,6 +236,24 @@ Future<Uint8List> buildVerificationReport(
       'verificación. Los resultados, lecturas, tolerancias y snapshots '
       'corresponden al momento de la medición.',
       style: pw.TextStyle(fontSize: 9, color: _muted, lineSpacing: 2),
+    ),
+    _section('Propiedad de la información'),
+    pw.Text(
+      'Las mediciones de esta verificación —lecturas, condiciones ambientales y '
+      'observaciones— fueron capturadas por el personal de la empresa titular '
+      'de la balanza y le pertenecen. IvMET las conserva por cuenta de esa '
+      'empresa y no las comparte con Métrica Ltda. salvo que su jefe de calidad '
+      'lo autorice de forma expresa para un caso concreto.',
+      style: pw.TextStyle(fontSize: 9, color: _ink, lineSpacing: 2),
+    ),
+    pw.SizedBox(height: 6),
+    pw.Text(
+      'Los datos técnicos de referencia sobre los que se apoya la verificación '
+      '—identificación de la balanza, rangos metrológicos, división de escala y '
+      'los certificados de las pesas patrón— provienen del catálogo levantado '
+      'por Métrica Ltda. en trabajos previos sobre este equipo, y su origen y '
+      'trazabilidad corresponden a Métrica Ltda.',
+      style: pw.TextStyle(fontSize: 9, color: _ink, lineSpacing: 2),
     ),
   ]);
 
@@ -247,6 +278,129 @@ Future<Uint8List> buildVerificationReport(
 String _withUnit(Object? value, String unit) {
   final text = _value(value, fallback: 'No informado');
   return text == 'No informado' ? text : '${_decimal(text)} $unit';
+}
+
+/// Croquis de la plataforma con las posiciones de ensayo y donde queda el
+/// indicador.
+///
+/// Reproduce el mismo dibujo que el operario vio al capturar. En un informe que
+/// se lee meses despues, "Posicion 3" no dice nada por si sola: hace falta ver
+/// donde se aplico la carga y desde donde se leia.
+///
+/// El lienzo del PDF tiene el origen abajo a la izquierda y la Y hacia arriba,
+/// al reves que la pantalla: las posiciones se declaran medidas desde arriba,
+/// como en la app, y se voltean al pintar.
+pw.Widget _eccentricityDiagram(ReportJson setup) {
+  const boxWidth = 250.0;
+  const boxHeight = 176.0;
+  final platform = _value(setup['platform'], fallback: 'square');
+  final indicator = _value(setup['indicatorPosition'], fallback: 'front');
+  final count = (setup['pointCount'] as num?)?.toInt() ?? 5;
+
+  final rectangular = platform == 'rectangular';
+  final width = rectangular ? 196.0 : 130.0;
+  final height = rectangular ? 98.0 : 130.0;
+  final left = (boxWidth - width) / 2;
+  final top = (boxHeight - height) / 2;
+
+  final positions = platform == 'triangular'
+      ? const [(0.5, 0.53), (0.5, 0.30), (0.66, 0.66), (0.34, 0.66)]
+      : count == 3
+      ? const [(0.5, 0.5), (0.22, 0.5), (0.78, 0.5)]
+      : count == 4
+      ? const [(0.5, 0.5), (0.69, 0.31), (0.5, 0.77), (0.31, 0.31)]
+      : const [
+          (0.5, 0.5),
+          (0.73, 0.27),
+          (0.73, 0.73),
+          (0.27, 0.73),
+          (0.27, 0.27),
+        ];
+
+  return pw.SizedBox(
+    width: boxWidth,
+    height: boxHeight,
+    child: pw.Stack(
+      children: [
+        pw.Positioned.fill(
+          child: pw.CustomPaint(
+            painter: (canvas, size) {
+              final bottom = size.y - top - height;
+              canvas
+                ..setStrokeColor(_blue)
+                ..setLineWidth(1.4);
+              if (platform == 'circular') {
+                canvas.drawEllipse(
+                  left + width / 2,
+                  bottom + height / 2,
+                  width / 2,
+                  height / 2,
+                );
+              } else if (platform == 'triangular') {
+                canvas
+                  ..moveTo(left + width / 2, bottom + height)
+                  ..lineTo(left + width, bottom)
+                  ..lineTo(left, bottom)
+                  ..closePath();
+              } else {
+                canvas.drawRRect(left, bottom, width, height, 6, 6);
+              }
+              canvas.strokePath();
+
+              // Donde se para quien lee la balanza.
+              final horizontal = indicator == 'left' || indicator == 'right';
+              final markerWidth = horizontal ? 6.0 : 34.0;
+              final markerHeight = horizontal ? 34.0 : 6.0;
+              final centerX = switch (indicator) {
+                'left' => left - 11,
+                'right' => left + width + 11,
+                _ => left + width / 2,
+              };
+              final centerY = switch (indicator) {
+                'back' => bottom + height + 11,
+                'front' => bottom - 11,
+                _ => bottom + height / 2,
+              };
+              canvas
+                ..setFillColor(_navy)
+                ..drawRRect(
+                  centerX - markerWidth / 2,
+                  centerY - markerHeight / 2,
+                  markerWidth,
+                  markerHeight,
+                  2,
+                  2,
+                )
+                ..fillPath();
+            },
+          ),
+        ),
+        for (var i = 0; i < positions.length; i++)
+          pw.Positioned(
+            left: left + positions[i].$1 * width - 10,
+            top: top + positions[i].$2 * height - 10,
+            child: pw.Container(
+              width: 20,
+              height: 20,
+              alignment: pw.Alignment.center,
+              decoration: pw.BoxDecoration(
+                color: i == 0 ? _navy : _paleBlue,
+                shape: pw.BoxShape.circle,
+                border: pw.Border.all(color: _blue, width: 0.8),
+              ),
+              child: pw.Text(
+                '${i + 1}',
+                style: pw.TextStyle(
+                  color: i == 0 ? PdfColors.white : _navy,
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 pw.Widget _pageHeader(pw.Context context, ReportJson equipment) => pw.Column(
@@ -351,14 +505,17 @@ pw.Widget _reportTitle(
   ),
 );
 
-pw.Widget _notice(String text, {PdfColor? color}) {
+/// Aviso destacado: regla de color a la izquierda sobre un fondo palido.
+///
+/// El fondo se pasa entero y no como el color de la regla con alfa: el visor de
+/// PDF no respeta la transparencia de un relleno y lo pintaba macizo, con lo
+/// que un parrafo largo quedaba en texto oscuro sobre rojo saturado.
+pw.Widget _notice(String text, {PdfColor? color, PdfColor? background}) {
   final ink = color ?? _blue;
   return pw.Container(
     padding: const pw.EdgeInsets.all(10),
     decoration: pw.BoxDecoration(
-      color: color == null
-          ? _paleBlue
-          : PdfColor(ink.red, ink.green, ink.blue, .1),
+      color: background ?? (color == null ? _paleBlue : _paleAmber),
       border: pw.Border(left: pw.BorderSide(color: ink, width: 3)),
     ),
     child: pw.Text(
@@ -585,6 +742,7 @@ List<pw.Widget> _testSection(ReportJson test, pw.Font chartFont) {
   final omitted = test['estado_ejecucion'] == 'omitted';
   final readings = _maps(test['readings']);
   final unit = _value(test['unidad'], fallback: '');
+  final setup = _map(test['setup']);
   final result = <pw.Widget>[
     _section(_testName(test['tipo'])),
     if (omitted)
@@ -607,6 +765,49 @@ List<pw.Widget> _testSection(ReportJson test, pw.Font chartFont) {
         ('Desviación estándar', _decimal(test['desviacion_estandar'])),
         ('Rango', _decimal(test['rango'])),
       ]),
+      // El croquis solo aparece si el registro guarda como se monto la prueba.
+      // Un expediente antiguo, anterior a la captura flexible, no lo trae: se
+      // omite en vez de dibujar una plataforma inventada.
+      if (test['tipo'] == 'eccentricity' && setup.isNotEmpty) ...[
+        pw.SizedBox(height: 13),
+        _subheading('Plataforma y posiciones de ensayo'),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _eccentricityDiagram(setup),
+            pw.SizedBox(width: 14),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _diagramFact(
+                    'Forma de la plataforma',
+                    _platformLabel(setup['platform']),
+                  ),
+                  _diagramFact(
+                    'Posiciones de ensayo',
+                    _value(setup['pointCount']),
+                  ),
+                  _diagramFact(
+                    'Ubicación del indicador',
+                    _indicatorLabel(setup['indicatorPosition']),
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'La posición 1 es la referencia central. La barra marca '
+                    'desde donde se lee el indicador.',
+                    style: pw.TextStyle(
+                      fontSize: 7.5,
+                      color: _muted,
+                      lineSpacing: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
       if (readings.isNotEmpty) ...[
         pw.SizedBox(height: 13),
         _subheading(_chartTitle(test['tipo'])),
@@ -625,6 +826,40 @@ List<pw.Widget> _testSection(ReportJson test, pw.Font chartFont) {
   ];
   return result;
 }
+
+/// Dato del croquis: rotulo pequeno encima del valor. En la columna estrecha
+/// que acompana al dibujo, la rejilla de dos columnas del resto del informe
+/// quedaria apretada.
+pw.Widget _diagramFact(String label, String value) => pw.Padding(
+  padding: const pw.EdgeInsets.only(bottom: 7),
+  child: pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Text(
+        label.toUpperCase(),
+        style: pw.TextStyle(fontSize: 6.5, color: _muted, letterSpacing: .4),
+      ),
+      pw.SizedBox(height: 1),
+      pw.Text(value, style: pw.TextStyle(fontSize: 9.5, color: _ink)),
+    ],
+  ),
+);
+
+String _platformLabel(Object? value) => switch (value?.toString()) {
+  'square' => 'Cuadrada',
+  'rectangular' => 'Rectangular',
+  'circular' => 'Circular',
+  'triangular' => 'Triangular',
+  _ => _value(value),
+};
+
+String _indicatorLabel(Object? value) => switch (value?.toString()) {
+  'front' => 'Al frente',
+  'back' => 'Atrás',
+  'left' => 'A la izquierda',
+  'right' => 'A la derecha',
+  _ => _value(value),
+};
 
 String _chartTitle(Object? type) => type == 'repeatability'
     ? 'Desviación de cada indicación respecto de la media'

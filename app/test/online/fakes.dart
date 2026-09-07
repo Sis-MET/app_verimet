@@ -297,6 +297,12 @@ final fixtureVerificationData = <String, dynamic>{
     {
       'tipo': 'eccentricity',
       'estado_ejecucion': 'executed',
+      // Como se monto la prueba: de aqui sale el croquis del informe.
+      'setup': {
+        'platform': 'square',
+        'pointCount': 5,
+        'indicatorPosition': 'front',
+      },
       'metodo_evaluacion': 'range',
       'metodo_codigo': 'EURAMET-CG18-V4-ECCENTRICITY',
       'unidad': 'kg',
