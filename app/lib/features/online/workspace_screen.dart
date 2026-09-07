@@ -63,7 +63,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         );
       }
     } catch (_) {
-      recoveryError = 'No se pudo recuperar la comprobación pendiente.';
+      recoveryError = 'No se pudo recuperar la verificación pendiente.';
     } finally {
       recovering = false;
       if (mounted) setState(() {});
@@ -248,7 +248,8 @@ class _Home extends StatelessWidget {
               ActionTile(
                 icon: Icons.add,
                 label: 'Nueva captura',
-                caption: 'Elige la balanza y empieza la comprobación interna',
+                caption:
+                    'Elige la balanza y empieza la verificación intermedia',
                 primary: true,
                 onTap: () => onSection(AppSection.verificar),
               ),
@@ -308,7 +309,7 @@ class _Home extends StatelessWidget {
           icon: Icons.shield_outlined,
         ),
         const Notice(
-          'Supabase calcula las comprobaciones internas con la configuración activa de cada balanza. Los resultados no son certificados de calibración ni verificaciones legales.',
+          'Supabase calcula las verificaciones intermedias con la configuración activa de cada balanza. Los resultados no son certificados de calibración ni verificaciones legales.',
         ),
       ],
     );

@@ -4,7 +4,7 @@
 
 Monorepo con la app movil Flutter, el backend principal en Supabase y los
 componentes de integracion con los servidores de Metrica. Permite a los
-clientes ejecutar y registrar comprobaciones de
+clientes ejecutar y registrar verificaciones intermedias de
 **excentricidad**, **repetibilidad** y **linealidad** sobre sus balanzas, entre
 calibraciones formales.
 
@@ -190,6 +190,24 @@ El detalle de firma y build para Play Store esta en
 
 ---
 
+## Vocabulario
+
+La app llama **verificación** a lo que hace, sin excepciones: se configuran
+verificaciones por balanza, se inician, se finalizan y quedan registradas.
+
+El sustantivo va calificado siempre que pueda confundirse. Lo que hace IvMET es
+una **verificación intermedia**: interna, privada y entre calibraciones
+formales. No es una **verificación legal** ni un certificado de calibración
+acreditada, y los avisos de las pantallas y del informe se apoyan en ese
+calificativo para distinguirlas.
+
+Hubo un segundo termino, "comprobación interna", para el acto en curso. Se
+retiró: dos palabras para lo mismo obligaban a elegir en cada texto nuevo, y la
+distinción real —intermedia frente a legal— la carga el calificativo, no el
+sustantivo.
+
+---
+
 ## Features
 
 La API organiza el dominio en estas features (`snake_case` en Dart,
@@ -227,7 +245,7 @@ borradores online, configuraciones internas versionadas, evidencia inmutable, al
 RLS y una outbox idempotente para el espejo SQL Server. El login por usuario y
 el cambio obligatorio de contraseña estan implementados como Edge Functions.
 
-La finalización de comprobaciones internas está implementada en Supabase con
+La finalización de verificaciones intermedias está implementada en Supabase con
 configuración guiada por balanza, perfiles internos versionados, trazabilidad,
 vencimientos por prueba y casos dorados. Flutter captura borradores y solicita la finalización sin
 calcular ni enviar veredictos. El alcance no es calibración acreditada ni

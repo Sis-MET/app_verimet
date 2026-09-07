@@ -171,11 +171,11 @@ void main() {
       expect(find.text('0001-01-001'), findsOneWidget);
       // La ficha abre por las acciones; el plan queda debajo del mosaico.
       await tester.scrollUntilVisible(
-        find.text('COMPROBACIONES ACTIVAS'),
+        find.text('VERIFICACIONES ACTIVAS'),
         220,
         scrollable: find.byType(Scrollable).last,
       );
-      expect(find.text('COMPROBACIONES ACTIVAS'), findsOneWidget);
+      expect(find.text('VERIFICACIONES ACTIVAS'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
@@ -361,7 +361,7 @@ void main() {
     await tester.ensureVisible(finalize);
     await tester.tap(finalize);
     await tester.pumpAndSettle();
-    expect(find.text('Finalizar comprobación interna'), findsWidgets);
+    expect(find.text('Finalizar verificación intermedia'), findsWidgets);
     await tester.tap(find.text('Finalizar'));
     await tester.pumpAndSettle();
     expect(find.text('Resultado guardado'), findsOneWidget);
@@ -503,7 +503,7 @@ void main() {
       );
       await tester.enterText(
         fieldLabeled('Observaciones'),
-        'Comprobación recuperada',
+        'Verificación recuperada',
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

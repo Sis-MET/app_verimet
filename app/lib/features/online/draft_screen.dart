@@ -23,7 +23,7 @@ class RecoveredDraftScreen extends StatelessWidget {
   final Json snapshot;
   @override
   Widget build(BuildContext context) => RemotePanel(
-    frameTitle: 'Recuperar comprobación',
+    frameTitle: 'Recuperar verificación',
     load: () => session.api.read('equipment', {
       'equipmentId': object(object(snapshot['bundle'])['equipment'])['id'],
     }),
@@ -85,13 +85,13 @@ class _DraftScreenState extends State<DraftScreen> {
     builder: (context, snapshot) {
       if (snapshot.hasData) return _DraftWizard(controller: snapshot.data!);
       return OnlinePage(
-        title: 'Recuperar comprobación',
+        title: 'Recuperar verificación',
         child: Center(
           child: snapshot.hasError
               ? const Padding(
                   padding: EdgeInsets.all(20),
                   child: Notice(
-                    'No se pudo abrir la recuperación local. Vuelve a abrir la comprobación; tus borradores se conservan.',
+                    'No se pudo abrir la recuperación local. Vuelve a abrir la verificación; tus borradores se conservan.',
                     alert: true,
                   ),
                 )
@@ -323,9 +323,9 @@ class _DraftWizardState extends State<_DraftWizard>
         context: context,
         useRootNavigator: false,
         builder: (context) => AlertDialog(
-          title: const Text('Finalizar comprobación interna'),
+          title: const Text('Finalizar verificación intermedia'),
           content: const Text(
-            'Se guardarán los datos y se calculará el resultado. La comprobación quedará privada y no se podrá editar. No equivale a una calibración acreditada ni a una verificación legal.',
+            'Se guardarán los datos y se calculará el resultado. La verificación intermedia quedará privada y no se podrá editar. No equivale a una calibración acreditada ni a una verificación legal.',
           ),
           actions: [
             TextButton(
@@ -357,7 +357,7 @@ class _DraftWizardState extends State<_DraftWizard>
       builder: (context) => AlertDialog(
         title: const Text('Resultado guardado'),
         content: Text(
-          '${verdictLabel(result['verdict'])} · $traceability. La comprobación permanece privada.',
+          '${verdictLabel(result['verdict'])} · $traceability. La verificación permanece privada.',
         ),
         actions: [
           FilledButton(
@@ -416,7 +416,7 @@ class _DraftWizardState extends State<_DraftWizard>
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Comprobación · ${customerEquipmentCode(capture.equipment)}',
+            'Verificación · ${customerEquipmentCode(capture.equipment)}',
           ),
         ),
         body: SafeArea(

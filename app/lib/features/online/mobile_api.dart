@@ -114,9 +114,9 @@ class MobileFailure implements Exception {
     'QUALITY_MANAGER_REQUIRED' =>
       'Esta operación corresponde al jefe de calidad de tu empresa.',
     'OFFICIAL_PROCEDURE_REQUIRED' =>
-      'El plan debe usar uno de los perfiles de comprobación interna controlados por IvMET.',
+      'El plan debe usar uno de los perfiles de verificación intermedia controlados por IvMET.',
     'NORMATIVE_PROFILE_REQUIRED' =>
-      'Selecciona un perfil de comprobación interna habilitado.',
+      'Selecciona un perfil de verificación intermedia habilitado.',
     'NORMATIVE_METHOD_REQUIRED' =>
       'La prueba no está disponible en el perfil seleccionado.',
     'NORMATIVE_METHOD_MISMATCH' =>
@@ -147,15 +147,15 @@ class MobileFailure implements Exception {
     'INVALID_CHECK_CONFIGURATION' =>
       'Revisa las pruebas y periodicidades seleccionadas.',
     'DUPLICATE_CHECK_TYPE' =>
-      'Cada tipo de comprobación solo puede aparecer una vez.',
+      'Cada tipo de verificación solo puede aparecer una vez.',
     'INVALID_CHECK_TOLERANCE' =>
-      'Cada comprobación necesita un límite mayor que cero.',
+      'Cada verificación necesita un límite mayor que cero.',
     'INVALID_CHECK_LOADS' => 'Revisa las cargas y el número de mediciones.',
     'CHECK_LOAD_OUT_OF_RANGE' => 'Una carga supera la capacidad de la balanza.',
     'EQUIPMENT_RANGES_REQUIRED' =>
       'La balanza no tiene capacidad y división válidas. Solicita revisar el catálogo.',
     'LEGACY_PLAN_MANAGEMENT_DISABLED' =>
-      'Configura las comprobaciones desde la ficha de cada balanza.',
+      'Configura las verificaciones desde la ficha de cada balanza.',
     'EXPLICIT_CONSENT_REQUIRED' =>
       'Revisa la información y confirma expresamente que deseas compartirla.',
     _ when status == 401 => 'La sesión venció. Ingresa nuevamente.',

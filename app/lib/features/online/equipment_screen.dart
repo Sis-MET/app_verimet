@@ -14,7 +14,7 @@ import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 
-/// Ficha de una balanza: sus datos, su plan de comprobacion y la vigencia de
+/// Ficha de una balanza: sus datos, su plan de verificacion y la vigencia de
 /// cada prueba.
 ///
 /// Es el segundo nivel del catalogo y desde aqui arrancan la captura, el
@@ -101,7 +101,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 ],
               ),
             ),
-            const SectionLabel('Comprobación'),
+            const SectionLabel('Verificación'),
             TileGrid(
               cells: [
                 TileCell.wide(
@@ -203,18 +203,18 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
             ),
             if (session.quality && ranges.isEmpty)
               const Notice(
-                'Faltan la capacidad y la división de escala. Solicita a Métrica revisar el catálogo antes de configurar las comprobaciones.',
+                'Faltan la capacidad y la división de escala. Solicita a Métrica revisar el catálogo antes de configurar las verificaciones.',
                 icon: Icons.warning_amber_outlined,
                 alert: true,
               ),
             if (plan == null)
               Notice(
                 session.quality
-                    ? 'Valida primero la ficha y configura las comprobaciones de esta balanza.'
-                    : 'El jefe de calidad todavía no configuró las comprobaciones de esta balanza.',
+                    ? 'Valida primero la ficha y configura las verificaciones de esta balanza.'
+                    : 'El jefe de calidad todavía no configuró las verificaciones de esta balanza.',
               )
             else ...[
-              const SectionLabel('Comprobaciones activas'),
+              const SectionLabel('Verificaciones activas'),
               SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

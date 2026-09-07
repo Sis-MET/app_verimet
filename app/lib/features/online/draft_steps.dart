@@ -114,7 +114,7 @@ class DraftSteps {
       ),
     ),
     const Notice(
-      'Los datos se guardan automáticamente. Un certificado vencido no aporta trazabilidad a la comprobación.',
+      'Los datos se guardan automáticamente. Un certificado vencido no aporta trazabilidad a la verificación.',
     ),
   ];
 
@@ -296,7 +296,7 @@ class DraftSteps {
     ),
     if (capture.completionIssue != null) Notice(capture.completionIssue!),
     const Notice(
-      'Comprobación interna y privada. No equivale a una calibración acreditada ni a una verificación legal.',
+      'Verificación intermedia, interna y privada. No equivale a una calibración acreditada ni a una verificación legal.',
       icon: Icons.shield_outlined,
     ),
     const SizedBox(height: 12),

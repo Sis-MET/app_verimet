@@ -177,7 +177,7 @@ class _EquipmentCheckConfigurationScreenState
 
   bool _selectedChecksAreValid() {
     if (checks.values.any((check) => check.enabled)) return true;
-    setState(() => error = 'Selecciona al menos una comprobación.');
+    setState(() => error = 'Selecciona al menos una verificación.');
     return false;
   }
 
@@ -309,7 +309,7 @@ class _EquipmentCheckConfigurationScreenState
       }
     },
     child: OnlinePage(
-      title: 'Configurar comprobaciones',
+      title: 'Configurar verificaciones',
       child: Form(
         key: form,
         child: Column(
@@ -398,7 +398,7 @@ class _EquipmentCheckConfigurationScreenState
       ),
       Text('Capacidad de referencia: ${largestRange['capacidad_max']} $unit'),
       const Notice(
-        'Selecciona las comprobaciones que necesita tu proceso. Puedes utilizar una periodicidad diferente para cada una.',
+        'Selecciona las verificaciones que necesita tu proceso. Puedes utilizar una periodicidad diferente para cada una.',
       ),
       for (final check in checks.values) _checkSelector(check),
     ],
@@ -557,7 +557,7 @@ class _EquipmentCheckConfigurationScreenState
       Notice(
         current == null
             ? 'Al activar, la configuración quedará disponible inmediatamente para esta balanza.'
-            : 'Al guardar, IvMET activará una nueva versión sin modificar las comprobaciones anteriores.',
+            : 'Al guardar, IvMET activará una nueva versión sin modificar las verificaciones anteriores.',
         icon: Icons.verified_outlined,
       ),
     ],

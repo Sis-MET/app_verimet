@@ -242,7 +242,7 @@ class MobileSession extends ChangeNotifier {
     _checking = false;
     stage = disconnected ? SessionStage.offline : SessionStage.suspended;
     error = disconnected
-        ? 'Sin conexión. El contenido está protegido hasta validar el acceso. Las comprobaciones conservan su borrador en este dispositivo.'
+        ? 'Sin conexión. El contenido está protegido hasta validar el acceso. Las verificaciones conservan su borrador en este dispositivo.'
         : null;
     _notify();
   }

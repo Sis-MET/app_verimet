@@ -98,7 +98,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             const Notice(
-              'Resultado de una comprobación interna. No constituye certificado de calibración ni verificación legal.',
+              'Resultado de una verificación intermedia. No constituye certificado de calibración ni verificación legal.',
               icon: Icons.science_outlined,
             ),
             const SizedBox(height: 12),

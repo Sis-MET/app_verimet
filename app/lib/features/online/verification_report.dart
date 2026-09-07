@@ -124,7 +124,7 @@ Future<Uint8List> buildVerificationReport(
     title: 'Informe de verificación intermedia - $reportId',
     author: 'IvMET',
     creator: 'IvMET',
-    subject: 'Resultado histórico de comprobación metrológica interna',
+    subject: 'Resultado histórico de verificación metrológica intermedia',
     keywords: 'IvMET, verificación intermedia, balanza, metrología',
   );
 
@@ -132,7 +132,7 @@ Future<Uint8List> buildVerificationReport(
     _reportTitle(verification, equipment, reportId),
     pw.SizedBox(height: 14),
     _notice(
-      'Este documento informa una comprobación metrológica interna. No es un '
+      'Este documento informa una verificación metrológica intermedia. No es un '
       'certificado de calibración ni una verificación legal.',
     ),
     pw.SizedBox(height: 14),

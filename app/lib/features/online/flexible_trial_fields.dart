@@ -349,7 +349,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
       ),
       if (setup['source'] != 'standard')
         const Notice(
-          'La masa declarada de productos o cargas de trabajo se conserva como referencia de la comprobación interna, sin trazabilidad certificada.',
+          'La masa declarada de productos o cargas de trabajo se conserva como referencia de la verificación intermedia, sin trazabilidad certificada.',
         ),
       if (type == 'eccentricity') ...[
         select(

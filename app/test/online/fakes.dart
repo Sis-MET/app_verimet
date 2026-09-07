@@ -155,7 +155,7 @@ const fixtureNormativeBundle = {
     'engineVersion': 'ivmet-internal-1.0.0',
     'claimScope': 'INTERNAL_CHECK_ONLY',
     'notice':
-        'Comprobación interna. No constituye calibración acreditada ni verificación legal.',
+        'Verificación intermedia. No constituye calibración acreditada ni verificación legal.',
     'finalizationEnabled': true,
     'tests': [
       {
