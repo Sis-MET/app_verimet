@@ -25,6 +25,7 @@ class MemoryDraftStore implements DraftRecoveryStore {
 class MemoryTokens implements TokenStorage {
   String? access;
   String? refresh;
+  String? owner;
   @override
   Future<String?> readAccessToken() async => access;
   @override
@@ -39,9 +40,16 @@ class MemoryTokens implements TokenStorage {
   }
 
   @override
+  Future<String?> readRecoveryOwner() async => owner;
+
+  @override
+  Future<void> saveRecoveryOwner(String value) async => owner = value;
+
+  @override
   Future<void> clear() async {
     access = null;
     refresh = null;
+    owner = null;
   }
 }
 

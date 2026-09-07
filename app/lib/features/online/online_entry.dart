@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/widgets/labeled_field.dart';
 import 'mobile_api.dart';
+import 'offline_recovery.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'workspace_screen.dart';
@@ -169,6 +170,14 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
         content = const Scaffold(
           key: ValueKey('starting'),
           body: Center(child: CircularProgressIndicator()),
+        );
+      } else if (session.stage == SessionStage.offline &&
+          session.offlineDrafts.isNotEmpty) {
+        // Sin poder validar la sesion no se entra a la app, pero tampoco se
+        // deja al operario mirando un muro con su captura dentro del telefono.
+        content = KeyedSubtree(
+          key: const ValueKey('offline-recovery'),
+          child: OfflineRecoveryScreen(session: session),
         );
       } else {
         content = KeyedSubtree(

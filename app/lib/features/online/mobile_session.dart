@@ -52,12 +52,40 @@ class MobileSession extends ChangeNotifier {
   final MobileApi api;
   final DraftRecovery recovery;
   final bool _ownsRecovery;
+
+  /// Dueno anotado en la ultima sesion validada de este dispositivo.
+  ///
+  /// Solo se usa cuando no hay usuario resuelto, que es lo que ocurre al abrir
+  /// la app sin senal. Se llena en [_loadOfflineDrafts] y se vacia al cerrar
+  /// sesion, a la vez que el dueno guardado en el almacen seguro.
+  String? _offlineOwner;
+
+  /// Clave de los borradores de este dispositivo.
+  ///
+  /// Se calcula con el usuario, que viene del servidor. Sin senal no hay
+  /// usuario, y sin esta clave no se podria ni abrir ni seguir guardando lo que
+  /// el operario ya escribio: por eso cae al dueno de la ultima sesion
+  /// validada, que es el mismo valor.
   String get recoveryOwner {
-    if (user == null) {
-      throw StateError('Recovery requires an authenticated user');
+    final current = user;
+    if (current != null) {
+      return jsonEncode([
+        api.configuration.url,
+        current['clientId'],
+        current['id'],
+      ]);
     }
-    return jsonEncode([api.configuration.url, user!['clientId'], user!['id']]);
+    final stored = _offlineOwner;
+    if (stored != null) return stored;
+    throw StateError('Recovery requires an authenticated user');
   }
+
+  /// Borradores de este dispositivo cuando no hay sesion validada.
+  ///
+  /// Se llena solo si el servidor no se pudo consultar. Nunca si denego el
+  /// acceso: un 401 cierra la sesion y borra el dueno guardado, asi que quien
+  /// perdio el acceso no llega aqui.
+  List<Json> offlineDrafts = const [];
 
   SessionStage stage = SessionStage.starting;
   Json? user;
@@ -160,6 +188,10 @@ class MobileSession extends ChangeNotifier {
         bootstrap = data;
         error = null;
         stage = SessionStage.ready;
+        offlineDrafts = const [];
+        // Con el usuario ya resuelto se puede anotar quien es el dueno de los
+        // borradores, para poder encontrarlos la proxima vez que no haya red.
+        unawaited(api.storage.saveRecoveryOwner(recoveryOwner));
       }
       if (stage != SessionStage.ready) bootstrap = {};
     } catch (failure) {
@@ -170,9 +202,12 @@ class MobileSession extends ChangeNotifier {
       if (failure is MobileFailure && failure.unauthorized) {
         await api.clear();
         user = null;
+        offlineDrafts = const [];
+        _offlineOwner = null;
         stage = SessionStage.login;
       } else {
         stage = SessionStage.offline;
+        await _loadOfflineDrafts();
       }
       if (stage == SessionStage.login) bootstrap = {};
     } finally {
@@ -180,6 +215,24 @@ class MobileSession extends ChangeNotifier {
         _checking = false;
         _notify();
       }
+    }
+  }
+
+  /// Busca en el disco lo que el operario dejo a medias, con el dueno anotado
+  /// en la ultima sesion validada.
+  ///
+  /// Es de solo lectura y no habilita la app: quien decide que se puede hacer
+  /// con esto es la pantalla de recuperacion.
+  Future<void> _loadOfflineDrafts() async {
+    if (user != null || !api.hasSession) return;
+    try {
+      final owner = await api.storage.readRecoveryOwner();
+      if (owner == null) return;
+      offlineDrafts = await recovery.list(owner);
+      _offlineOwner = owner;
+    } catch (_) {
+      offlineDrafts = const [];
+      _offlineOwner = null;
     }
   }
 
@@ -204,6 +257,8 @@ class MobileSession extends ChangeNotifier {
     _checking = false;
     user = null;
     bootstrap = {};
+    offlineDrafts = const [];
+    _offlineOwner = null;
     stage = SessionStage.login;
     error = null;
     workspaceVersion++;

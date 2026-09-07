@@ -510,4 +510,60 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('sin señal, un arranque en frío devuelve la captura sin enviar', (
+    tester,
+  ) async {
+    final server = FixtureServer()..bundle = fixtureWizardBundle;
+    final session = MobileSession(server.api, recovery: server.recovery);
+    await tester.runAsync(() => session.login('operador', 'fixture-password'));
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DraftScreen(session: session, bundle: fixtureWizardBundle),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(fieldLabeled('Temperatura (°C)'), '23,125');
+    await tester.pumpAndSettle();
+
+    // El operario cierra la app con la captura a medias y se queda sin
+    // cobertura: al volver, la sesion no se puede validar contra Supabase.
+    await tester.pumpWidget(const SizedBox());
+    session.dispose();
+    server.online = false;
+    await start(tester, server);
+
+    // Antes veia la pantalla de acceso bloqueada, con su trabajo intacto en
+    // el mismo telefono.
+    expect(find.text('Acceso a IvMET'), findsNothing);
+    expect(find.text('Tienes 1 captura sin enviar'), findsOneWidget);
+
+    // Y puede volver a ella y seguir capturando, sin red.
+    await tester.tap(find.text('BAL-014'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tienes 1 captura sin enviar'), findsNothing);
+    expect(find.text('Paso 1 de 5'), findsOneWidget);
+    final temperature = fieldLabeled('Temperatura (°C)');
+    expect(
+      tester.widget<TextFormField>(temperature).controller!.text,
+      '23,125',
+    );
+    await tester.enterText(temperature, '23,500');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('sin borradores locales, sin señal se sigue bloqueando', (
+    tester,
+  ) async {
+    final server = FixtureServer()..online = false;
+    await start(tester, server);
+    // No hay dueno anotado —nunca hubo sesion validada en este dispositivo—
+    // asi que no hay nada que devolver.
+    expect(find.text('Tienes 1 captura sin enviar'), findsNothing);
+  });
 }

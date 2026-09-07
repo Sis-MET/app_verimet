@@ -40,22 +40,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     child: RemotePanel(
       dataKey: '$page|$revision',
       load: () async {
-        final data = await widget.session.api.read(
-          widget.drafts ? 'drafts' : 'history',
-          {'page': page, 'equipmentId': widget.equipmentId},
-        );
-        if (widget.drafts) {
-          data['localDrafts'] =
-              (await widget.session.recovery.list(widget.session.recoveryOwner))
-                  .where(
-                    (d) =>
-                        widget.equipmentId == null ||
-                        object(object(d['bundle'])['equipment'])['id'] ==
-                            widget.equipmentId,
-                  )
-                  .toList();
+        // Lo local va primero y por separado: leia despues del servidor, sin
+        // proteger, asi que un fallo de red se llevaba por delante la lista de
+        // borradores que estaban en este mismo dispositivo.
+        final local = widget.drafts ? await _localDrafts() : const <Json>[];
+        try {
+          final data = await widget.session.api.read(
+            widget.drafts ? 'drafts' : 'history',
+            {'page': page, 'equipmentId': widget.equipmentId},
+          );
+          if (widget.drafts) data['localDrafts'] = local;
+          return data;
+        } catch (_) {
+          if (local.isEmpty) rethrow;
+          return {'items': <Json>[], 'total': 0, 'localDrafts': local};
         }
-        return data;
       },
       builder: (data) {
         final items = objects(data['items']);
@@ -147,6 +146,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
       },
     ),
   );
+
+  Future<List<Json>> _localDrafts() async {
+    try {
+      final drafts = await widget.session.recovery.list(
+        widget.session.recoveryOwner,
+      );
+      return drafts
+          .where(
+            (d) =>
+                widget.equipmentId == null ||
+                object(object(d['bundle'])['equipment'])['id'] ==
+                    widget.equipmentId,
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   Future<void> _open(Json item) async {
     if (widget.drafts) {

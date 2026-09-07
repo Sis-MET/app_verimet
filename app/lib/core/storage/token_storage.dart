@@ -14,6 +14,16 @@ abstract interface class TokenStorage {
     required String refreshToken,
   });
   Future<void> clear();
+
+  /// Dueno de los borradores locales de la ultima sesion validada.
+  ///
+  /// `MobileSession.recoveryOwner` se calcula con el usuario, que viene del
+  /// servidor: sin senal no hay usuario y no se podria localizar en el disco lo
+  /// que el operario ya escribio. Se guarda aqui, junto al token y con su misma
+  /// vida: al cerrar sesion se borra, para que quien entre despues no vea los
+  /// borradores del anterior.
+  Future<String?> readRecoveryOwner();
+  Future<void> saveRecoveryOwner(String owner);
 }
 
 class SecureTokenStorage implements TokenStorage {
@@ -62,8 +72,19 @@ class SecureTokenStorage implements TokenStorage {
   }
 
   @override
+  Future<String?> readRecoveryOwner() =>
+      _storage.read(key: StorageKeys.recoveryOwner);
+
+  @override
+  Future<void> saveRecoveryOwner(String owner) =>
+      _storage.write(key: StorageKeys.recoveryOwner, value: owner);
+
+  // Va en su propia clave y no en el registro de tokens: ese se reescribe
+  // entero en cada rotacion del refresh, a proposito, para no mezclar pares.
+  @override
   Future<void> clear() async {
     await _storage.delete(key: _sessionKey);
+    await _storage.delete(key: StorageKeys.recoveryOwner);
     await _storage.delete(key: StorageKeys.accessToken);
     await _storage.delete(key: StorageKeys.refreshToken);
     await _storage.delete(key: StorageKeys.userId);
