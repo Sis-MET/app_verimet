@@ -107,11 +107,11 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 TileCell.wide(
                   ActionTile(
                     icon: Icons.play_arrow,
-                    label: 'Iniciar comprobación',
+                    label: 'Iniciar verificación',
                     caption: canStart
                         ? 'Capturar lecturas con la configuración activa'
                         : validated
-                        ? 'La configuración todavía no habilita el cálculo'
+                        ? 'La configuración todavía no habilita el cálculo de resultados'
                         : 'Valida antes la ficha de la balanza',
                     primary: canStart,
                     onTap: canStart
