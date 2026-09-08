@@ -260,7 +260,7 @@ Future<Uint8List> buildVerificationReport(
   document.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(34, 44, 34, 38),
+      margin: const pw.EdgeInsets.fromLTRB(34, 44, 34, 58),
       maxPages: 80,
       theme: pw.ThemeData.withFont(
         base: regularFont,
@@ -268,7 +268,17 @@ Future<Uint8List> buildVerificationReport(
         italic: italicFont,
       ),
       header: (context) => _pageHeader(context, equipment),
-      footer: _pageFooter,
+      footer: (context) => _pageFooter(
+        context,
+        reportId: reportId,
+        equipmentCode: _value(
+          equipment['cod_interno'] ?? equipment['cod_metrica'],
+          fallback: 'sin código',
+        ),
+        generated: generated,
+        measuredAt: verification['realizado_at'],
+        generatedBy: generatedBy,
+      ),
       build: (_) => widgets,
     ),
   );
@@ -427,26 +437,65 @@ pw.Widget _pageHeader(pw.Context context, ReportJson equipment) => pw.Column(
   ],
 );
 
-pw.Widget _pageFooter(pw.Context context) => pw.Column(
-  mainAxisSize: pw.MainAxisSize.min,
-  children: [
-    pw.Divider(height: 1, color: _line),
-    pw.SizedBox(height: 5),
-    pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(
-          'Documento de uso interno',
-          style: pw.TextStyle(color: _muted, fontSize: 7.5),
-        ),
-        pw.Text(
-          'Página ${context.pageNumber} de ${context.pagesCount}',
-          style: pw.TextStyle(color: _muted, fontSize: 7.5),
-        ),
-      ],
-    ),
-  ],
-);
+/// Pie de pagina: lo que hay que saber si esta hoja se separa del resto.
+///
+/// Un informe impreso se fotocopia, se escanea suelto y se adjunta a un correo
+/// por paginas. Cada una tiene que poder responder sola tres preguntas: que
+/// vale este papel, de que verificacion sale y quien lo saco.
+///
+/// Por eso la advertencia legal se repite en todas y no solo en la portada:
+/// una hoja intermedia, con su tabla de lecturas y su grafico, es justo la que
+/// se puede confundir con un certificado.
+pw.Widget _pageFooter(
+  pw.Context context, {
+  required String reportId,
+  required String equipmentCode,
+  required DateTime generated,
+  required Object? measuredAt,
+  String? generatedBy,
+}) {
+  final origin = [
+    'Verificación $reportId',
+    'Balanza $equipmentCode',
+    'Medición ${_date(measuredAt, time: false)}',
+    'Documento generado el '
+        '${DateFormat("dd/MM/yyyy 'a las' HH:mm").format(generated.toLocal())}',
+    if (generatedBy != null && generatedBy.trim().isNotEmpty)
+      'por $generatedBy',
+  ].join(' · ');
+
+  return pw.Column(
+    mainAxisSize: pw.MainAxisSize.min,
+    children: [
+      pw.Divider(height: 1, color: _line),
+      pw.SizedBox(height: 4),
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            child: pw.Text(
+              'Sin validez legal. No es un certificado de calibración ni una '
+              'verificación reglamentaria, y no acredita el funcionamiento de '
+              'la balanza ante IBMETRO.',
+              style: pw.TextStyle(color: _red, fontSize: 7, lineSpacing: 1),
+            ),
+          ),
+          pw.SizedBox(width: 14),
+          pw.Text(
+            'Página ${context.pageNumber} de ${context.pagesCount}',
+            style: pw.TextStyle(color: _ink, fontSize: 7.5),
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 3),
+      pw.Text(
+        origin,
+        maxLines: 2,
+        style: pw.TextStyle(color: _muted, fontSize: 6.5, lineSpacing: 1),
+      ),
+    ],
+  );
+}
 
 pw.Widget _reportTitle(
   ReportJson verification,
