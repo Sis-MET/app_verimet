@@ -51,18 +51,26 @@ void main() {
   test(
     'un expediente sin setup no dibuja croquis y sigue generandose',
     () async {
-      final data = Map<String, dynamic>.from(fixtureVerificationData);
-      data['tests'] = [
-        for (final test in fixtureVerificationData['tests'] as List)
-          {
-            for (final entry in (test as Map).entries)
-              if (entry.key != 'setup') entry.key: entry.value,
-          },
-      ];
-      final bytes = await buildVerificationReport(data);
+      final bytes = await buildVerificationReport(_withEccentricitySnapshot());
       expect(ascii.decode(bytes.take(4).toList()), '%PDF');
     },
   );
+
+  // Los tests de arriba solo prueban que el PDF sale. Este prueba que el
+  // croquis esta: con el mismo expediente y la misma fecha, lo unico que
+  // cambia es el montaje, y si el croquis se dibuja el documento crece.
+  test('dibuja el croquis con el montaje que devuelve Supabase', () async {
+    final generatedAt = DateTime.utc(2026, 9, 4, 16);
+    final withSetup = await buildVerificationReport(
+      fixtureVerificationData,
+      generatedAt: generatedAt,
+    );
+    final withoutSetup = await buildVerificationReport(
+      _withEccentricitySnapshot(),
+      generatedAt: generatedAt,
+    );
+    expect(withSetup.length, greaterThan(withoutSetup.length + 1000));
+  });
 }
 
 /// Copia del expediente con otro montaje de excentricidad.
@@ -70,17 +78,28 @@ Map<String, dynamic> _withEccentricitySetup(
   String platform,
   int points,
   String indicator,
-) {
+) => _withEccentricitySnapshot(
+  setup: {
+    'platform': platform,
+    'pointCount': points,
+    'indicatorPosition': indicator,
+  },
+);
+
+/// Copia del expediente cuya prueba de excentricidad guarda [setup] en su
+/// evaluacion congelada, o no guarda montaje, como un registro anterior a la
+/// captura flexible.
+Map<String, dynamic> _withEccentricitySnapshot({Map<String, Object>? setup}) {
   final data = Map<String, dynamic>.from(fixtureVerificationData);
   data['tests'] = [
     for (final test in fixtureVerificationData['tests'] as List)
       if ((test as Map)['tipo'] == 'eccentricity')
         {
           ...test,
-          'setup': {
-            'platform': platform,
-            'pointCount': points,
-            'indicatorPosition': indicator,
+          'evaluacion_snapshot': {
+            'claimScope': 'INTERNAL_CHECK_ONLY',
+            'engineVersion': 'ivmet-internal-2.0.0',
+            'setup': ?setup,
           },
         }
       else

@@ -297,11 +297,23 @@ final fixtureVerificationData = <String, dynamic>{
     {
       'tipo': 'eccentricity',
       'estado_ejecucion': 'executed',
-      // Como se monto la prueba: de aqui sale el croquis del informe.
-      'setup': {
-        'platform': 'square',
-        'pointCount': 5,
-        'indicatorPosition': 'front',
+      // Tal como lo devuelve `ivmet_mobile_read('verification')`: el montaje
+      // viaja dentro de la evaluacion congelada. De aqui sale el croquis.
+      'evaluacion_snapshot': {
+        'claimScope': 'INTERNAL_CHECK_ONLY',
+        'engineVersion': 'ivmet-internal-2.0.0',
+        'setup': {
+          'source': 'standard',
+          'description': '',
+          'notes': '',
+          'platform': 'square',
+          'indicatorPosition': 'front',
+          'groupCount': 1,
+          'measurementCount': 3,
+          'pointCount': 5,
+          'loadingMethod': 'none',
+          'substitutionMethod': 'none',
+        },
       },
       'metodo_evaluacion': 'range',
       'metodo_codigo': 'EURAMET-CG18-V4-ECCENTRICITY',

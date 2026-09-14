@@ -473,6 +473,9 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       assert.equal(repeatResult.media, null, 'no meaningless average across different loads');
       assert.deepEqual(repeatResult.evaluacion_snapshot.groups.map(g => Number(g.mean)), [10,80]);
       assert.equal(evidence.find(e => e.tipo === 'eccentricity').valor_metrica, '0.100000000');
+      const eccentricityDetail = (await read('verification', { id: result.id })).tests.find(t => t.tipo === 'eccentricity');
+      assert.deepEqual(eccentricityDetail.evaluacion_snapshot.setup, setupOf(),
+        'the PDF report draws the platform from the setup inside the evaluation snapshot');
 
       const substituted = structuredClone(contentV2);
       const linear = substituted.tests[0];

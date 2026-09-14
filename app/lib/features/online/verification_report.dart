@@ -791,7 +791,9 @@ List<pw.Widget> _testSection(ReportJson test, pw.Font chartFont) {
   final omitted = test['estado_ejecucion'] == 'omitted';
   final readings = _maps(test['readings']);
   final unit = _value(test['unidad'], fallback: '');
-  final setup = _map(test['setup']);
+  // Supabase guarda el montaje dentro de la evaluacion congelada, junto a la
+  // version del motor; la fila de la prueba no lo trae suelto.
+  final setup = _map(_map(test['evaluacion_snapshot'])['setup']);
   final result = <pw.Widget>[
     _section(_testName(test['tipo'])),
     if (omitted)
