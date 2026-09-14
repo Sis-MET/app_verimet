@@ -5,6 +5,7 @@ import 'package:ivmet/core/domain/test_verdict.dart';
 import 'package:ivmet/features/online/online_widgets.dart';
 import 'package:ivmet/shared/widgets/app_shell.dart';
 import 'package:ivmet/shared/widgets/labeled_field.dart';
+import 'package:ivmet/shared/widgets/numeric_keypad.dart';
 import 'package:ivmet/shared/widgets/section_label.dart';
 import 'package:ivmet/shared/widgets/segmented_pills.dart';
 import 'package:ivmet/shared/widgets/status_tag.dart';
@@ -225,6 +226,18 @@ void main() {
     );
   });
 
+  testWidgets('teclado numérico de lecturas', (tester) async {
+    // Con el campo enfocado el cursor parpadearia entre fotografias.
+    EditableText.debugDeterministicCursor = true;
+    addTearDown(() => EditableText.debugDeterministicCursor = false);
+    await expectSpecimen(
+      tester,
+      name: 'teclado',
+      size: const Size(400, 400),
+      child: const _KeypadSpecimen(),
+    );
+  });
+
   testWidgets('barra de navegación', (tester) async {
     await expectSpecimen(
       tester,
@@ -236,4 +249,48 @@ void main() {
       ),
     );
   });
+}
+
+/// Campo de lectura enfocado con el teclado abierto, como en la captura.
+class _KeypadSpecimen extends StatefulWidget {
+  const _KeypadSpecimen();
+
+  @override
+  State<_KeypadSpecimen> createState() => _KeypadSpecimenState();
+}
+
+class _KeypadSpecimenState extends State<_KeypadSpecimen> {
+  final keypad = NumericKeypadController();
+  final reading = TextEditingController(text: '-0,02');
+
+  @override
+  void dispose() {
+    keypad.dispose();
+    reading.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => NumericKeypadScope(
+    controller: keypad,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LabeledInput(
+          label: 'Indicación (kg)',
+          child: KeypadInput(
+            controller: reading,
+            builder: (context, keypadFocus) => TextField(
+              controller: reading,
+              focusNode: keypadFocus,
+              autofocus: true,
+              keyboardType: TextInputType.none,
+            ),
+          ),
+        ),
+        const Spacer(),
+        NumericKeypad(controller: keypad),
+      ],
+    ),
+  );
 }

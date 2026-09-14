@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/numeric_keypad.dart';
 import 'draft_controller.dart';
 import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
@@ -54,6 +55,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
     bool readOnly = false,
     int? maxLength,
     Widget? suffixIcon,
+    bool negative = true,
   }) {
     final controller = fields.putIfAbsent(
       id,
@@ -74,37 +76,50 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
         }
       });
     }
+    void edited(String text) {
+      update(text);
+      changed();
+    }
+
+    Widget input(FocusNode? keypadFocus) => TextFormField(
+      key: ValueKey(id),
+      controller: controller,
+      focusNode: keypadFocus,
+      enabled: !locked,
+      readOnly: readOnly,
+      maxLength: maxLength,
+      keyboardType: keypadFocus != null
+          ? TextInputType.none
+          : number
+          ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+          : TextInputType.text,
+      decoration: InputDecoration(
+        helperText: hint,
+        helperMaxLines: 3,
+        suffixIcon: suffixIcon,
+      ),
+      validator: (text) => required && (text ?? '').trim().isEmpty
+          ? 'Completa este dato.'
+          : number
+          ? decimalError(text)
+          : null,
+      onChanged: edited,
+    );
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: LabeledInput(
         label: label,
-        child: TextFormField(
-          key: ValueKey(id),
-          controller: controller,
-          enabled: !locked,
-          readOnly: readOnly,
-          maxLength: maxLength,
-          keyboardType: number
-              ? const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
-                )
-              : TextInputType.text,
-          decoration: InputDecoration(
-            helperText: hint,
-            helperMaxLines: 3,
-            suffixIcon: suffixIcon,
-          ),
-          validator: (text) => required && (text ?? '').trim().isEmpty
-              ? 'Completa este dato.'
-              : number
-              ? decimalError(text)
-              : null,
-          onChanged: (text) {
-            update(text);
-            changed();
-          },
-        ),
+        // Las lecturas de las tres pruebas van con el teclado propio: el del
+        // sistema cambia de un fabricante a otro. Los textos siguen con el suyo.
+        child: number
+            ? KeypadInput(
+                controller: controller,
+                allowNegative: negative,
+                onChanged: edited,
+                builder: (context, keypadFocus) => input(keypadFocus),
+              )
+            : input(null),
       ),
     );
   }
@@ -195,6 +210,7 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
           'Carga utilizada ($unit)',
           update,
           required: true,
+          negative: false,
           hint: rawHint.isEmpty
               ? null
               : 'Sugerida: $hint $unit. Puedes utilizar otra carga.',

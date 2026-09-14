@@ -8,6 +8,7 @@ import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/trial_capture.dart';
 import 'package:ivmet/shared/theme/app_theme.dart';
+import 'package:ivmet/shared/widgets/numeric_keypad.dart';
 
 import 'fakes.dart';
 
@@ -269,6 +270,120 @@ void main() {
       controllers.remove(c);
     },
   );
+
+  for (final (type, step, name) in const [
+    ('eccentricity', 1, 'excentricidad'),
+    ('repeatability', 2, 'repetibilidad'),
+    ('linearity', 3, 'linealidad'),
+  ]) {
+    testWidgets(
+      '$name se escribe con el teclado propio: coma, signo y siguiente',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        // Con un campo enfocado el cursor parpadea con un temporizador y
+        // pumpAndSettle no terminaria nunca.
+        EditableText.debugDeterministicCursor = true;
+        addTearDown(() => EditableText.debugDeterministicCursor = false);
+        final c = create();
+        final id = activeReadings(c.testInput(type)).first['pointId'];
+        await tester.runAsync(() => c.goTo(step));
+        c.dispose();
+        controllers.remove(c);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: DraftScreen(session: session, bundle: server.bundle),
+          ),
+        );
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle();
+
+        Finder editable(String field) => find.descendant(
+          of: find.byKey(ValueKey('$id:$field')),
+          matching: find.byType(EditableText),
+        );
+        Future<void> press(String key) async {
+          await tester.tap(find.byKey(ValueKey('keypad-$key')));
+          await tester.pump();
+        }
+
+        Future<void> focus(Finder field) async {
+          await tester.ensureVisible(field);
+          await tester.pumpAndSettle();
+          await tester.tap(field);
+          await tester.pumpAndSettle();
+        }
+
+        final indication = find.byKey(ValueKey('$id:indication'));
+        await focus(indication);
+        // El sistema recibe TextInputType.none: no abre su teclado.
+        expect(
+          object(tester.testTextInput.setClientArgs!['inputType'])['name'],
+          'TextInputType.none',
+        );
+        expect(find.byType(NumericKeypad), findsOneWidget);
+        expect(find.text('Guardar y salir'), findsNothing);
+
+        for (final key in ['1', 'comma', '5', 'sign']) {
+          await press(key);
+        }
+        expect(
+          tester.widget<EditableText>(editable('indication')).controller.text,
+          '-1,5',
+        );
+
+        // Lo tecleado llega al borrador igual que con el teclado del sistema.
+        final capture = tester
+            .widget<FlexibleTrialFields>(find.byType(FlexibleTrialFields))
+            .capture;
+        expect(
+          activeReadings(capture.testInput(type)).first['indication'],
+          '-1,5',
+        );
+        expect(capture.dirty, true);
+
+        await press('next');
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<EditableText>(editable('zero')).focusNode.hasFocus,
+          true,
+        );
+
+        // La carga no admite negativos: el signo se apaga.
+        await focus(find.byKey(ValueKey('$id:load')));
+        expect(
+          tester
+              .widget<InkWell>(
+                find.descendant(
+                  of: find.byKey(const ValueKey('keypad-sign')),
+                  matching: find.byType(InkWell),
+                ),
+              )
+              .onTap,
+          isNull,
+        );
+
+        await press('done');
+        await tester.pumpAndSettle();
+        expect(find.byType(NumericKeypad), findsNothing);
+        expect(find.text('Guardar y salir'), findsOneWidget);
+
+        // Atrás cierra primero el teclado y no sale del paso.
+        await focus(indication);
+        expect(find.byType(NumericKeypad), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(NumericKeypad), findsNothing);
+        expect(find.byKey(ValueKey('$id:indication')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
 
   testWidgets(
     'linearity omits loading and substitution methods in capture and summary',

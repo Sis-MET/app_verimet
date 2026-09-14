@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
+import '../../shared/widgets/numeric_keypad.dart';
 import '../../shared/widgets/section_label.dart';
 import 'draft_controller.dart';
 import 'draft_steps.dart';
@@ -124,6 +125,10 @@ class _DraftWizardState extends State<_DraftWizard>
     onSaveDraft: _save,
   );
   late ScrollController scroll;
+
+  /// Teclado numerico propio de las lecturas. Mientras escribe ocupa el sitio
+  /// de la barra de pasos.
+  final keypad = NumericKeypadController();
   bool navigating = false;
   bool allowPop = false;
   bool restoringScroll = false;
@@ -202,6 +207,7 @@ class _DraftWizardState extends State<_DraftWizard>
     capture.removeListener(_updated);
     capture.dispose();
     scroll.dispose();
+    keypad.dispose();
     for (final field in fields.values) {
       field.dispose();
     }
@@ -407,6 +413,11 @@ class _DraftWizardState extends State<_DraftWizard>
       canPop: allowPop,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || navigating) return;
+        // Atras primero cierra el teclado, como con el del sistema.
+        if (keypad.visible) {
+          keypad.close();
+          return;
+        }
         if (step > 0 && !capture.locked) {
           unawaited(_go(step - 1));
         } else {
@@ -420,214 +431,231 @@ class _DraftWizardState extends State<_DraftWizard>
           ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              ClipRect(
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment.topCenter,
-                  child: headerHidden
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          key: const ValueKey('draft-step-header'),
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  for (var index = 0; index < 5; index++) ...[
-                                    if (index > 0)
-                                      Expanded(
-                                        child: Divider(
-                                          color: index <= step
-                                              ? palette.accentInk
-                                              : palette.track,
+          child: NumericKeypadScope(
+            controller: keypad,
+            child: Column(
+              children: [
+                ClipRect(
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: headerHidden
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            key: const ValueKey('draft-step-header'),
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    for (var index = 0; index < 5; index++) ...[
+                                      if (index > 0)
+                                        Expanded(
+                                          child: Divider(
+                                            color: index <= step
+                                                ? palette.accentInk
+                                                : palette.track,
+                                          ),
+                                        ),
+                                      Semantics(
+                                        selected: index == step,
+                                        label:
+                                            'Paso ${index + 1}: ${draftStepTitles[index]}',
+                                        child: IconButton.filledTonal(
+                                          tooltip: draftStepTitles[index],
+                                          onPressed:
+                                              index < step &&
+                                                  !capture.locked &&
+                                                  !navigating
+                                              ? () => _go(index)
+                                              : null,
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: index == step
+                                                ? palette.accentInk
+                                                : palette.surface,
+                                            disabledBackgroundColor:
+                                                index == step
+                                                ? palette.accentInk
+                                                : palette.surface,
+                                            foregroundColor: index == step
+                                                ? palette.card
+                                                : palette.text,
+                                            disabledForegroundColor:
+                                                index == step
+                                                ? palette.card
+                                                : palette.muted,
+                                          ),
+                                          icon: Text(
+                                            '${index + 1}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    Semantics(
-                                      selected: index == step,
-                                      label:
-                                          'Paso ${index + 1}: ${draftStepTitles[index]}',
-                                      child: IconButton.filledTonal(
-                                        tooltip: draftStepTitles[index],
-                                        onPressed:
-                                            index < step &&
-                                                !capture.locked &&
-                                                !navigating
-                                            ? () => _go(index)
-                                            : null,
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: index == step
-                                              ? palette.accentInk
-                                              : palette.surface,
-                                          disabledBackgroundColor: index == step
-                                              ? palette.accentInk
-                                              : palette.surface,
-                                          foregroundColor: index == step
-                                              ? palette.card
-                                              : palette.text,
-                                          disabledForegroundColor: index == step
-                                              ? palette.card
-                                              : palette.muted,
-                                        ),
-                                        icon: Text(
-                                          '${index + 1}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Paso ${step + 1} de 5',
+                                  style: AppTextStyles.caption(
+                                    context,
+                                    size: 12,
+                                  ),
+                                ),
+                                Text(
+                                  draftStepTitles[step],
+                                  style: AppTextStyles.figure(
+                                    context,
+                                    size: 25,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      capture.localError != null
+                                          ? Icons.error_outline
+                                          : capture.dirty
+                                          ? Icons.save_outlined
+                                          : Icons.cloud_done_outlined,
+                                      size: 16,
+                                      color: capture.localError != null
+                                          ? palette.fail
+                                          : palette.muted,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        _saveStatus,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: palette.muted,
                                         ),
                                       ),
                                     ),
                                   ],
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Paso ${step + 1} de 5',
-                                style: AppTextStyles.caption(context, size: 12),
-                              ),
-                              Text(
-                                draftStepTitles[step],
-                                style: AppTextStyles.figure(context, size: 25),
-                              ),
-                              const SizedBox(height: 6),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Form(
+                    key: form,
+                    child: ListView(
+                      key: const ValueKey('draft-content'),
+                      controller: scroll,
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      children: [
+                        if (capture.localError != null)
+                          OutlinedButton(
+                            onPressed: _save,
+                            child: const Text('Reintentar guardado'),
+                          ),
+                        if (capture.error != null)
+                          Notice(capture.error!, alert: true),
+                        if (capture.conflict) ...[
+                          const Notice(
+                            'Se conserva tu captura local. El servidor tiene otra versión; no se sobrescribirá automáticamente.',
+                          ),
+                          if (capture.draftId != null)
+                            OutlinedButton(
+                              onPressed: _compareServer,
+                              child: const Text('Ver datos del servidor'),
+                            ),
+                        ],
+                        if (capture.draftIssue != null && capture.dirty)
+                          Notice(capture.draftIssue!),
+                        KeyedSubtree(
+                          key: ValueKey(step),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: step == 0
+                                ? steps.preparation(context)
+                                : step == 4
+                                ? steps.summary(context)
+                                : steps.testStep(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListenableBuilder(
+                  listenable: keypad,
+                  builder: (context, _) => keypad.visible
+                      ? NumericKeypad(controller: keypad)
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+                          child: Column(
+                            children: [
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    capture.localError != null
-                                        ? Icons.error_outline
-                                        : capture.dirty
-                                        ? Icons.save_outlined
-                                        : Icons.cloud_done_outlined,
-                                    size: 16,
-                                    color: capture.localError != null
-                                        ? palette.fail
-                                        : palette.muted,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      _saveStatus,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: palette.muted,
+                                  if (step > 0) ...[
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: navigating || capture.locked
+                                            ? null
+                                            : () => _go(step - 1),
+                                        child: const Text('Anterior'),
                                       ),
                                     ),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  Expanded(
+                                    flex: 2,
+                                    child: step < 4
+                                        ? FilledButton.icon(
+                                            onPressed:
+                                                navigating || capture.locked
+                                                ? null
+                                                : () => _go(step + 1),
+                                            icon: const Icon(
+                                              Icons.arrow_forward,
+                                              size: 18,
+                                            ),
+                                            label: const Text('Siguiente'),
+                                          )
+                                        : FilledButton(
+                                            onPressed:
+                                                navigating ||
+                                                    capture.finalizing ||
+                                                    capture.plan['finalizationEnabled'] !=
+                                                        true
+                                                ? null
+                                                : _finalize,
+                                            child: Text(
+                                              capture.finalizing
+                                                  ? 'Finalizando…'
+                                                  : capture.locked
+                                                  ? 'Confirmar resultado'
+                                                  : 'Guardar y finalizar',
+                                            ),
+                                          ),
                                   ),
                                 ],
+                              ),
+                              TextButton.icon(
+                                onPressed: navigating || capture.finalizing
+                                    ? null
+                                    : _leave,
+                                icon: const Icon(Icons.save_outlined, size: 17),
+                                label: const Text('Guardar y salir'),
                               ),
                             ],
                           ),
                         ),
                 ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: Form(
-                  key: form,
-                  child: ListView(
-                    key: const ValueKey('draft-content'),
-                    controller: scroll,
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    children: [
-                      if (capture.localError != null)
-                        OutlinedButton(
-                          onPressed: _save,
-                          child: const Text('Reintentar guardado'),
-                        ),
-                      if (capture.error != null)
-                        Notice(capture.error!, alert: true),
-                      if (capture.conflict) ...[
-                        const Notice(
-                          'Se conserva tu captura local. El servidor tiene otra versión; no se sobrescribirá automáticamente.',
-                        ),
-                        if (capture.draftId != null)
-                          OutlinedButton(
-                            onPressed: _compareServer,
-                            child: const Text('Ver datos del servidor'),
-                          ),
-                      ],
-                      if (capture.draftIssue != null && capture.dirty)
-                        Notice(capture.draftIssue!),
-                      KeyedSubtree(
-                        key: ValueKey(step),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: step == 0
-                              ? steps.preparation(context)
-                              : step == 4
-                              ? steps.summary(context)
-                              : steps.testStep(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        if (step > 0) ...[
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: navigating || capture.locked
-                                  ? null
-                                  : () => _go(step - 1),
-                              child: const Text('Anterior'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        Expanded(
-                          flex: 2,
-                          child: step < 4
-                              ? FilledButton.icon(
-                                  onPressed: navigating || capture.locked
-                                      ? null
-                                      : () => _go(step + 1),
-                                  icon: const Icon(
-                                    Icons.arrow_forward,
-                                    size: 18,
-                                  ),
-                                  label: const Text('Siguiente'),
-                                )
-                              : FilledButton(
-                                  onPressed:
-                                      navigating ||
-                                          capture.finalizing ||
-                                          capture.plan['finalizationEnabled'] !=
-                                              true
-                                      ? null
-                                      : _finalize,
-                                  child: Text(
-                                    capture.finalizing
-                                        ? 'Finalizando…'
-                                        : capture.locked
-                                        ? 'Confirmar resultado'
-                                        : 'Guardar y finalizar',
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                    TextButton.icon(
-                      onPressed: navigating || capture.finalizing
-                          ? null
-                          : _leave,
-                      icon: const Icon(Icons.save_outlined, size: 17),
-                      label: const Text('Guardar y salir'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
