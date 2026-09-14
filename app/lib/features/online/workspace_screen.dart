@@ -7,6 +7,7 @@ import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
+import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/tile_grid.dart';
 import 'catalog_screen.dart';
 import 'history_screen.dart';
@@ -25,6 +26,10 @@ class WorkspaceScreen extends StatefulWidget {
 
 class _WorkspaceScreenState extends State<WorkspaceScreen> {
   AppSection section = AppSection.inicio;
+
+  /// Pastilla activa de Plantas. Vive aqui y no en la pestaña para que Inicio
+  /// pueda abrirla directamente en "Pesas patrón".
+  _PlantsView plantsView = _PlantsView.plantsAndAreas;
   bool recoveryChecked = false;
   bool recovering = false;
   String? recoveryError;
@@ -122,9 +127,17 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       AppSection.inicio => _Home(
                         session: session,
                         onSection: (value) => setState(() => section = value),
+                        onPlants: (view) => setState(() {
+                          plantsView = view;
+                          section = AppSection.areas;
+                        }),
                       ),
                       AppSection.verificar => CatalogScreen(session: session),
-                      AppSection.areas => _Plants(session: session),
+                      AppSection.areas => _Plants(
+                        session: session,
+                        view: plantsView,
+                        onView: (view) => setState(() => plantsView = view),
+                      ),
                       AppSection.ajustes => _Settings(session),
                     },
                   ),
@@ -204,9 +217,16 @@ class ScreenHeader extends StatelessWidget {
 /// decir cuanto hay, que esta abierto y por donde se empieza; el detalle vive
 /// una pulsacion mas adentro.
 class _Home extends StatelessWidget {
-  const _Home({required this.session, required this.onSection});
+  const _Home({
+    required this.session,
+    required this.onSection,
+    required this.onPlants,
+  });
   final MobileSession session;
   final ValueChanged<AppSection> onSection;
+
+  /// Lleva a la pestaña Plantas con una pastilla ya elegida.
+  final ValueChanged<_PlantsView> onPlants;
 
   @override
   Widget build(BuildContext context) {
@@ -278,27 +298,15 @@ class _Home extends StatelessWidget {
                 icon: Icons.factory_outlined,
                 label: 'Gestionar plantas',
                 caption: 'Áreas organizadas dentro de cada planta',
-                onTap: () => openPage(
-                  context,
-                  CustomerSetupScreen(
-                    session: session,
-                    initialSection: 'plants',
-                  ),
-                ),
+                onTap: () => onPlants(_PlantsView.plantsAndAreas),
               ),
             ),
             TileCell(
               ActionTile(
                 icon: Icons.straighten_outlined,
                 label: 'Gestionar patrones',
-                caption: 'Pesas patrón y certificados asociados',
-                onTap: () => openPage(
-                  context,
-                  CustomerSetupScreen(
-                    session: session,
-                    initialSection: 'patterns',
-                  ),
-                ),
+                caption: 'Pesas patrón de cada planta',
+                onTap: () => onPlants(_PlantsView.patterns),
               ),
             ),
           ],
@@ -316,14 +324,24 @@ class _Home extends StatelessWidget {
   }
 }
 
-/// Areas: el parque como plano de planta.
+enum _PlantsView { plantsAndAreas, patterns }
+
+/// Plantas: la estructura del cliente, en dos pastillas.
 ///
-/// Cada planta es un modulo ancho y sus areas, modulos de media fila debajo.
-/// Se ve de un vistazo por donde esta repartido el trabajo, y una pulsacion
-/// entra al catalogo ya filtrado.
+/// "Plantas y áreas" muestra cada planta una sola vez y entra a sus áreas;
+/// "Pesas patrón" lista los patrones aquí mismo. Antes la pestaña juntaba en
+/// una rejilla los accesos de gestión, las plantas y sus áreas, y "Gestionar
+/// plantas" volvía a listar las mismas plantas. Las balanzas se buscan en
+/// Verificar.
 class _Plants extends StatelessWidget {
-  const _Plants({required this.session});
+  const _Plants({
+    required this.session,
+    required this.view,
+    required this.onView,
+  });
   final MobileSession session;
+  final _PlantsView view;
+  final ValueChanged<_PlantsView> onView;
 
   @override
   Widget build(BuildContext context) {
@@ -331,123 +349,105 @@ class _Plants extends StatelessWidget {
     final plants = objects(bootstrap['plants']);
     final areas = objects(bootstrap['areas']);
 
-    return ListView(
-      padding: kShellContentPadding,
+    return Column(
       children: [
-        ScreenHeader(
-          kicker: valueLabel(object(bootstrap['client'])['name']),
-          title: 'Plantas y áreas',
-          subtitle:
-              '${plants.length} ${plants.length == 1 ? 'planta' : 'plantas'} · '
-              '${areas.length} ${areas.length == 1 ? 'área' : 'áreas'}',
-        ),
-        const SizedBox(height: 18),
-        TileGrid(
-          cells: [
-            TileCell(
-              ActionTile(
-                icon: Icons.edit_location_outlined,
-                label: 'Gestionar plantas',
-                caption: 'Crear y editar las áreas de cada planta',
-                primary: true,
-                onTap: () => openPage(
-                  context,
-                  CustomerSetupScreen(
-                    session: session,
-                    initialSection: 'plants',
-                  ),
-                ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ScreenHeader(
+                kicker: valueLabel(object(bootstrap['client'])['name']),
+                title: 'Plantas',
+                subtitle:
+                    '${plants.length} ${plants.length == 1 ? 'planta' : 'plantas'} · '
+                    '${areas.length} ${areas.length == 1 ? 'área' : 'áreas'}',
               ),
-            ),
-            TileCell(
-              ActionTile(
-                icon: Icons.straighten_outlined,
-                label: 'Gestionar patrones',
-                caption: 'Pesas patrón y certificados de calibración',
-                onTap: () => openPage(
-                  context,
-                  CustomerSetupScreen(
-                    session: session,
-                    initialSection: 'patterns',
-                  ),
-                ),
+              const SizedBox(height: 14),
+              SegmentedPills<_PlantsView>(
+                selected: view,
+                onSelect: onView,
+                segments: const [
+                  PillSegment(_PlantsView.plantsAndAreas, 'Plantas y áreas'),
+                  PillSegment(_PlantsView.patterns, 'Pesas patrón'),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        if (plants.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Notice(
-              'No tienes plantas asignadas. Solicita su habilitación en RimMET.',
-            ),
-          ),
-        for (final plant in plants)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: _PlantBlock(
-              session: session,
-              plant: plant,
-              areas: areas.where((a) => a['plantId'] == plant['id']).toList(),
-            ),
-          ),
+        Expanded(
+          child: view == _PlantsView.patterns
+              ? PatternsPanel(session: session)
+              : _PlantList(session: session, plants: plants, areas: areas),
+        ),
       ],
     );
   }
 }
 
-class _PlantBlock extends StatelessWidget {
-  const _PlantBlock({
+/// Cada planta una vez; al tocarla se gestionan sus áreas.
+class _PlantList extends StatelessWidget {
+  const _PlantList({
     required this.session,
-    required this.plant,
+    required this.plants,
     required this.areas,
   });
   final MobileSession session;
-  final Json plant;
+  final List<Json> plants;
   final List<Json> areas;
-
-  void _open(BuildContext context, String title, {String? areaId}) => openPage(
-    context,
-    OnlinePage(
-      title: title,
-      child: CatalogScreen(
-        session: session,
-        plantId: plant['id'] as String,
-        areaId: areaId,
-      ),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
-    final name = valueLabel(plant['name']);
-
-    return TileGrid(
-      cells: [
-        TileCell.wide(
-          ActionTile(
-            icon: Icons.factory_outlined,
-            label: name,
-            caption:
-                '${valueLabel(plant['code'])} · todas las balanzas de la planta',
-            onTap: () => _open(context, name),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 4, 18, 140),
+      children: [
+        Text(
+          'Selecciona una planta',
+          style: AppTextStyles.figure(context, size: 23),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 3, bottom: 18),
+          child: Text(
+            'Dentro podrás crear, revisar o editar sus áreas.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: IndustryPalette.of(context).muted,
+            ),
           ),
         ),
-        for (final area in areas)
-          TileCell(
-            ActionTile(
-              icon: Icons.grid_view_outlined,
-              label: valueLabel(area['name']),
-              caption: 'Balanzas del área',
-              onTap: () => _open(
-                context,
-                valueLabel(area['name']),
-                areaId: area['id'] as String,
-              ),
-            ),
+        if (plants.isEmpty)
+          const Notice(
+            'No tienes plantas asignadas. Solicita su habilitación en RimMET.',
+          )
+        else
+          TileGrid(
+            minTileHeight: 132,
+            cells: [
+              for (final plant in plants)
+                TileCell(
+                  ActionTile(
+                    icon: Icons.factory_outlined,
+                    label: valueLabel(plant['name']),
+                    caption: _areaCount(plant, valueLabel(plant['code'])),
+                    onTap: () => openPage(
+                      context,
+                      CustomerSetupScreen(
+                        session: session,
+                        plantId: plant['id'] as String,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
       ],
     );
+  }
+
+  String _areaCount(Json plant, String code) {
+    final count = areas.where((a) => a['plantId'] == plant['id']).length;
+    return '$count ${count == 1 ? 'área' : 'áreas'} · $code';
   }
 }
 

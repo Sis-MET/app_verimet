@@ -6,6 +6,7 @@ import 'package:ivmet/features/online/online_widgets.dart';
 import 'package:ivmet/shared/widgets/app_shell.dart';
 import 'package:ivmet/shared/widgets/labeled_field.dart';
 import 'package:ivmet/shared/widgets/section_label.dart';
+import 'package:ivmet/shared/widgets/segmented_pills.dart';
 import 'package:ivmet/shared/widgets/status_tag.dart';
 import 'package:ivmet/shared/widgets/surface_card.dart';
 import 'package:ivmet/shared/widgets/tile_grid.dart';
@@ -201,6 +202,25 @@ void main() {
           OutlinedButton(onPressed: () {}, child: const Text('Descartar')),
           TextButton(onPressed: () {}, child: const Text('Ver expediente')),
         ],
+      ),
+    );
+  });
+
+  testWidgets('selector de vista', (tester) async {
+    await expectSpecimen(
+      tester,
+      name: 'selector',
+      size: const Size(400, 100),
+      child: Align(
+        alignment: Alignment.center,
+        child: SegmentedPills<int>(
+          selected: 0,
+          onSelect: (_) {},
+          segments: const [
+            PillSegment(0, 'Por planta'),
+            PillSegment(1, 'Lista completa'),
+          ],
+        ),
       ),
     );
   });

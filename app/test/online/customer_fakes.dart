@@ -132,6 +132,37 @@ class CustomerFixtureServer extends FixtureServer {
             },
           );
         case 'patterns':
+          return (
+            200,
+            {
+              'total': 1,
+              'items': [
+                {
+                  'id': 'pattern-fixture',
+                  'codigo': 'JP-001',
+                  'descripcion': 'Juego de pesas patrón',
+                  'tipo': 'pesas',
+                  'capacidad': '20',
+                  'unidad': 'kg',
+                  'activo': true,
+                  'plantIds': ['plant-fixture'],
+                  'row_version': '1',
+                  'canEdit': true,
+                  'certificates': [
+                    {
+                      'id': 'certificate-fixture',
+                      'numero': 'CERT-2026-001',
+                      'laboratorio': 'Laboratorio acreditado',
+                      'calibrado_el': '2026-01-15',
+                      'vence_el': '2027-01-15',
+                      'estado': 'ACTIVE',
+                      'row_version': '1',
+                    },
+                  ],
+                },
+              ],
+            },
+          );
         case 'plans':
         case 'updates':
           return (200, {'items': [], 'total': 0});

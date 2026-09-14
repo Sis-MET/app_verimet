@@ -7,6 +7,7 @@ import 'package:ivmet/features/online/equipment_screen.dart';
 import 'package:ivmet/features/online/mobile_api.dart';
 import 'package:ivmet/features/online/mobile_session.dart';
 import 'package:ivmet/features/online/verification_screen.dart';
+import 'customer_fakes.dart';
 import 'fakes.dart';
 import 'finders.dart';
 
@@ -119,7 +120,7 @@ void main() {
   testWidgets(
     'login vacío, datos reales del contrato y navegación por plantas',
     (tester) async {
-      final server = FixtureServer();
+      final server = CustomerFixtureServer();
       await start(tester, server);
       expect(find.text('BAL-014'), findsNothing);
       expect(find.text('VPN'), findsNothing);
@@ -133,7 +134,18 @@ void main() {
       expect(find.text('Gestionar patrones'), findsOneWidget);
       await tester.tap(find.text('Plantas'));
       await tester.pumpAndSettle();
+      // Cada planta aparece una vez y sus áreas se gestionan dentro de ella.
       expect(find.text('Planta uno'), findsOneWidget);
+      expect(find.text('Gestionar plantas'), findsNothing);
+      await tester.tap(find.text('Planta uno'));
+      await tester.pumpAndSettle();
+      expect(find.text('Áreas · Planta uno'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pesas patrón'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nuevo patrón'), findsOneWidget);
+      expect(find.text('Selecciona una planta'), findsNothing);
       expect(tester.takeException(), isNull, reason: 'Plantas');
       await tester.tap(find.text('Verificar'));
       await tester.pumpAndSettle();
@@ -180,6 +192,32 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets('Inicio abre Plantas en la pastilla de cada gestión', (
+    tester,
+  ) async {
+    final server = CustomerFixtureServer();
+    await start(tester, server);
+    await login(tester);
+
+    await tester.ensureVisible(find.text('Gestionar patrones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gestionar patrones'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nuevo patrón'), findsOneWidget);
+    expect(find.text('Selecciona una planta'), findsNothing);
+
+    await tester.tap(find.text('Inicio'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Gestionar plantas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gestionar plantas'));
+    await tester.pumpAndSettle();
+    expect(find.text('Selecciona una planta'), findsOneWidget);
+    expect(find.text('Nuevo patrón'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('Atrás retrocede dentro de IvMET antes de ofrecer salir', (
     tester,
   ) async {

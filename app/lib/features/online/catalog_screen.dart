@@ -4,6 +4,7 @@ import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/tile_grid.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
@@ -11,15 +12,9 @@ import 'online_widgets.dart';
 import 'equipment_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({
-    required this.session,
-    this.plantId,
-    this.areaId,
-    super.key,
-  });
+  const CatalogScreen({required this.session, this.plantId, super.key});
   final MobileSession session;
   final String? plantId;
-  final String? areaId;
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
 }
@@ -52,10 +47,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
   );
 
   Widget _equipmentResults({required bool completeList}) => RemotePanel(
-    dataKey: '${widget.plantId}|${widget.areaId}|$search|$page|$revision',
+    dataKey: '${widget.plantId}|$search|$page|$revision',
     load: () => widget.session.api.read('instruments', {
       'plantId': widget.plantId,
-      'areaId': widget.areaId,
       'search': search,
       'page': page,
     }),
@@ -83,25 +77,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
           if (items.isEmpty)
             const Notice('No hay balanzas habilitadas para este filtro.')
-          else if (completeList)
-            for (final equipment in items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _EquipmentListRow(
-                  equipment: equipment,
-                  onTap: () => _openEquipment(context, equipment),
-                ),
-              )
           else
-            TileGrid(
-              minTileHeight: 148,
-              cells: [
+            SurfaceList(
+              children: [
                 for (final equipment in items)
-                  TileCell(
-                    _EquipmentTile(
-                      equipment: equipment,
-                      onTap: () => _openEquipment(context, equipment),
-                    ),
+                  _EquipmentRow(
+                    equipment: equipment,
+                    showPlant: completeList,
+                    onTap: () => _openEquipment(context, equipment),
                   ),
               ],
             ),
@@ -186,27 +169,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
               const SizedBox(height: 2),
               Text('Verificar', style: AppTextStyles.figure(context, size: 29)),
               const SizedBox(height: 12),
-              TileGrid(
-                minTileHeight: 112,
-                cells: [
-                  TileCell(
-                    ActionTile(
-                      icon: Icons.factory_outlined,
-                      label: 'Por planta',
-                      caption: 'Explorar las balanzas de cada planta',
-                      primary: view == _CatalogView.byPlant,
-                      onTap: () => _selectView(_CatalogView.byPlant),
-                    ),
-                  ),
-                  TileCell(
-                    ActionTile(
-                      icon: Icons.format_list_numbered,
-                      label: 'Lista completa',
-                      caption: 'Buscar por código o departamento',
-                      primary: view == _CatalogView.completeList,
-                      onTap: () => _selectView(_CatalogView.completeList),
-                    ),
-                  ),
+              SegmentedPills<_CatalogView>(
+                selected: view,
+                onSelect: _selectView,
+                segments: const [
+                  PillSegment(_CatalogView.byPlant, 'Por planta'),
+                  PillSegment(_CatalogView.completeList, 'Lista completa'),
                 ],
               ),
               if (view == _CatalogView.completeList) ...[
@@ -288,80 +256,21 @@ class _PlantPicker extends StatelessWidget {
   }
 }
 
-/// Módulo de balanza: manda el código del cliente; el de Métrica es trazabilidad.
-class _EquipmentTile extends StatelessWidget {
-  const _EquipmentTile({required this.equipment, required this.onTap});
+/// Fila de balanza dentro de la lista agrupada: mandan el código del cliente y
+/// el departamento; el código de Métrica es trazabilidad.
+///
+/// Es la misma fila en la lista completa y dentro de una planta. Antes, dentro
+/// de la planta, cada balanza era un módulo del mosaico y la pantalla se leía
+/// como una rejilla de cajas. Ahí la planta ya está en la cabecera, así que la
+/// fila no la repite ([showPlant]).
+class _EquipmentRow extends StatelessWidget {
+  const _EquipmentRow({
+    required this.equipment,
+    required this.showPlant,
+    required this.onTap,
+  });
   final Json equipment;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = IndustryPalette.of(context);
-    final marca = valueLabel(equipment['marca']);
-    final modelo = valueLabel(equipment['modelo']);
-
-    return SurfaceCard(
-      onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            customerEquipmentCode(equipment),
-            style: AppTextStyles.reading(
-              context,
-              size: 16,
-              color: palette.accentInk,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                marca == modelo ? marca : '$marca $modelo',
-                style: AppTextStyles.figure(context, size: 18),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '${equipment['planta']} · ${equipment['area']}',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.3,
-                  color: palette.muted,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'Métrica · ${valueLabel(equipment['cod_metrica'])}',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  height: 1.3,
-                  color: palette.muted,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Fila compacta de la vista general: código del cliente y departamento mandan.
-class _EquipmentListRow extends StatelessWidget {
-  const _EquipmentListRow({required this.equipment, required this.onTap});
-  final Json equipment;
+  final bool showPlant;
   final VoidCallback onTap;
 
   @override
@@ -372,60 +281,67 @@ class _EquipmentListRow extends StatelessWidget {
     );
     final brand = valueLabel(equipment['marca']);
     final model = valueLabel(equipment['modelo']);
+    final instrument = brand == model ? brand : '$brand $model';
 
-    return SurfaceCard(
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customerEquipmentCode(equipment),
-                  style: AppTextStyles.reading(
-                    context,
-                    size: 16,
-                    color: palette.accentInk,
+      splashColor: palette.accent.withValues(alpha: 0.10),
+      highlightColor: palette.accent.withValues(alpha: 0.05),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    customerEquipmentCode(equipment),
+                    style: AppTextStyles.reading(
+                      context,
+                      size: 16,
+                      color: palette.accentInk,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Departamento · $department',
-                  style: AppTextStyles.figure(context, size: 16),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${valueLabel(equipment['planta'])} · ${brand == model ? brand : '$brand $model'}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.3,
-                    color: palette.muted,
+                  const SizedBox(height: 5),
+                  Text(
+                    'Departamento · $department',
+                    style: AppTextStyles.figure(context, size: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Métrica · ${valueLabel(equipment['cod_metrica'])}',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    height: 1.3,
-                    color: palette.muted,
+                  const SizedBox(height: 3),
+                  Text(
+                    showPlant
+                        ? '${valueLabel(equipment['planta'])} · $instrument'
+                        : instrument,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: palette.muted,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    'Métrica · ${valueLabel(equipment['cod_metrica'])}',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      height: 1.3,
+                      color: palette.muted,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.chevron_right, color: palette.muted),
-        ],
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right, color: palette.muted),
+          ],
+        ),
       ),
     );
   }
