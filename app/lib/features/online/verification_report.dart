@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../core/utils/measurement_format.dart';
+
 typedef ReportJson = Map<String, dynamic>;
 
 final _navy = PdfColor.fromHex('#153447');
@@ -42,13 +44,7 @@ double? _number(Object? value) =>
 /// `normalizedDecimal` envia— pero el informe lo lee un cliente en Bolivia.
 String _decimal(Object? value) {
   final text = _value(value, fallback: '-');
-  if (text == '-') return text;
-  final normalized = text.replaceAll(',', '.');
-  if (!normalized.contains('.')) return normalized;
-  return normalized
-      .replaceFirst(RegExp(r'0+$'), '')
-      .replaceFirst(RegExp(r'\.$'), '')
-      .replaceFirst('.', ',');
+  return text == '-' ? text : MeasurementFormat.display(text);
 }
 
 String _date(Object? value, {bool time = true}) {

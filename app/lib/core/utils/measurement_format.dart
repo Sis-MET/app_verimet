@@ -24,6 +24,20 @@ abstract final class MeasurementFormat {
     return value.toStringAsFixed(decimals).replaceAll('.', ',');
   }
 
+  /// Decimal exacto tal como lo guarda el servidor ("20.000000000"), escrito
+  /// para la pantalla: coma y sin los ceros de relleno ("20", "0,01").
+  ///
+  /// Trabaja sobre el texto y no sobre `double`: un `numeric` con nueve
+  /// decimales no siempre cabe entero en coma flotante.
+  static String display(String value) {
+    final normalized = value.trim().replaceAll(',', '.');
+    if (!normalized.contains('.')) return normalized;
+    return normalized
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '')
+        .replaceFirst('.', ',');
+  }
+
   /// Error con signo explicito ("+0,01", "−0,02"). Siempre lleva signo: en una
   /// columna de errores, el que no lo lleva se confunde con un cero.
   static String signedError(double? value, {int decimals = 2}) {

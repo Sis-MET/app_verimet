@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
+import 'draft_controller.dart' show normalizedDecimal;
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -85,8 +87,9 @@ class _CustomerFormState extends State<CustomerForm> {
       error = null;
     });
     try {
+      final sent = _normalizedValues();
       pending ??= object(
-        jsonDecode(jsonEncode(widget.payload?.call(values) ?? Map.of(values))),
+        jsonDecode(jsonEncode(widget.payload?.call(sent) ?? sent)),
       );
       await widget.session.api.rpc('ivmet_customer_mutate', {
         'action': widget.action,
@@ -120,6 +123,20 @@ class _CustomerFormState extends State<CustomerForm> {
       if (mounted) setState(() => busy = false);
     }
   }
+
+  /// Lo que viaja. Un decimal se teclea con coma o con punto, pero sale con
+  /// punto: es lo que espera Supabase.
+  Json _normalizedValues() => {
+    for (final entry in values.entries)
+      entry.key:
+          entry.value is String &&
+              widget.fields.any(
+                (field) =>
+                    field.keyName == entry.key && field.kind == 'decimal',
+              )
+          ? normalizedDecimal(entry.value as String)
+          : entry.value,
+  };
 
   Future<void> askLeave() async {
     if (busy) return;
@@ -303,7 +320,12 @@ class _CustomerFormState extends State<CustomerForm> {
                     : LabeledInput(
                         label: field.label,
                         child: TextFormField(
-                          initialValue: values[field.keyName]?.toString() ?? '',
+                          // Hacia la pantalla, coma y sin ceros de relleno.
+                          initialValue: field.kind == 'decimal'
+                              ? MeasurementFormat.display(
+                                  values[field.keyName]?.toString() ?? '',
+                                )
+                              : values[field.keyName]?.toString() ?? '',
                           readOnly: field.readOnly || busy || pending != null,
                           maxLength: field.max,
                           keyboardType: field.kind == 'decimal'
@@ -325,11 +347,11 @@ class _CustomerFormState extends State<CustomerForm> {
                               return 'Completa este campo.';
                             }
                             if (field.kind == 'decimal' &&
-                                (v ?? '').isNotEmpty &&
+                                (v ?? '').trim().isNotEmpty &&
                                 !RegExp(
                                   r'^(0|[1-9]\d{0,9})(\.\d{1,9})?$',
-                                ).hasMatch(v!)) {
-                              return 'Usa punto decimal y hasta 9 decimales.';
+                                ).hasMatch(normalizedDecimal(v!))) {
+                              return 'Usa hasta 9 decimales, sin miles.';
                             }
                             if (field.kind == 'date' &&
                                 !RegExp(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
 import 'customer_form.dart';
 import 'equipment_validation.dart';
@@ -350,9 +351,7 @@ class _PatternsPanelState extends State<PatternsPanel> {
                             '${item['codigo']} · ${item['descripcion']}',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          Text(
-                            '${valueLabel(item['tipo'])} · ${valueLabel(item['capacidad'])} ${item['unidad'] ?? ''}',
-                          ),
+                          Text(_patternSummary(item)),
                           if (item['canEdit'] == true)
                             Align(
                               alignment: Alignment.centerLeft,
@@ -419,6 +418,20 @@ class _PatternsPanelState extends State<PatternsPanel> {
       ],
     );
   }
+}
+
+/// "Pesas · 20 kg". La capacidad llega del servidor con nueve decimales y
+/// punto ("20.000000000"); en pantalla va con coma y sin ceros de relleno.
+String _patternSummary(Json pattern) {
+  final capacity = pattern['capacidad']?.toString() ?? '';
+  final unit = pattern['unidad']?.toString() ?? '';
+  return [
+    valueLabel(pattern['tipo']),
+    if (capacity.isEmpty)
+      valueLabel(null)
+    else
+      '${MeasurementFormat.display(capacity)} $unit'.trim(),
+  ].join(' · ');
 }
 
 /// Anterior, página actual y siguiente, con páginas de 25 registros.

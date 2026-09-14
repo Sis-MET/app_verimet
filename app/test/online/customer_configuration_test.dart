@@ -175,6 +175,8 @@ void main() {
     await tester.runAsync(() => session.login('operador', 'fixture-password'));
     await show(tester, Scaffold(body: PatternsPanel(session: session)));
     expect(find.text('JP-001 · Juego de pesas patrón'), findsOneWidget);
+    // El servidor envía "20.000000000": en pantalla, sin ceros de relleno.
+    expect(find.text('pesas · 20 kg'), findsOneWidget);
     expect(find.text('Editar patrón'), findsOneWidget);
     expect(find.text('Agregar certificado'), findsNothing);
     // Los certificados que ya existen se siguen viendo y se pueden anular.
@@ -193,6 +195,46 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     session.dispose();
   });
+  testWidgets(
+    'la capacidad de un patrón se escribe con coma y viaja con punto',
+    (tester) async {
+      final server = CustomerFixtureServer();
+      final session = MobileSession(server.api, recovery: server.recovery);
+      await tester.runAsync(
+        () => session.login('operador', 'fixture-password'),
+      );
+      await show(tester, Scaffold(body: PatternsPanel(session: session)));
+      await tester.tap(find.text('Editar patrón'));
+      await tester.pumpAndSettle();
+
+      final capacity = fieldLabeled('Capacidad');
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: capacity,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .controller
+            .text,
+        '20',
+      );
+      await tester.enterText(capacity, '12,5');
+      final save = find.text('Guardar');
+      await scrollTo(tester, save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+
+      final sent = server.requests.singleWhere(
+        (r) => r.path.contains('ivmet_customer_mutate'),
+      );
+      expect(object(object(sent.data)['payload'])['capacity'], '12.5');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+    },
+  );
   testWidgets('la rutina guiada guarda una sola configuración por balanza', (
     tester,
   ) async {

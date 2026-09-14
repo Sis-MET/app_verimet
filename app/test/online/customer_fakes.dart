@@ -142,7 +142,8 @@ class CustomerFixtureServer extends FixtureServer {
                   'codigo': 'JP-001',
                   'descripcion': 'Juego de pesas patrón',
                   'tipo': 'pesas',
-                  'capacidad': '20',
+                  // Como lo devuelve Supabase: numeric con nueve decimales.
+                  'capacidad': '20.000000000',
                   'unidad': 'kg',
                   'activo': true,
                   'plantIds': ['plant-fixture'],
