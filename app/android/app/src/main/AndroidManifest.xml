@@ -4,7 +4,7 @@
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="false"
-        android:label="ivmet"
+        android:label="IvMET"
         android:name="${applicationName}"
         android:icon="@mipmap/ivmet">
         <activity
