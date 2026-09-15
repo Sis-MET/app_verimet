@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'customer_form.dart';
+import 'equipment_registration.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -112,27 +113,29 @@ class EquipmentUpdatePreview extends StatelessWidget {
   const EquipmentUpdatePreview({required this.snapshot, super.key});
   final Json snapshot;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      DetailField(
-        'Balanza / planta',
-        '${snapshot['code']} · ${snapshot['plantCode']}',
-      ),
-      for (final field in const {
-        'ubicacion': 'Ubicación',
-        'cod_interno': 'Código interno',
-        'marca': 'Marca',
-        'modelo': 'Modelo',
-        'serie': 'Serie',
-      }.entries)
-        DetailField(
-          field.value,
-          '${valueLabel(object(snapshot['catalog'])[field.key])} → ${valueLabel(object(snapshot['customer'])[field.key])}',
-        ),
-      DetailField('Área confirmada', snapshot['area']),
-    ],
-  );
+  Widget build(BuildContext context) => snapshot['kind'] == 'registration'
+      ? EquipmentRegistrationPreview(snapshot: snapshot)
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DetailField(
+              'Balanza / planta',
+              '${snapshot['code']} · ${snapshot['plantCode']}',
+            ),
+            for (final field in const {
+              'ubicacion': 'Ubicación',
+              'cod_interno': 'Código interno',
+              'marca': 'Marca',
+              'modelo': 'Modelo',
+              'serie': 'Serie',
+            }.entries)
+              DetailField(
+                field.value,
+                '${valueLabel(object(snapshot['catalog'])[field.key])} → ${valueLabel(object(snapshot['customer'])[field.key])}',
+              ),
+            DetailField('Área confirmada', snapshot['area']),
+          ],
+        );
 }
 
 class ShareEquipmentUpdate extends StatelessWidget {

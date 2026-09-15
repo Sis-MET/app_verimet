@@ -232,7 +232,9 @@ class _HistoryRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    valueLabel(item['cod_metrica']),
+                    // Una balanza registrada por la empresa no tiene código
+                    // de Métrica.
+                    valueLabel(item['cod_metrica'] ?? item['cod_interno']),
                     style: AppTextStyles.reading(
                       context,
                       size: 15,

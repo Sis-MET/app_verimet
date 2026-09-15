@@ -24,8 +24,50 @@ const equipmentUpdateFixture = {
   },
 };
 
+/// Datos de envío de una balanza registrada, como los arma Supabase.
+const registrationSnapshotFixture = {
+  'kind': 'registration',
+  'code': 'BAL-NUEVA',
+  'clientCode': '0001',
+  'plantCode': '0001-01',
+  'plantName': 'Planta uno',
+  'catalog': {},
+  'customer': {
+    'ubicacion': '',
+    'cod_interno': 'BAL-NUEVA',
+    'marca': 'Marca',
+    'modelo': 'Modelo',
+    'serie': 'S-1',
+  },
+  'area': 'Producción',
+  'technical': {
+    'type': 'Báscula camionera',
+    'class': 'III',
+    'unit': 'kg',
+    'ranges': [
+      {
+        'number': 1,
+        'capacity': '60',
+        'division': '0.01',
+        'interval': '0.01',
+        'decimals': 2,
+      },
+      {
+        'number': 2,
+        'capacity': '150',
+        'division': '0.02',
+        'interval': '',
+        'decimals': 2,
+      },
+    ],
+  },
+};
+
 class CustomerFixtureServer extends FixtureServer {
   int saveFailures = 0;
+
+  /// La balanza registrada ya tiene capturas o verificaciones.
+  bool registrationInUse = true;
   @override
   FutureOr<(int, Json)> handle(RequestOptions request) {
     final body = request.data is Map
@@ -162,6 +204,43 @@ class CustomerFixtureServer extends FixtureServer {
                   ],
                 },
               ],
+            },
+          );
+        case 'registration':
+          return (
+            200,
+            {
+              'id': 'equipment-registered',
+              'plantId': 'plant-fixture',
+              'version': '4',
+              'data': {
+                'cod_interno': 'BAL-NUEVA',
+                'marca': 'Marca',
+                'modelo': 'Modelo',
+                'serie': 'S-1',
+                'ubicacion': '',
+                'tipo': 'PLATFORM',
+                'clase': 'III',
+                'unidad': 'kg',
+              },
+              'ranges': [
+                {'capacity': '60', 'division': '0.01', 'interval': '0.01'},
+              ],
+              'areaId': 'area-fixture',
+              'areas': [
+                {'id': 'area-fixture', 'name': 'Producción'},
+              ],
+              'inUse': registrationInUse,
+            },
+          );
+        case 'registration-preview':
+          return (
+            200,
+            {
+              'snapshot': registrationSnapshotFixture,
+              'hash': 'registration-fixture-hash',
+              'consentVersion': 'equipment-registration-v1',
+              'notice': 'Métrica recibirá solo los datos de esta balanza.',
             },
           );
         case 'plans':

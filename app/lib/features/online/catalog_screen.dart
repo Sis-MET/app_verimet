@@ -9,6 +9,7 @@ import '../../shared/widgets/tile_grid.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'equipment_registration.dart';
 import 'equipment_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
@@ -46,6 +47,27 @@ class _CatalogScreenState extends State<CatalogScreen> {
     ),
   );
 
+  /// Alta de una balanza de esta planta; al terminar se abre su ficha para
+  /// configurar las verificaciones.
+  Future<void> _register(BuildContext context) async {
+    final receipt = await openPage<Json>(
+      context,
+      EquipmentRegistrationScreen.create(
+        session: widget.session,
+        plantId: widget.plantId!,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => revision++);
+    final id = receipt?['id'];
+    if (id is! String || !context.mounted) return;
+    await openPage(
+      context,
+      EquipmentScreen(session: widget.session, equipmentId: id),
+    );
+    if (mounted) setState(() => revision++);
+  }
+
   Widget _equipmentResults({required bool completeList}) => RemotePanel(
     dataKey: '${widget.plantId}|$search|$page|$revision',
     load: () => widget.session.api.read('instruments', {
@@ -76,7 +98,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ],
           ),
           if (items.isEmpty)
-            const Notice('No hay balanzas habilitadas para este filtro.')
+            Notice(
+              widget.session.quality && widget.plantId != null
+                  ? 'No hay balanzas habilitadas para este filtro. Si tu empresa incorporó una balanza nueva, regístrala.'
+                  : 'No hay balanzas habilitadas para este filtro.',
+            )
           else
             SurfaceList(
               children: [
@@ -149,6 +175,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 ),
                 const SizedBox(height: 12),
                 _searchField(label: 'Código interno o marca'),
+                if (widget.session.quality) ...[
+                  const SizedBox(height: 4),
+                  FilledButton.icon(
+                    onPressed: () => _register(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Registrar balanza'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -328,7 +362,9 @@ class _EquipmentRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Métrica · ${valueLabel(equipment['cod_metrica'])}',
+                    registeredByCustomer(equipment)
+                        ? registeredEquipmentLabel
+                        : 'Métrica · ${valueLabel(equipment['cod_metrica'])}',
                     style: TextStyle(
                       fontSize: 10.5,
                       height: 1.3,

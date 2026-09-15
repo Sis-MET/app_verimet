@@ -191,6 +191,10 @@ String customerEquipmentCode(Json equipment) {
   return code.isEmpty ? 'Sin código interno' : code;
 }
 
+/// La empresa registró la balanza: no tiene código de Métrica.
+bool registeredByCustomer(Json equipment) => equipment['origen'] == 'CLIENTE';
+const registeredEquipmentLabel = 'Registrada por la empresa';
+
 String testLabel(Object? value) => switch (value) {
   'linearity' => 'Linealidad',
   'repeatability' => 'Repetibilidad',

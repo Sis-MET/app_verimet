@@ -6,8 +6,10 @@ import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/status_tag.dart';
 import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/tile_grid.dart';
+import 'customer_configuration.dart';
 import 'draft_screen.dart';
 import 'equipment_check_configuration.dart';
+import 'equipment_registration.dart';
 import 'equipment_validation.dart';
 import 'history_screen.dart';
 import 'measurement_suggestions.dart';
@@ -44,6 +46,20 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     if (mounted) setState(() => revision++);
   }
 
+  /// Tras la baja la balanza ya no es accesible: la ficha se cierra.
+  Future<void> retire(Json equipment) async {
+    final retired = await openPage<bool>(
+      context,
+      RetireRegisteredEquipment(session: session, equipment: equipment),
+    );
+    if (!mounted) return;
+    if (retired == true) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() => revision++);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => OnlinePage(
     title: 'Ficha de la balanza',
@@ -58,6 +74,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         final validated = data['customerValidated'] == true;
         final sharePending = data['customerUpdatePending'] == true;
         final canStart = validated && plan?['finalizationEnabled'] == true;
+        final registered = data['registeredByCustomer'] == true;
+        final registrationShared = data['registrationShared'] == true;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
@@ -77,7 +95,11 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: StatusTag(
-                    validated ? 'Ficha validada' : 'Sin validar',
+                    registered
+                        ? registeredEquipmentLabel
+                        : validated
+                        ? 'Ficha validada'
+                        : 'Sin validar',
                   ),
                 ),
               ],
@@ -87,18 +109,29 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DetailField('Código Métrica', equipment['cod_metrica']),
+                  if (!registered)
+                    DetailField('Código Métrica', equipment['cod_metrica']),
                   DetailField(
                     'Marca y modelo',
                     '${valueLabel(equipment['marca'])} · ${valueLabel(equipment['modelo'])}',
                   ),
                   DetailField('Serie', equipment['serie']),
                   DetailField('Ubicación', equipment['ubicacion']),
+                  if (registered) ...[
+                    DetailField('Tipo', equipment['tipo_balanza']),
+                    DetailField('Clase', equipment['clase']),
+                  ],
                   for (final range in ranges)
                     DetailField(
                       'Rango ${range['numero_rango']}',
-                      '${rangeCapacityLabel(range)} ${range['unidad']}'
-                          ' · división ${rangeDivisionLabel(range)} ${range['unidad']}',
+                      registered
+                          ? registeredRangeLabel({
+                              'capacity': range['capacidad_max'],
+                              'division': range['division_escala'],
+                              'interval': range['intervalo_verificacion'],
+                            }, valueLabel(range['unidad']))
+                          : '${rangeCapacityLabel(range)} ${range['unidad']}'
+                                ' · división ${rangeDivisionLabel(range)} ${range['unidad']}',
                     ),
                 ],
               ),
@@ -124,21 +157,40 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                         : null,
                   ),
                 ),
-                TileCell(
-                  ActionTile(
-                    icon: Icons.fact_check_outlined,
-                    label: validated ? 'Revisar ficha' : 'Validar ficha',
-                    caption: validated
-                        ? 'Corrige datos privados del equipo'
-                        : 'Confirma los datos antes de capturar',
-                    onTap: () => configure(
-                      EquipmentValidation(
-                        session: session,
-                        equipmentId: equipmentId,
+                // La ficha de una balanza registrada nace validada: no hay
+                // catálogo contra el que revisarla, se corrige al editarla.
+                if (!registered)
+                  TileCell(
+                    ActionTile(
+                      icon: Icons.fact_check_outlined,
+                      label: validated ? 'Revisar ficha' : 'Validar ficha',
+                      caption: validated
+                          ? 'Corrige datos privados del equipo'
+                          : 'Confirma los datos antes de capturar',
+                      onTap: () => configure(
+                        EquipmentValidation(
+                          session: session,
+                          equipmentId: equipmentId,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                if (registered && session.quality)
+                  TileCell(
+                    ActionTile(
+                      icon: Icons.edit_outlined,
+                      label: 'Editar balanza',
+                      caption: data['registrationInUse'] == true
+                          ? 'Identificación y área'
+                          : 'Datos, área y rangos',
+                      onTap: () => configure(
+                        EquipmentRegistrationScreen.edit(
+                          session: session,
+                          equipmentId: equipmentId,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (session.quality)
                   TileCell(
                     ActionTile(
@@ -187,7 +239,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                     ),
                   ),
                 ),
-                if (session.quality && sharePending)
+                if (session.quality && sharePending && !registered)
                   TileCell(
                     ActionTile(
                       icon: Icons.share_outlined,
@@ -201,8 +253,48 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                       ),
                     ),
                   ),
+                if (session.quality &&
+                    registered &&
+                    data['registrationSharePending'] == true)
+                  TileCell(
+                    ActionTile(
+                      icon: Icons.send_outlined,
+                      label: 'Enviar a Métrica',
+                      caption: registrationShared
+                          ? 'Autoriza enviar los datos actualizados'
+                          : 'Autoriza compartir los datos de esta balanza',
+                      onTap: () => configure(
+                        ShareEquipmentRegistration(
+                          session: session,
+                          equipmentId: equipmentId,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
+            if (registered) ...[
+              Notice(
+                registrationShared
+                    ? 'Balanza registrada por tu empresa. Métrica recibió sus datos con tu autorización.'
+                    : 'Balanza registrada por tu empresa. Es privada: Métrica no la ve salvo que el jefe de calidad autorice enviarla.',
+                icon: Icons.shield_outlined,
+              ),
+              if (session.quality && registrationShared)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => configure(
+                      CustomerSetupScreen(
+                        session: session,
+                        initialSection: 'updates',
+                        equipmentId: equipmentId,
+                      ),
+                    ),
+                    child: const Text('Ver envíos a Métrica'),
+                  ),
+                ),
+            ],
             if (session.quality && ranges.isEmpty)
               const Notice(
                 'Faltan la capacidad y la división de escala. Solicita a Métrica revisar el catálogo antes de configurar las verificaciones.',
@@ -211,9 +303,11 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               ),
             if (plan == null)
               Notice(
-                session.quality
-                    ? 'Valida primero la ficha y configura las verificaciones de esta balanza.'
-                    : 'El jefe de calidad todavía no configuró las verificaciones de esta balanza.',
+                !session.quality
+                    ? 'El jefe de calidad todavía no configuró las verificaciones de esta balanza.'
+                    : registered
+                    ? 'Configura las verificaciones de esta balanza.'
+                    : 'Valida primero la ficha y configura las verificaciones de esta balanza.',
               )
             else ...[
               const SectionLabel('Verificaciones activas'),
@@ -258,6 +352,21 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 'Control interno privado. IvMET recalcula el resultado en Supabase al finalizar y deriva el próximo vencimiento de cada prueba trazable.',
               ),
             ],
+            // Acción destructiva y poco frecuente: un enlace al pie, no un
+            // módulo más del mosaico.
+            if (registered && session.quality)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: palette.fail),
+                    onPressed: () => retire(equipment),
+                    icon: const Icon(Icons.remove_circle_outline),
+                    label: const Text('Dar de baja esta balanza'),
+                  ),
+                ),
+              ),
           ],
         );
       },

@@ -175,3 +175,49 @@ Los contratos anteriores `plan.*`, `plans`, `plan` y `method-catalog` responden
 no modifica la tabla maestra. `update.share` exige el hash mostrado por
 `share-preview`, un mensaje y consentimiento explícito. Su snapshot contiene la
 ficha de esa balanza, no resultados, configuraciones, patrones ni historial.
+
+## Balanzas registradas por el cliente
+
+Balanzas que la empresa incorpora sin que Métrica tenga acceso a ellas. Ver
+[la guía de la entrega](customer-registered-equipment.md).
+
+`ivmet_customer_mutate` agrega acciones exclusivas del jefe de calidad:
+
+| action | payload | Resultado |
+| --- | --- | --- |
+| `equipment.register` | `plantId`, `areaId` o `areaName`, `data`, `ranges` | `{id}` |
+| `equipment.edit` | `id`, `version`, `areaId` o `areaName`, `data`, `ranges` | `{id,version,configurationReset}` |
+| `equipment.retire` | `id`, `version`, `reason` | `{id}` |
+| `registration.share` | `id`, `hash`, `message`, `consent`, `consentVersion` | `{id}` |
+
+`data` contiene `cod_interno` (obligatorio, hasta 50), `marca` y `modelo`
+(hasta 50), `serie` (hasta 70), `ubicacion` (hasta 150), `tipo`
+(`PLATFORM` o `TRUCK`), `clase` (`''`, `I`, `II`, `III` o `IIII`) y `unidad`
+(`kg`, `g`, `t` o `mg`); todos son cadenas. `ranges` tiene de uno a tres
+objetos `{capacity,division,interval}` con decimales exactos en cadena;
+`interval` puede ser `''`. `version` es `source_version` de la balanza.
+
+`equipment.edit` rechaza con `EQUIPMENT_IN_USE` un cambio de tipo, clase,
+unidad o rangos si la balanza tiene capturas abiertas o verificaciones. Sin
+uso, el cambio retira la configuración vigente (`configurationReset: true`).
+`registration.share` usa el consentimiento `equipment-registration-v1` y queda
+en `actualizaciones_compartidas`; `update.withdraw` retira el acceso.
+
+`ivmet_customer_read` agrega dos secciones, exclusivas del jefe de calidad:
+
+| section | Filtros | Uso |
+| --- | --- | --- |
+| `registration` | `id` | Datos del formulario, rangos, áreas de la planta, `version` e `inUse`. |
+| `registration-preview` | `id` | Snapshot exacto (`kind: 'registration'`), hash y aviso antes de autorizar. |
+
+`ivmet_mobile_read` agrega `origen` y `cod_interno` a los ítems de
+`instruments`, `history` y `drafts`. La sección `equipment` suma
+`registeredByCustomer`, `registrationInUse`, `registrationSharePending` y
+`registrationShared`; `cod_metrica` llega vacío en estas balanzas.
+
+Errores propios: `EQUIPMENT_CODE_REQUIRED`, `EQUIPMENT_CODE_EXISTS`,
+`EQUIPMENT_SERIAL_EXISTS`, `INVALID_EQUIPMENT_DATA`, `INVALID_EQUIPMENT_RANGES`,
+`EXACT_DECIMAL_REQUIRED`, `AREA_REQUIRED`, `EQUIPMENT_IN_USE`,
+`EQUIPMENT_HAS_OPEN_DRAFTS`, `REGISTERED_EQUIPMENT_REQUIRED`,
+`REGISTRATION_ALREADY_SHARED` y `MESSAGE_REQUIRED`. `equipment.validate` y
+`update.share` responden `REGISTERED_EQUIPMENT_USES_EDIT` para estas balanzas.

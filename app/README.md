@@ -13,7 +13,9 @@ Contrato: [API móvil](../docs/mobile-online-api.md).
 La app permite que el cliente administre áreas por planta, patrones,
 certificados y planes metrológicos versionados. Cada balanza se valida contra
 el catálogo importado; sus correcciones quedan privadas y solo el jefe de
-calidad puede compartir una vista previa exacta con Métrica.
+calidad puede compartir una vista previa exacta con Métrica. El jefe de calidad
+también registra las balanzas que Métrica no tiene en su catálogo: ver
+[balanzas registradas por el cliente](../docs/customer-registered-equipment.md).
 
 La captura recorre cinco pasos: pesas patrón y ambiente, excentricidad,
 repetibilidad, linealidad y resumen. Guarda borradores privados y puede finalizar planes publicados con

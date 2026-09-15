@@ -408,6 +408,9 @@ class FixtureServer {
   bool allowed = true;
   bool online = true;
   bool customerUpdatePending = false;
+
+  /// Filas del catálogo; por defecto, una balanza del catálogo de Métrica.
+  List<Json>? instruments;
   int bootstrapCalls = 0;
   final List<RequestOptions> requests = [];
   late final api = MobileApi(
@@ -515,11 +518,9 @@ class FixtureServer {
         bootstrapCalls++;
         return (200, fixtureBootstrap);
       case 'instruments':
-        return (
-          200,
-          {
-            'total': 1,
-            'items': [
+        final items =
+            instruments ??
+            [
               {
                 'id': 'equipment-fixture',
                 'cod_metrica': '0001-01-001',
@@ -530,9 +531,8 @@ class FixtureServer {
                 'area': 'Sin área',
                 'departamento': 'Producción',
               },
-            ],
-          },
-        );
+            ];
+        return (200, {'total': items.length, 'items': items});
       case 'equipment':
         return (
           200,

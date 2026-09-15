@@ -153,7 +153,13 @@ Future<Uint8List> buildVerificationReport(
     _statusSummary(verification),
     _section('Identificación de la balanza'),
     _detailGrid([
-      ('Código Métrica', equipment['cod_metrica']),
+      (
+        'Código Métrica',
+        equipment['cod_metrica'] ??
+            (equipment['origen'] == 'CLIENTE'
+                ? 'Registrada por la empresa'
+                : null),
+      ),
       ('Código interno', equipment['cod_interno']),
       (
         'Instrumento',

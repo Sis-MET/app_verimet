@@ -56,6 +56,11 @@ Ver [activación de la app](../docs/mobile-online-release.md) y
     reglas de decisión, cálculo transaccional, finalización idempotente,
     vencimientos por prueba y evidencia inmutable de control interno.
 
+`202609150001_customer_registered_equipment.sql` agrega las balanzas que
+registra el cliente: privadas, fuera del espejo SQL Server y ocultas para
+RimMET salvo envío autorizado. Ver
+[Balanzas registradas por el cliente](../docs/customer-registered-equipment.md).
+
 Para pasar del piloto a operación continua, seguir
 [Incorporación automática en producción](../docs/onboarding-production.md).
 

@@ -160,6 +160,32 @@ class MobileFailure implements Exception {
       'Configura las verificaciones desde la ficha de cada balanza.',
     'EXPLICIT_CONSENT_REQUIRED' =>
       'Revisa la información y confirma expresamente que deseas compartirla.',
+    'EQUIPMENT_CODE_REQUIRED' => 'Escribe el código interno de la balanza.',
+    'EQUIPMENT_CODE_EXISTS' =>
+      'Ya hay una balanza con ese código interno en esta planta.',
+    'EQUIPMENT_SERIAL_EXISTS' =>
+      'Ya hay una balanza de esa marca con el mismo número de serie.',
+    'INVALID_EQUIPMENT_DATA' =>
+      'Revisa los datos de la balanza: tipo, unidad, clase y largo de cada campo.',
+    'INVALID_EQUIPMENT_RANGES' =>
+      'Revisa los rangos: cada capacidad supera a la anterior, la división es menor que la capacidad y e no es menor que la división.',
+    'AREA_REQUIRED' => 'Elige un área o escribe el nombre de una nueva.',
+    'INVALID_AREA' => 'Revisa el nombre del área.',
+    'PLANT_SCOPE_INVALID' => 'No tienes acceso a esa planta.',
+    'EQUIPMENT_NOT_ACCESSIBLE' =>
+      'La balanza ya no está disponible. Actualiza el catálogo.',
+    'EQUIPMENT_IN_USE' =>
+      'La balanza ya tiene capturas o verificaciones: sus datos técnicos no se pueden cambiar.',
+    'EQUIPMENT_HAS_OPEN_DRAFTS' =>
+      'Hay capturas sin finalizar de esta balanza. Finalízalas antes de darla de baja.',
+    'REGISTERED_EQUIPMENT_REQUIRED' =>
+      'Esta acción es solo para balanzas registradas por tu empresa.',
+    'REGISTERED_EQUIPMENT_USES_EDIT' =>
+      'Tu empresa registró esta balanza: corrígela desde Editar balanza.',
+    'REGISTRATION_ALREADY_SHARED' =>
+      'Métrica ya recibió estos datos de la balanza.',
+    'MESSAGE_REQUIRED' => 'Escribe un mensaje para Métrica.',
+    'REASON_REQUIRED' => 'Indica el motivo.',
     _ when status == 401 => 'La sesión venció. Ingresa nuevamente.',
     _ when status == 429 =>
       'Demasiados intentos. Espera antes de volver a intentar.',

@@ -394,7 +394,7 @@ class _EquipmentCheckConfigurationScreenState
     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
     children: [
       Text(
-        valueLabel(equipment['cod_metrica']),
+        valueLabel(equipment['cod_metrica'] ?? equipment['cod_interno']),
         style: Theme.of(context).textTheme.headlineSmall,
       ),
       Text(
