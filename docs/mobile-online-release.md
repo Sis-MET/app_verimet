@@ -120,16 +120,22 @@ Set-Location 'C:\Users\jhona\IvMET\app'
 Copy-Item -LiteralPath '.\config\supabase.example.json' -Destination '.\config\supabase.local.json'
 ```
 
-Editar la clave pública del archivo creado. No volver a copiar encima si ya
-está configurado. El archivo local está excluido de Git.
+Editar la URL y la clave pública del archivo creado. No volver a copiar encima
+si ya está configurado. Salvo la plantilla, los archivos de `config` están
+excluidos de Git.
 
 ```powershell
 flutter pub get
 flutter run --dart-define-from-file=config/supabase.local.json
 ```
 
-La app no lee `worker/.env` ni `backend/.env`. Sin configuración muestra un
+La app no lee `worker/.env` ni `backend/.env`, y tampoco el JSON al abrirse: la
+configuración se incrusta al compilar. Gradle detiene la compilación de Android
+si falta o si la clave no es pública; en otras plataformas la app muestra un
 aviso y deshabilita el ingreso. No hay usuario ni contraseña precargados.
+
+El APK o bundle del piloto se compila con `config/supabase.prod.json` y el
+keystore de IvMET: ver [compilar para distribuir](app-install-guide.md#8-compilar-para-distribuir).
 
 ## Comportamiento online y privacidad
 

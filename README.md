@@ -168,11 +168,11 @@ Generar el codigo de `freezed`, `json_serializable`, `riverpod_generator` y
 pnpm app:gen
 ```
 
-Correr en un dispositivo con la configuracion del proyecto Supabase de
-desarrollo:
+Correr en un dispositivo. La conexion con Supabase se incrusta al compilar desde
+`app/config/supabase.local.json`, creado a partir de `supabase.example.json`:
 
 ```bash
-cd app && flutter run --dart-define=SUPABASE_URL=https://PROJECT_REF.supabase.co --dart-define=SUPABASE_ANON_KEY=PUBLIC_KEY
+pnpm app:run
 ```
 
 Analizar y testear:
@@ -185,8 +185,19 @@ cd app && flutter analyze
 pnpm app:test
 ```
 
-El detalle de firma y build para Play Store esta en
-[docs/app-install-guide.md](docs/app-install-guide.md).
+Compilar el APK o el bundle de distribucion, con `app/config/supabase.prod.json`
+y el keystore de IvMET:
+
+```bash
+pnpm app:apk
+```
+
+```bash
+pnpm app:aab
+```
+
+Gradle detiene el build si falta la configuracion de Supabase o la firma. El
+detalle esta en [docs/app-install-guide.md](docs/app-install-guide.md).
 
 ---
 

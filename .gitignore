@@ -70,7 +70,9 @@ app/.pub/
 app/build/
 app/coverage/
 app/doc/api/
-app/config/*.local.json
+# Conexion a Supabase por ambiente: solo la plantilla va al repo.
+app/config/*.json
+!app/config/*.example.json
 
 # Codigo generado por build_runner (freezed / json_serializable / riverpod / drift)
 *.g.dart

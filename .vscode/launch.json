@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // La conexion a Supabase se incrusta al compilar; sin el archivo, Gradle
+      // detiene el build. Ver docs/app-install-guide.md.
+      "name": "IvMET",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=config/supabase.local.json"]
+    }
+  ]
+}

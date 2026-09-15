@@ -17,6 +17,8 @@ class MobileConfiguration {
   final String url;
   final String publicKey;
 
+  /// `android/app/build.gradle.kts` replica estas reglas para no compilar un
+  /// APK sin configuración: si cambian aquí, cambiarlas también allí.
   String? get error {
     final uri = Uri.tryParse(url);
     if (uri == null ||

@@ -45,6 +45,10 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run --dart-define-from-file=config/supabase.local.json
 ```
 
+`config/supabase.local.json` se crea copiando `config/supabase.example.json`.
+Para el APK o el bundle de distribución, ver
+[compilar para distribuir](../docs/app-install-guide.md#8-compilar-para-distribuir).
+
 ## Mapa de `lib/`
 
 | Carpeta | Contenido |
