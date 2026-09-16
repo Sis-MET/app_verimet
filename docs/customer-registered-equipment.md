@@ -31,8 +31,8 @@ que compra o adquiere y a las que Métrica todavía no tiene acceso.
   puede habilitarla ni suspenderla.
 - **Envío a Métrica**: si la empresa lo decide, el jefe de calidad revisa la
   vista previa (identificación, área y datos técnicos) y autoriza con un mensaje
-  y consentimiento explícito. El envío llega a **Actualizaciones del cliente**
-  en RimMET, donde Métrica lo marca como revisado. Un cambio posterior requiere
+  y consentimiento explícito. El envío llega a **Actualizaciones de balanzas**,
+  en la ficha del cliente en RimMET, donde Métrica lo marca como revisado. Un cambio posterior requiere
   otra autorización, y el acceso se puede retirar desde **Ver envíos a
   Métrica**.
 - Si Métrica calibra después esa balanza y entra desde DataMET, aparece como

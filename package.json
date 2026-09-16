@@ -9,7 +9,7 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "db:test:admin": "node --test scripts/test-admin-db.mjs",
+    "db:test:admin": "node --test scripts/test-admin-db.mjs scripts/test-bulk-equipment-db.mjs",
     "db:test:operations": "node --test scripts/test-operations-db.mjs",
     "db:test:mobile": "node --test scripts/test-mobile-db.mjs scripts/test-registered-equipment-db.mjs",
     "test:mobile-auth": "node --experimental-vm-modules --test scripts/test-mobile-auth.mjs",
