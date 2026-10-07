@@ -67,6 +67,9 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       return u.id;
     };
     const operator = await user('operator', 'cliente_operador'), quality = await user('quality', 'cliente_jefe_calidad');
+    // El jefe de calidad asigna las balanzas a cada operador; la de la planta
+    // ajena no se vuelve visible por estar asignada.
+    await q('insert into public.usuario_equipos(usuario_id,equipo_id) values($1,$2),($1,$3)', [operator, equipment, hiddenEquipment]);
     const plan = uuid(), version = uuid(), trial = uuid(), point = uuid();
     await q('insert into public.planes(id,cliente_id,nombre) values($1,$2,$3)', [plan, client, 'Plan SOLO fixture']);
     await q('insert into public.plan_versiones(id,plan_id,version) values($1,$2,1)', [version, plan]);

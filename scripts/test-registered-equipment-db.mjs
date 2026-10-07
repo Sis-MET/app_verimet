@@ -77,6 +77,7 @@ test('balanzas registradas por la empresa en PostgreSQL desechable', async (t) =
       await identity(quality);
       const request = uuid();
       registered = (await customer('equipment.register', registration, request)).id;
+      await q('select public.ivmet_customer_assign_equipment($1,$2)', [{ userId: operator, plantId: plant, equipmentIds: [registered, catalogEquipment] }, uuid()]);
       assert.deepEqual(await customer('equipment.register', registration, request), { id: registered });
       await assert.rejects(customer('equipment.register', { ...registration, data: { ...registration.data, serie: 'OTRA' } }, request), /IDEMPOTENCY_CONFLICT/);
       area = (await setup('areas', { plantId: plant })).items.find(a => a.name === 'Laboratorio Nuevo');

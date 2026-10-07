@@ -221,3 +221,53 @@ Errores propios: `EQUIPMENT_CODE_REQUIRED`, `EQUIPMENT_CODE_EXISTS`,
 `EQUIPMENT_HAS_OPEN_DRAFTS`, `REGISTERED_EQUIPMENT_REQUIRED`,
 `REGISTRATION_ALREADY_SHARED` y `MESSAGE_REQUIRED`. `equipment.validate` y
 `update.share` responden `REGISTERED_EQUIPMENT_USES_EDIT` para estas balanzas.
+
+## Agenda, periodicidad y operadores
+
+Ver [la guía de la entrega](operator-agenda-and-schedules.md).
+
+Todas las lecturas aceptan `utcOffsetMinutes` (desfase del teléfono, de −720 a
+840; por defecto −240) para decidir qué día es hoy y en qué día cayó cada
+verificación. `bootstrap` agrega `equipmentScope` (`ASSIGNED` para el
+operador, `PLANT` para el jefe) y `agenda` `{today,dueToday,doneToday,overdue,
+unassigned}`. Para el operador, `equipmentCount`, el conteo por planta y
+`openAlerts` cuentan solo sus balanzas.
+
+`equipment` agrega, por prueba de la configuración activa, `schedule`
+`[{type,rule,lastRunAt,lastTraceableAt,dueAt,warningAt,state}]`, con `dueAt` y
+`warningAt` como fecha `YYYY-MM-DD` y `state` `CURRENT`, `DUE_SOON` u
+`OVERDUE`. Para el jefe de calidad agrega `assignees` `[{id,name}]`.
+
+| section | filtros | Resultado |
+| --- | --- | --- |
+| `agenda` | `from`, `to` (hasta 62 días), `plantId`, `operatorId` (jefe; uuid o `unassigned`) | `{today,from,to,equipmentCount,items:[{date,equipment,tests:[{type,state,doneOn}]}],overdue:[{dueOn,equipment,tests}]}` |
+| `team` | `plantId` (jefe) | `{plantId,equipmentCount,unassignedCount,members:[{id,name,username,assignedCount}]}` |
+| `team-member` | `plantId`, `userId` (jefe) | `{plantId,member,items:[{id,cod_interno,…,assigned,assigneeCount}]}` |
+| `equipment-team` | `equipmentId` (jefe) | `{equipmentId,plantId,members:[{id,name,username,assigned}]}` |
+
+Estados de `agenda`: `SCHEDULED`, `DUE_SOON`, `DUE_TODAY`, `DONE`, `OVERDUE` y
+`MISSED`.
+
+`ivmet_customer_configure_checks` acepta en cada prueba `schedule` en lugar de
+`frequencyDays`:
+
+```json
+{ "mode": "fixed", "unit": "week", "every": 1, "warningDays": 1,
+  "startsOn": "2026-10-07", "weekdays": [1, 4] }
+```
+
+`mode` es `fixed` o `rolling`; `unit`, `day` (1–365), `week` (1–52), `month`
+(1–24) o `year` (1–5); `warningDays`, 0–90. Con `fixed` se exige `startsOn`; en
+semanas, `weekdays` (ISO, 1 = lunes); en meses y años, `monthMode` `day` con
+`monthDay` (1–31) o `weekday` con `weekOfMonth` (1–4, 5 = último) y `weekday`.
+`rolling` no admite más claves. Una regla inválida responde
+`INVALID_CHECK_SCHEDULE`; el recibo agrega `schedules` con la forma normalizada.
+
+`ivmet_customer_assign_equipment(assignment, request_id)` (jefe de calidad,
+idempotente) reemplaza:
+
+- las balanzas de un operador en una planta: `{userId,plantId,equipmentIds}`;
+- los operadores de una balanza: `{equipmentId,userIds}`.
+
+Errores: `OPERATOR_NOT_IN_PLANT`, `EQUIPMENT_NOT_ACCESSIBLE`,
+`INVALID_ASSIGNMENT`, `IDEMPOTENCY_CONFLICT`.
