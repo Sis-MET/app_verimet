@@ -266,7 +266,7 @@ void main() {
     );
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    expect(find.text('2. Errores permisibles y confirmación'), findsOneWidget);
+    expect(find.text('Paso 2 de 2 · Errores permisibles'), findsOneWidget);
     expect(find.text('Linealidad'), findsOneWidget);
     expect(find.textContaining('Carga ('), findsNothing);
     for (final field
@@ -287,7 +287,10 @@ void main() {
     expect(
       objects(configuration['tests']).every(
         (test) =>
-            test['frequencyDays'] == '30' &&
+            !test.containsKey('frequencyDays') &&
+            object(test['schedule'])['mode'] == 'fixed' &&
+            object(test['schedule'])['unit'] == 'month' &&
+            object(test['schedule'])['every'] == 1 &&
             test['tolerance'] == '0.5' &&
             !test.containsKey('loads') &&
             !test.containsKey('load') &&

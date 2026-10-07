@@ -1,34 +1,32 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../shared/theme/app_typography.dart';
+import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 
+import 'check_schedule.dart';
 import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
-
-const _frequencyOptions = <String, String>{
-  '7': 'Semanal',
-  '30': 'Mensual',
-  '90': 'Trimestral',
-  '180': 'Semestral',
-  '365': 'Anual',
-};
+import 'schedule_editor.dart';
 
 class _CheckConfiguration {
   _CheckConfiguration({
     required this.type,
     required this.enabled,
-    required this.frequencyDays,
+    required this.schedule,
     required this.tolerance,
   });
 
   final String type;
   bool enabled;
-  String frequencyDays;
+  CheckSchedule schedule;
   final TextEditingController tolerance;
 
   void dispose() {
@@ -58,7 +56,8 @@ class _EquipmentCheckConfigurationScreenState
     extends State<EquipmentCheckConfigurationScreen> {
   static final _decimal = RegExp(r'^(0|[1-9]\d{0,9})(\.\d{1,9})?$');
   final form = GlobalKey<FormState>();
-  final pages = PageController();
+  final scaffold = GlobalKey<ScaffoldState>();
+  static const _stepTitles = ['Pruebas y periodicidad', 'Errores permisibles'];
   late final Json equipment = object(widget.bundle['equipment']);
   late final List<Json> ranges = objects(widget.bundle['ranges']);
   late final Json? current = widget.bundle['plan'] == null
@@ -106,6 +105,20 @@ class _EquipmentCheckConfigurationScreenState
       for (final test in objects(current?['tests']))
         test['type'] as String: test,
     };
+    // La vigencia trae la regla guardada; las configuraciones anteriores solo
+    // tienen dias entre pruebas.
+    final rules = <String, Json>{
+      for (final due in objects(widget.bundle['schedule']))
+        if (due['rule'] is Map) due['type'] as String: object(due['rule']),
+    };
+    CheckSchedule scheduleOf(String type, Json? test) {
+      final rule = rules[type];
+      if (rule != null) return CheckSchedule.fromJson(rule);
+      final days = int.tryParse('${test?['frequencyDays'] ?? ''}');
+      if (days != null) return CheckSchedule.legacyDays(days);
+      return CheckSchedule.preset(SchedulePreset.monthly, DateTime.now());
+    }
+
     _CheckConfiguration make(String type) {
       final test = existing[type];
       final points = objects(test?['points']);
@@ -116,7 +129,7 @@ class _EquipmentCheckConfigurationScreenState
       return _CheckConfiguration(
         type: type,
         enabled: test != null || current == null,
-        frequencyDays: test?['frequencyDays']?.toString() ?? '30',
+        schedule: scheduleOf(type, test),
         tolerance: TextEditingController(
           text: tolerances.length == 1 ? tolerances.single : '',
         ),
@@ -131,7 +144,6 @@ class _EquipmentCheckConfigurationScreenState
 
   @override
   void dispose() {
-    pages.dispose();
     for (final check in checks.values) {
       check.dispose();
     }
@@ -182,32 +194,65 @@ class _EquipmentCheckConfigurationScreenState
     return false;
   }
 
-  Future<void> next() async {
+  void _goTo(int target) {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (step == 0 && !_selectedChecksAreValid()) return;
     setState(() {
       error = null;
-      step++;
+      step = target.clamp(0, _stepTitles.length - 1);
     });
-    await pages.animateToPage(
-      step,
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOutCubic,
-    );
   }
 
-  Future<void> previous() async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (step == 0) return;
-    setState(() {
-      error = null;
-      step--;
-    });
-    await pages.animateToPage(
-      step,
-      duration: const Duration(milliseconds: 210),
-      curve: Curves.easeOutCubic,
-    );
+  void next() {
+    if (step == 0 && !_selectedChecksAreValid()) {
+      showWizardMessage(context, 'Selecciona al menos una verificación.');
+      return;
+    }
+    _goTo(step + 1);
+  }
+
+  void previous() {
+    if (step > 0) _goTo(step - 1);
+  }
+
+  /// Atras del sistema: cierra el panel, retrocede un paso y en el primero
+  /// pregunta antes de perder lo que no se guardo.
+  void _onSystemBack() {
+    if (closeWizardDrawer(scaffold)) return;
+    if (step > 0) {
+      previous();
+    } else {
+      unawaited(askLeave());
+    }
+  }
+
+  List<WizardStep> _wizardSteps() {
+    final enabled = checks.values.where((check) => check.enabled).toList();
+    final limits = enabled
+        .where((check) => decimalValidator(check.tolerance.text) == null)
+        .length;
+    return [
+      WizardStep(
+        title: _stepTitles[0],
+        detail: enabled.isEmpty
+            ? 'Ninguna prueba elegida'
+            : enabled.map((check) => label(check.type)).join(' · '),
+        progress: enabled.isNotEmpty
+            ? WizardProgress.complete
+            : step > 0
+            ? WizardProgress.review
+            : WizardProgress.pending,
+      ),
+      WizardStep(
+        title: _stepTitles[1],
+        detail: enabled.isEmpty
+            ? 'Elige antes las pruebas'
+            : '$limits de ${enabled.length} '
+                  '${enabled.length == 1 ? 'límite' : 'límites'}',
+        progress: enabled.isNotEmpty && limits == enabled.length
+            ? WizardProgress.complete
+            : WizardProgress.pending,
+      ),
+    ];
   }
 
   Json _payload() => {
@@ -215,7 +260,7 @@ class _EquipmentCheckConfigurationScreenState
       for (final check in checks.values.where((value) => value.enabled))
         {
           'type': check.type,
-          'frequencyDays': check.frequencyDays,
+          'schedule': check.schedule.toJson(),
           'tolerance': check.tolerance.text.trim(),
         },
     ],
@@ -225,7 +270,11 @@ class _EquipmentCheckConfigurationScreenState
     FocusManager.instance.primaryFocus?.unfocus();
     if (busy || !_selectedChecksAreValid()) return;
     if (!form.currentState!.validate()) {
-      setState(() => error = 'Revisa los límites antes de guardar.');
+      revealFirstFormError(
+        context,
+        form,
+        message: 'Revisa los límites antes de guardar.',
+      );
       return;
     }
     setState(() {
@@ -302,117 +351,109 @@ class _EquipmentCheckConfigurationScreenState
   Widget build(BuildContext context) => PopScope(
     canPop: leaving || (!busy && !dirty && pending == null && step == 0),
     onPopInvokedWithResult: (didPop, result) {
-      if (didPop) return;
-      if (step > 0) {
-        previous();
-      } else {
-        askLeave();
-      }
+      if (!didPop) _onSystemBack();
     },
-    child: OnlinePage(
-      title: 'Configurar verificaciones',
-      child: Form(
-        key: form,
-        child: Column(
-          children: [
-            LinearProgressIndicator(value: (step + 1) / 2),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(switch (step) {
-                      0 => '1. Pruebas y periodicidad',
-                      _ => '2. Errores permisibles y confirmación',
-                    }, style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                  Text('${step + 1} de 2'),
-                ],
-              ),
-            ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: error == null
-                  ? const SizedBox.shrink(key: ValueKey('no-error'))
-                  : Padding(
-                      key: ValueKey(error),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Notice(error!, icon: Icons.error_outline),
-                    ),
-            ),
-            Expanded(
-              child: PageView(
-                controller: pages,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [_testsStep(), _limitsStep()],
-              ),
-            ),
-            SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: Row(
-                children: [
-                  if (step > 0) ...[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: busy ? null : previous,
-                        child: const Text('Atrás'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: busy
-                          ? null
-                          : step < 1
-                          ? next
-                          : save,
-                      child: Text(
-                        busy
-                            ? 'Guardando…'
-                            : step < 1
-                            ? 'Continuar'
-                            : pending != null
-                            ? 'Reintentar guardado'
-                            : current == null
-                            ? 'Activar configuración'
-                            : 'Guardar nueva versión',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    child: WizardScaffold(
+      scaffoldKey: scaffold,
+      kicker: 'Configurar verificaciones',
+      title: current == null
+          ? 'Configurar verificaciones'
+          : 'Actualizar verificaciones',
+      drawerTitle: valueLabel(
+        equipment['cod_interno'] ?? equipment['cod_metrica'],
+      ),
+      steps: _wizardSteps(),
+      current: step,
+      onSelectStep: _goTo,
+      actions: [
+        PopupMenuButton<String>(
+          tooltip: 'Más opciones',
+          icon: const Icon(Icons.more_vert),
+          onSelected: (_) {
+            if (dirty || pending != null) {
+              unawaited(askLeave());
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+          itemBuilder: (context) => [
+            wizardMenuItem(
+              'leave',
+              Icons.logout,
+              dirty || pending != null ? 'Salir sin guardar' : 'Salir',
+              enabled: !busy,
             ),
           ],
         ),
+      ],
+      body: Form(
+        key: form,
+        child: KeyedSubtree(
+          key: ValueKey(step),
+          child: step == 0 ? _testsStep() : _limitsStep(),
+        ),
+      ),
+      pill: WizardNavPill(
+        label: busy
+            ? 'Guardando…'
+            : step == 0
+            ? 'Continuar'
+            : pending != null
+            ? 'Reintentar guardado'
+            : current == null
+            ? 'Activar configuración'
+            : 'Guardar nueva versión',
+        icon: step == 0 ? Icons.arrow_forward_rounded : Icons.check_rounded,
+        onBack: step > 0 && !busy ? previous : null,
+        onNext: busy
+            ? null
+            : step == 0
+            ? next
+            : save,
       ),
     ),
   );
 
   Widget _testsStep() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    padding: const EdgeInsets.fromLTRB(
+      20,
+      18,
+      20,
+      WizardNavPill.contentPadding,
+    ),
     children: [
-      Text(
-        valueLabel(equipment['cod_metrica'] ?? equipment['cod_interno']),
-        style: Theme.of(context).textTheme.headlineSmall,
+      if (error != null) Notice(error!, icon: Icons.error_outline),
+      WizardStepHeading(
+        title: _stepTitles[0],
+        caption:
+            '${valueLabel(equipment['cod_interno'] ?? equipment['cod_metrica'])} · '
+            'capacidad de referencia ${rangeCapacityLabel(largestRange)} $unit. '
+            'Elige las pruebas que necesita tu proceso y cuándo tocan.',
       ),
-      Text(
-        'Capacidad de referencia: ${rangeCapacityLabel(largestRange)} $unit',
-      ),
-      const Notice(
-        'Selecciona las verificaciones que necesita tu proceso. Puedes utilizar una periodicidad diferente para cada una.',
-      ),
+      const SizedBox(height: 6),
       for (final check in checks.values) _checkSelector(check),
     ],
   );
 
-  Widget _checkSelector(_CheckConfiguration check) {
-    final options = Map<String, String>.of(_frequencyOptions);
-    options.putIfAbsent(
-      check.frequencyDays,
-      () => 'Cada ${check.frequencyDays} días',
+  Future<void> _editSchedule(_CheckConfiguration check) async {
+    final enabled = checks.values.where((value) => value.enabled).toList();
+    final choice = await showScheduleEditor(
+      context,
+      initial: check.schedule,
+      testLabel: label(check.type),
+      offerApplyToAll: enabled.length > 1,
     );
+    if (choice == null || !mounted) return;
+    setState(() {
+      for (final target in choice.applyToAll ? enabled : [check]) {
+        target.schedule = choice.schedule;
+      }
+    });
+    changed();
+  }
+
+  Widget _checkSelector(_CheckConfiguration check) {
+    final palette = IndustryPalette.of(context);
     return Card(
       child: Column(
         children: [
@@ -430,34 +471,57 @@ class _EquipmentCheckConfigurationScreenState
             curve: Curves.easeOutCubic,
             child: !check.enabled
                 ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: LabeledInput(
-                      label: 'Periodicidad',
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey('${check.type}-${check.frequencyDays}'),
-                        initialValue: check.frequencyDays,
-                        isExpanded: true,
-                        items: [
-                          for (final option in options.entries)
-                            DropdownMenuItem(
-                              value: option.key,
-                              child: Text(option.value),
-                            ),
-                          const DropdownMenuItem(
-                            value: 'custom',
-                            child: Text('Personalizada…'),
+                : InkWell(
+                    key: ValueKey('schedule-${check.type}'),
+                    onTap: () => _editSchedule(check),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 10, 16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.event_repeat_outlined,
+                            size: 20,
+                            color: palette.accentInk,
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'PERIODICIDAD',
+                                  style: AppTextStyles.caption(
+                                    context,
+                                    size: 10.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  check.schedule.summary,
+                                  style: AppTextStyles.figure(
+                                    context,
+                                    size: 17,
+                                  ),
+                                ),
+                                Text(
+                                  check.schedule.warningLabel,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: palette.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            'Cambiar',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: palette.accentInk,
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: palette.accentInk),
                         ],
-                        onChanged: (value) async {
-                          if (value == null) return;
-                          final selected = value == 'custom'
-                              ? await _customFrequency(check.frequencyDays)
-                              : value;
-                          if (selected == null || !mounted) return;
-                          setState(() => check.frequencyDays = selected);
-                          changed();
-                        },
                       ),
                     ),
                   ),
@@ -467,57 +531,22 @@ class _EquipmentCheckConfigurationScreenState
     );
   }
 
-  Future<String?> _customFrequency(String current) async {
-    final controller = TextEditingController(text: current);
-    final dialogForm = GlobalKey<FormState>();
-    final value = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Periodicidad personalizada'),
-        content: Form(
-          key: dialogForm,
-          child: LabeledInput(
-            label: 'Días entre pruebas',
-            child: TextFormField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                final days = int.tryParse(value ?? '');
-                return days == null || days < 1 || days > 3650
-                    ? 'Ingresa entre 1 y 3650 días.'
-                    : null;
-              },
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (dialogForm.currentState!.validate()) {
-                Navigator.pop(context, controller.text.trim());
-              }
-            },
-            child: const Text('Aplicar'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return value;
-  }
-
   Widget _limitsStep() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    padding: const EdgeInsets.fromLTRB(
+      20,
+      18,
+      20,
+      WizardNavPill.contentPadding,
+    ),
     children: [
-      const Notice(
-        'El límite pertenece al proceso interno de tu empresa. IvMET aplicará comparación directa y calculará el resultado en Supabase.',
-        icon: Icons.rule_outlined,
+      if (error != null) Notice(error!, icon: Icons.error_outline),
+      WizardStepHeading(
+        title: _stepTitles[1],
+        caption:
+            'El límite pertenece al proceso interno de tu empresa. IvMET compara directamente y calcula el resultado en Supabase.',
       ),
+      if (checks.values.every((check) => !check.enabled))
+        const Notice('Elige antes al menos una prueba en el paso 1.'),
       for (final check in checks.values.where((value) => value.enabled))
         Card(
           child: Padding(
@@ -530,9 +559,7 @@ class _EquipmentCheckConfigurationScreenState
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Periodicidad: ${_frequencyOptions[check.frequencyDays] ?? 'cada ${check.frequencyDays} días'}',
-                ),
+                Text('Periodicidad: ${check.schedule.summary.toLowerCase()}'),
                 const SizedBox(height: 12),
                 LabeledInput(
                   label: check.type == 'linearity'
@@ -550,7 +577,11 @@ class _EquipmentCheckConfigurationScreenState
                     validator: (value) => check.enabled
                         ? decimalValidator(value, zeroAllowed: false)
                         : null,
-                    onChanged: (_) => changed(),
+                    // Tambien redibuja la linea de progreso.
+                    onChanged: (_) {
+                      changed();
+                      setState(() {});
+                    },
                   ),
                 ),
               ],
