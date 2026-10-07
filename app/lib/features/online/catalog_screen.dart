@@ -6,6 +6,7 @@ import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/tile_grid.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -160,7 +161,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.plantId != null) {
-      return Column(
+      final page = Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
@@ -175,20 +176,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 ),
                 const SizedBox(height: 12),
                 _searchField(label: 'Código interno o marca'),
-                if (widget.session.quality) ...[
-                  const SizedBox(height: 4),
-                  FilledButton.icon(
-                    onPressed: () => _register(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Registrar balanza'),
-                  ),
-                ],
               ],
             ),
           ),
           Expanded(child: _equipmentResults(completeList: false)),
         ],
       );
+      // Registrar es la accion de la planta: fija a la vista, no en la
+      // cabecera.
+      return widget.session.quality
+          ? FloatingActionLayout(
+              action: WizardNavPill.action(
+                label: 'Registrar balanza',
+                icon: Icons.add,
+                onNext: () => _register(context),
+              ),
+              child: page,
+            )
+          : page;
     }
 
     final client = object(widget.session.bootstrap['client']);

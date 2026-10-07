@@ -60,6 +60,17 @@ void main() {
     return session;
   }
 
+  /// Accion de la pildora flotante con ese rotulo.
+  Finder pill(String label) => find.descendant(
+    of: find.byKey(const ValueKey('wizard-next')),
+    matching: find.text(label),
+  );
+
+  Future<void> nextStep(WidgetTester tester) async {
+    await tester.tap(pill('Siguiente'));
+    await tester.pumpAndSettle();
+  }
+
   List<Json> mutations(FixtureServer server) => server.requests
       .where((r) => r.path.contains('ivmet_customer_mutate'))
       .map((r) => object(r.data))
@@ -108,9 +119,17 @@ void main() {
       );
       // La planta del fixture no tiene áreas: se pide directamente la primera.
       expect(find.text('Área existente'), findsNothing);
+      expect(find.text('Paso 1 de 3 · Área'), findsOneWidget);
+      // Sin area no avanza: lleva al campo y lo dice.
+      await nextStep(tester);
+      expect(find.text('Paso 1 de 3 · Área'), findsOneWidget);
+      expect(find.text('Completa este campo.'), findsOneWidget);
       await type(tester, fieldLabeled('Nombre del área nueva'), 'Laboratorio');
+      await nextStep(tester);
       await type(tester, fieldLabeled('Código interno'), 'BAL-NUEVA');
       await type(tester, fieldLabeled('Serie'), 'S-1');
+      await nextStep(tester);
+      expect(find.text('Paso 3 de 3 · Datos técnicos'), findsOneWidget);
       await scrollTo(tester, find.text('Báscula camionera'));
       await tester.tap(find.text('Báscula camionera'));
       await scrollTo(tester, find.text('III'));
@@ -137,8 +156,7 @@ void main() {
       await tester.tap(confirm);
       await tester.pumpAndSettle();
 
-      final register = find.widgetWithText(FilledButton, 'Registrar balanza');
-      await scrollTo(tester, register);
+      final register = pill('Registrar balanza');
       await tester.tap(register);
       await tester.pumpAndSettle();
       expect(mutations(server), isEmpty);
@@ -148,7 +166,6 @@ void main() {
       );
 
       await type(tester, fieldLabeled('Capacidad máxima (kg)').at(1), '150');
-      await scrollTo(tester, register);
       await tester.tap(register);
       await tester.pumpAndSettle();
 
@@ -193,8 +210,11 @@ void main() {
         equipmentId: 'equipment-registered',
       ),
     );
-    // La identificación sigue editable; está arriba de los datos técnicos.
+    // La identificación sigue editable; está en el paso anterior a los
+    // datos técnicos.
+    await nextStep(tester);
     await type(tester, fieldLabeled('Marca'), 'Otra marca');
+    await nextStep(tester);
     final locked = find.textContaining(
       'sus datos técnicos no se pueden cambiar',
     );
@@ -213,9 +233,7 @@ void main() {
     await scrollTo(tester, confirm);
     await tester.tap(confirm);
     await tester.pumpAndSettle();
-    final save = find.widgetWithText(FilledButton, 'Guardar cambios');
-    await scrollTo(tester, save);
-    await tester.tap(save);
+    await tester.tap(pill('Guardar cambios'));
     await tester.pumpAndSettle();
 
     final sent = mutations(server).single;

@@ -7,8 +7,8 @@ import 'package:uuid/uuid.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/labeled_field.dart';
-import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/segmented_pills.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'customer_form.dart';
 import 'draft_controller.dart' show normalizedDecimal;
 import 'mobile_api.dart';
@@ -130,6 +130,9 @@ class _RegistrationFormState extends State<_RegistrationForm> {
   static final _exact = RegExp(r'^(0|[1-9]\d{0,9})(\.\d{1,9})?$');
 
   final form = GlobalKey<FormState>();
+  final scaffold = GlobalKey<ScaffoldState>();
+  static const _stepTitles = ['Área', 'Identificación', 'Datos técnicos'];
+  int step = 0;
   late final Json data = object(widget.current?['data'] ?? {});
   late final bool editing = widget.current != null;
 
@@ -253,15 +256,109 @@ class _RegistrationFormState extends State<_RegistrationForm> {
     'ranges': [for (final range in ranges) range.payload()],
   };
 
+  bool get _areaValid => newArea
+      ? areaName.text.trim().isNotEmpty
+      : widget.areas.any((area) => area['id'] == areaId);
+
+  bool get _identificationValid => code.text.trim().isNotEmpty;
+
+  bool get _rangesValid => [
+    for (var index = 0; index < ranges.length; index++) ...[
+      _capacityError(index),
+      _divisionError(index),
+      _intervalError(index),
+    ],
+  ].every((issue) => issue == null);
+
+  bool _stepValid(int index) => switch (index) {
+    0 => _areaValid,
+    1 => _identificationValid,
+    _ => _rangesValid && confirmed,
+  };
+
+  List<WizardStep> _wizardSteps() {
+    String areaDetail() {
+      if (newArea) {
+        final name = areaName.text.trim();
+        return name.isEmpty ? 'Escribe el área nueva' : 'Nueva: $name';
+      }
+      final selected = widget.areas
+          .where((area) => area['id'] == areaId)
+          .firstOrNull;
+      return selected == null ? 'Elige un área' : valueLabel(selected['name']);
+    }
+
+    return [
+      for (var index = 0; index < _stepTitles.length; index++)
+        WizardStep(
+          title: _stepTitles[index],
+          detail: switch (index) {
+            0 => areaDetail(),
+            1 =>
+              _identificationValid
+                  ? code.text.trim()
+                  : 'Falta el código interno',
+            _ =>
+              '${ranges.length} ${ranges.length == 1 ? 'rango' : 'rangos'} · $unit'
+                  '${confirmed ? '' : ' · sin confirmar'}',
+          },
+          progress: _stepValid(index)
+              ? WizardProgress.complete
+              : index < step
+              ? WizardProgress.review
+              : WizardProgress.pending,
+        ),
+    ];
+  }
+
+  void _goTo(int target) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      error = null;
+      step = target.clamp(0, _stepTitles.length - 1);
+    });
+  }
+
+  void next() {
+    if (!form.currentState!.validate()) {
+      revealFirstFormError(context, form);
+      return;
+    }
+    _goTo(step + 1);
+  }
+
+  /// Atras del sistema: cierra el panel, retrocede un paso y en el primero
+  /// pregunta antes de perder lo escrito.
+  void _onSystemBack() {
+    if (closeWizardDrawer(scaffold)) return;
+    if (step > 0) {
+      _goTo(step - 1);
+    } else {
+      unawaited(askLeave());
+    }
+  }
+
   Future<void> save() async {
     FocusManager.instance.primaryFocus?.unfocus();
     if (busy) return;
     if (!form.currentState!.validate()) {
-      setState(() => error = 'Revisa los campos marcados antes de guardar.');
+      revealFirstFormError(context, form);
       return;
     }
     if (!confirmed) {
       setState(() => error = 'Confirma que revisaste los datos de la balanza.');
+      return;
+    }
+    // Desde el panel se puede llegar aqui saltando pasos: el primero que
+    // falte se abre con sus errores a la vista.
+    final missing = [0, 1].where((index) => !_stepValid(index)).firstOrNull;
+    if (missing != null) {
+      _goTo(missing);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !form.currentState!.validate()) {
+          revealFirstFormError(context, form);
+        }
+      });
       return;
     }
     setState(() {
@@ -338,70 +435,130 @@ class _RegistrationFormState extends State<_RegistrationForm> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: leaving || (!busy && !dirty && pending == null),
+    canPop: leaving || (!busy && !dirty && pending == null && step == 0),
     onPopInvokedWithResult: (didPop, result) {
-      if (!didPop) askLeave();
+      if (!didPop) _onSystemBack();
     },
-    child: OnlinePage(
+    child: WizardScaffold(
+      scaffoldKey: scaffold,
+      kicker: editing ? 'Editar balanza' : 'Registrar balanza',
       title: editing ? 'Editar balanza' : 'Registrar balanza',
-      child: Form(
-        key: form,
-        onChanged: () {
-          if (!dirty) setState(() => dirty = true);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          children: [
-            Notice(
-              editing
-                  ? 'Corrige los datos de la balanza que registró tu empresa. El área y la identificación se pueden cambiar siempre.'
-                  : 'Registra una balanza que Métrica todavía no tiene en su catálogo. Queda privada de tu empresa y lista para configurar sus verificaciones.',
+      drawerTitle: code.text.trim().isEmpty
+          ? 'Balanza nueva'
+          : code.text.trim(),
+      steps: _wizardSteps(),
+      current: step,
+      onSelectStep: _goTo,
+      actions: [
+        PopupMenuButton<String>(
+          tooltip: 'Más opciones',
+          icon: const Icon(Icons.more_vert),
+          onSelected: (_) {
+            if (dirty || pending != null) {
+              unawaited(askLeave());
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+          itemBuilder: (context) => [
+            wizardMenuItem(
+              'leave',
+              Icons.logout,
+              dirty || pending != null ? 'Salir sin guardar' : 'Salir',
+              enabled: !busy,
             ),
+          ],
+        ),
+      ],
+      body: Form(
+        key: form,
+        // Cada cambio redibuja tambien la linea de progreso.
+        onChanged: () => setState(() => dirty = true),
+        child: ListView(
+          key: ValueKey('registration-step-$step'),
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            WizardNavPill.contentPadding,
+          ),
+          children: [
             if (error != null) Notice(error!, icon: Icons.error_outline),
             if (pending != null && !busy)
               const Notice(
                 'Respuesta pendiente. Reintenta con los mismos datos para evitar duplicados.',
               ),
-            ..._areaSection(),
-            ..._identificationSection(),
-            ..._technicalSection(),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text(
-                'Confirmo que estos datos corresponden a la balanza',
-              ),
-              value: confirmed,
-              onChanged: frozen
-                  ? null
-                  : (value) => changed(() => confirmed = value == true),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: busy ? null : save,
-              child: Text(
-                busy
-                    ? 'Guardando…'
-                    : pending != null
-                    ? 'Reintentar guardado'
-                    : editing
-                    ? 'Guardar cambios'
-                    : 'Registrar balanza',
-              ),
-            ),
-            if (!editing)
-              const Notice(
-                'Métrica no recibe esta balanza. Si más adelante quieres que la conozca, autoriza el envío desde su ficha.',
-                icon: Icons.shield_outlined,
-              ),
+            ...switch (step) {
+              0 => [
+                WizardStepHeading(
+                  title: _stepTitles[0],
+                  caption: editing
+                      ? 'Corrige los datos de la balanza que registró tu empresa. El área y la identificación se pueden cambiar siempre.'
+                      : 'Registra una balanza que Métrica todavía no tiene en su catálogo. Queda privada de tu empresa y lista para configurar sus verificaciones.',
+                ),
+                ..._areaSection(),
+              ],
+              1 => [
+                WizardStepHeading(
+                  title: _stepTitles[1],
+                  caption:
+                      'El código interno es el que la empresa usa en planta; el resto ayuda a reconocerla.',
+                ),
+                ..._identificationSection(),
+              ],
+              _ => [
+                WizardStepHeading(
+                  title: _stepTitles[2],
+                  caption:
+                      'Tipo, unidad y rangos de la placa. Definen las cargas y la precisión de las lecturas.',
+                ),
+                ..._technicalSection(),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Confirmo que estos datos corresponden a la balanza',
+                  ),
+                  value: confirmed,
+                  onChanged: frozen
+                      ? null
+                      : (value) => changed(() => confirmed = value == true),
+                ),
+                if (!editing)
+                  const Notice(
+                    'Métrica no recibe esta balanza. Si más adelante quieres que la conozca, autoriza el envío desde su ficha.',
+                    icon: Icons.shield_outlined,
+                  ),
+              ],
+            },
           ],
         ),
+      ),
+      pill: WizardNavPill(
+        label: step < _stepTitles.length - 1
+            ? 'Siguiente'
+            : busy
+            ? 'Guardando…'
+            : pending != null
+            ? 'Reintentar guardado'
+            : editing
+            ? 'Guardar cambios'
+            : 'Registrar balanza',
+        icon: step < _stepTitles.length - 1
+            ? Icons.arrow_forward_rounded
+            : Icons.check_rounded,
+        onBack: step > 0 && !busy ? () => _goTo(step - 1) : null,
+        onNext: busy
+            ? null
+            : step < _stepTitles.length - 1
+            ? next
+            : save,
       ),
     ),
   );
 
   List<Widget> _areaSection() => [
-    const SectionLabel('Área'),
+    const SizedBox(height: 10),
     if (widget.areas.isEmpty)
       const Notice(
         'Esta planta todavía no tiene áreas: escribe el nombre de la primera.',
@@ -448,7 +605,7 @@ class _RegistrationFormState extends State<_RegistrationForm> {
   ];
 
   List<Widget> _identificationSection() => [
-    const SectionLabel('Identificación'),
+    const SizedBox(height: 10),
     _text(code, 'Código interno', max: 50, required: true),
     _text(brand, 'Marca', max: 50),
     _text(model, 'Modelo', max: 50),
@@ -460,7 +617,7 @@ class _RegistrationFormState extends State<_RegistrationForm> {
     final locked = frozen || technicalLocked;
     final palette = IndustryPalette.of(context);
     return [
-      const SectionLabel('Datos técnicos'),
+      const SizedBox(height: 10),
       if (technicalLocked)
         const Notice(
           'Esta balanza ya tiene capturas o verificaciones: sus datos técnicos no se pueden cambiar. Si son incorrectos, dala de baja y regístrala de nuevo.',

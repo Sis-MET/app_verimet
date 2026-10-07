@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'customer_form.dart';
 import 'equipment_validation.dart';
 import 'mobile_api.dart';
@@ -74,8 +75,29 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
         ? 'Áreas · ${_plantNames(widget.session)[plantId] ?? 'Planta'}'
         : 'Actualizaciones compartidas';
 
+    final areas = section == 'areas' && plantId != null;
     return OnlinePage(
       title: title,
+      // Crear es la accion de la pagina; sugerir desde Ubicacion, una extra.
+      floating: areas
+          ? WizardNavPill.action(
+              label: 'Nueva área',
+              icon: Icons.add,
+              onNext: areaForm,
+            )
+          : null,
+      actions: [
+        if (areas)
+          ?pageMenu([
+            wizardMenuItem<VoidCallback>(
+              () => edit(
+                AreaSuggestions(session: widget.session, plantId: plantId!),
+              ),
+              Icons.auto_fix_high_outlined,
+              'Sugerir áreas desde Ubicación',
+            ),
+          ]),
+      ],
       child: section == 'areas' && plantId == null
           ? const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
@@ -89,24 +111,14 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
                 if (section == 'updates') 'id': widget.equipmentId,
               }),
               builder: (data) => ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  16,
+                  20,
+                  WizardNavPill.contentPadding,
+                ),
                 children: [
                   if (section == 'areas') ...[
-                    FilledButton.icon(
-                      onPressed: areaForm,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Nueva área'),
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: () => edit(
-                        AreaSuggestions(
-                          session: widget.session,
-                          plantId: plantId!,
-                        ),
-                      ),
-                      child: const Text('Sugerir áreas desde Ubicación'),
-                    ),
                     const Notice(
                       'Las coincidencias ignoran mayúsculas, acentos y espacios repetidos. Cada planta mantiene sus propias áreas.',
                     ),

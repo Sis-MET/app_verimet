@@ -31,6 +31,7 @@ varias cargas de repetibilidad y puntos de indicación por sustitución.
 Ver [captura flexible y comparación con ServiceMET](../docs/flexible-metrology-capture.md).
 
 - Arquitectura y reglas de capas: [../docs/architecture.md](../docs/architecture.md)
+- Marco de las pantallas (asistentes, ⋮ y píldora fija): [../docs/app-screen-frame.md](../docs/app-screen-frame.md)
 - Instalar / compilar / firmar: [../docs/app-install-guide.md](../docs/app-install-guide.md)
 
 ## Atajos

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -95,172 +96,174 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
+  /// Anular es raro y destructivo: va en ⋮, no al pie del expediente.
+  List<Widget> _menu(Json data) {
+    final v = object(data['verification']);
+    final menu = pageMenu([
+      if (widget.session.quality && v['estado'] == 'ACTIVE')
+        wizardMenuItem<VoidCallback>(
+          () => action(
+            'annul_ivmet_verification',
+            {'target_verification_id': widget.id},
+            question:
+                'La anulación conservará toda la evidencia. Indica el motivo y realiza una nueva verificación cuando corresponda.',
+          ),
+          Icons.block_outlined,
+          'Anular con motivo',
+          enabled: !busy,
+        ),
+    ]);
+    return [?menu];
+  }
+
   @override
-  Widget build(BuildContext context) => OnlinePage(
+  Widget build(BuildContext context) => RemotePage(
     title: 'Verificación privada',
-    child: RemotePanel(
-      dataKey: '$revision',
-      load: () => widget.session.api.read('verification', {'id': widget.id}),
-      builder: (data) {
-        final v = object(data['verification']);
-        final alert = data['alert'] == null ? null : object(data['alert']);
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const Notice(
-              'Resultado de una verificación intermedia. No constituye certificado de calibración ni verificación legal.',
-              icon: Icons.science_outlined,
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              key: const ValueKey('generate-verification-pdf'),
-              onPressed: reporting ? null : () => generateReport(data),
-              icon: reporting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(
-                reporting ? 'Generando informe…' : 'Generar informe PDF',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              verdictLabel(v['veredicto_global']),
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            DetailField('Capturado por', object(data['users'])['capture']),
-            DetailField(
-              'Finalizado por',
-              object(data['users'])['finalization'],
-            ),
-            // La marca ISO cruda queda en el expediente de abajo; aqui va la
-            // fecha como la lee quien revisa la verificacion.
-            DetailField('Fecha de medición', dateLabel(v['realizado_at'])),
-            DetailField('Fecha de recepción', dateLabel(v['recibido_at'])),
-            DetailField(
-              'Alcance',
-              v['alcance'] == 'partial' ? 'Parcial' : 'Completa',
-            ),
-            DetailField(
-              'Trazabilidad',
-              v['trazabilidad'] == 'traceable' ? 'Trazable' : 'No trazable',
-            ),
-            DetailField(
-              'Estado',
-              v['estado'] == 'ANNULLED' ? 'Anulada' : 'Activa',
-            ),
-            if (v['motivo_anulacion'] != null)
-              DetailField('Motivo de anulación', v['motivo_anulacion']),
+    dataKey: '$revision',
+    load: () => widget.session.api.read('verification', {'id': widget.id}),
+    actions: _menu,
+    // El informe es lo que se viene a buscar: queda fijo a la vista.
+    floating: (data) => WizardNavPill.action(
+      key: const ValueKey('generate-verification-pdf'),
+      label: reporting ? 'Generando informe…' : 'Generar informe PDF',
+      icon: Icons.picture_as_pdf_outlined,
+      onNext: reporting ? null : () => generateReport(data),
+    ),
+    builder: (data) {
+      final v = object(data['verification']);
+      final alert = data['alert'] == null ? null : object(data['alert']);
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          WizardNavPill.contentPadding,
+        ),
+        children: [
+          const Notice(
+            'Resultado de una verificación intermedia. No constituye certificado de calibración ni verificación legal.',
+            icon: Icons.science_outlined,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            verdictLabel(v['veredicto_global']),
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          DetailField('Capturado por', object(data['users'])['capture']),
+          DetailField('Finalizado por', object(data['users'])['finalization']),
+          // La marca ISO cruda queda en el expediente de abajo; aqui va la
+          // fecha como la lee quien revisa la verificacion.
+          DetailField('Fecha de medición', dateLabel(v['realizado_at'])),
+          DetailField('Fecha de recepción', dateLabel(v['recibido_at'])),
+          DetailField(
+            'Alcance',
+            v['alcance'] == 'partial' ? 'Parcial' : 'Completa',
+          ),
+          DetailField(
+            'Trazabilidad',
+            v['trazabilidad'] == 'traceable' ? 'Trazable' : 'No trazable',
+          ),
+          DetailField(
+            'Estado',
+            v['estado'] == 'ANNULLED' ? 'Anulada' : 'Activa',
+          ),
+          if (v['motivo_anulacion'] != null)
+            DetailField('Motivo de anulación', v['motivo_anulacion']),
+          EvidenceSection(
+            title: 'Equipo, plan y condiciones históricas',
+            children: [EvidenceTree(v)],
+          ),
+          EvidenceSection(
+            title: 'Patrones utilizados',
+            children: [EvidenceTree(data['patterns'])],
+          ),
+          for (final t in objects(data['tests']))
             EvidenceSection(
-              title: 'Equipo, plan y condiciones históricas',
-              children: [EvidenceTree(v)],
+              title: testLabel(t['tipo']),
+              subtitle: t['estado_ejecucion'] == 'omitted'
+                  ? 'Omitida: ${t['motivo_omision']}'
+                  : verdictLabel(t['veredicto']),
+              children: [EvidenceTree(t)],
             ),
-            EvidenceSection(
-              title: 'Patrones utilizados',
-              children: [EvidenceTree(data['patterns'])],
+          if (error != null) Notice(error!, icon: Icons.error_outline),
+          if (alert != null) ...[
+            Notice(
+              valueLabel(alert['resumen']),
+              icon: Icons.warning_amber_outlined,
             ),
-            for (final t in objects(data['tests']))
-              EvidenceSection(
-                title: testLabel(t['tipo']),
-                subtitle: t['estado_ejecucion'] == 'omitted'
-                    ? 'Omitida: ${t['motivo_omision']}'
-                    : verdictLabel(t['veredicto']),
-                children: [EvidenceTree(t)],
+            if (alert['visibilidad_metrica'] == 'PRIVATE')
+              const Notice(
+                'Esta alerta no está compartida con Métrica.',
+                icon: Icons.lock_outline,
               ),
-            if (error != null) Notice(error!, icon: Icons.error_outline),
-            if (alert != null) ...[
-              Notice(
-                valueLabel(alert['resumen']),
-                icon: Icons.warning_amber_outlined,
-              ),
-              if (alert['visibilidad_metrica'] == 'PRIVATE')
-                const Notice(
-                  'Esta alerta no está compartida con Métrica.',
-                  icon: Icons.lock_outline,
-                ),
-              if (widget.session.quality &&
-                  alert['visibilidad_metrica'] == 'PRIVATE')
-                FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () async {
-                          await openPage(
-                            context,
-                            SharePreviewScreen(
-                              session: widget.session,
-                              alertId: alert['id'] as String,
-                            ),
-                          );
-                          if (mounted) setState(() => revision++);
-                        },
-                  child: const Text('Revisar expediente para compartir'),
-                ),
-              if (!widget.session.quality)
-                const Notice(
-                  'Solo el jefe de calidad puede autorizar el envío a Métrica.',
-                ),
-            ],
-            for (final shared in objects(data['cases']))
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Caso ${shared['code']}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      DetailField(
-                        'Acceso de Métrica',
-                        shared['visibility'] == 'SHARED'
-                            ? 'Compartido'
-                            : 'Retirado',
-                      ),
-                      DetailField('Seguimiento', shared['state']),
-                      DetailField('Mensaje enviado', shared['message']),
-                      EvidenceSection(
-                        title: 'Actividad del caso',
-                        children: [EvidenceTree(shared['events'])],
-                      ),
-                      if (widget.session.quality &&
-                          shared['visibility'] == 'SHARED')
-                        OutlinedButton(
-                          onPressed: busy
-                              ? null
-                              : () => action(
-                                  'withdraw_ivmet_case',
-                                  {
-                                    'target_case_id': shared['id'],
-                                    'expected_row_version': shared['version'],
-                                  },
-                                  question:
-                                      'Retirar el acceso de Métrica. Las copias ya entregadas no se eliminan. Indica el motivo.',
-                                ),
-                          child: const Text('Retirar acceso'),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            if (widget.session.quality && v['estado'] == 'ACTIVE')
-              TextButton(
+            if (widget.session.quality &&
+                alert['visibilidad_metrica'] == 'PRIVATE')
+              FilledButton(
                 onPressed: busy
                     ? null
-                    : () => action(
-                        'annul_ivmet_verification',
-                        {'target_verification_id': widget.id},
-                        question:
-                            'La anulación conservará toda la evidencia. Indica el motivo y realiza una nueva verificación cuando corresponda.',
-                      ),
-                child: const Text('Anular con motivo'),
+                    : () async {
+                        await openPage(
+                          context,
+                          SharePreviewScreen(
+                            session: widget.session,
+                            alertId: alert['id'] as String,
+                          ),
+                        );
+                        if (mounted) setState(() => revision++);
+                      },
+                child: const Text('Revisar expediente para compartir'),
+              ),
+            if (!widget.session.quality)
+              const Notice(
+                'Solo el jefe de calidad puede autorizar el envío a Métrica.',
               ),
           ],
-        );
-      },
-    ),
+          for (final shared in objects(data['cases']))
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Caso ${shared['code']}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    DetailField(
+                      'Acceso de Métrica',
+                      shared['visibility'] == 'SHARED'
+                          ? 'Compartido'
+                          : 'Retirado',
+                    ),
+                    DetailField('Seguimiento', shared['state']),
+                    DetailField('Mensaje enviado', shared['message']),
+                    EvidenceSection(
+                      title: 'Actividad del caso',
+                      children: [EvidenceTree(shared['events'])],
+                    ),
+                    if (widget.session.quality &&
+                        shared['visibility'] == 'SHARED')
+                      OutlinedButton(
+                        onPressed: busy
+                            ? null
+                            : () => action(
+                                'withdraw_ivmet_case',
+                                {
+                                  'target_case_id': shared['id'],
+                                  'expected_row_version': shared['version'],
+                                },
+                                question:
+                                    'Retirar el acceso de Métrica. Las copias ya entregadas no se eliminan. Indica el motivo.',
+                              ),
+                        child: const Text('Retirar acceso'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    },
   );
 }
 
@@ -372,43 +375,51 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       load: () => widget.session.api.rpc('preview_ivmet_alert_share', {
         'target_alert_id': widget.alertId,
       }),
-      builder: (preview) => ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Notice(valueLabel(preview['notice']), icon: Icons.shield_outlined),
-          const Text(
-            'Este es el expediente completo que se enviará. Despliega las secciones para revisar todas las lecturas y sus datos históricos.',
+      builder: (preview) => FloatingActionLayout(
+        action: WizardNavPill.action(
+          label: busy ? 'Confirmando…' : 'Compartir expediente',
+          icon: Icons.send_outlined,
+          onNext: consent && !busy && message.text.trim().isNotEmpty
+              ? () => confirm(preview)
+              : null,
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            WizardNavPill.contentPadding,
           ),
-          EvidenceTree(preview['snapshot']),
-          const SizedBox(height: 16),
-          LabeledInput(
-            label: 'Mensaje para Métrica',
-            child: TextField(
-              controller: message,
-              enabled: !busy,
-              maxLength: 2000,
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
+          children: [
+            Notice(valueLabel(preview['notice']), icon: Icons.shield_outlined),
+            const Text(
+              'Este es el expediente completo que se enviará. Despliega las secciones para revisar todas las lecturas y sus datos históricos.',
             ),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: consent,
-            onChanged: busy ? null : (v) => setState(() => consent = v == true),
-            title: const Text(
-              'Autorizo enviar únicamente este expediente a Métrica. Entiendo que retirar el acceso no elimina las copias ya entregadas.',
+            EvidenceTree(preview['snapshot']),
+            const SizedBox(height: 16),
+            LabeledInput(
+              label: 'Mensaje para Métrica',
+              child: TextField(
+                controller: message,
+                enabled: !busy,
+                maxLength: 2000,
+                maxLines: 3,
+                onChanged: (_) => setState(() {}),
+              ),
             ),
-          ),
-          if (error != null) Notice(error!, icon: Icons.error_outline),
-          FilledButton(
-            onPressed: consent && !busy && message.text.trim().isNotEmpty
-                ? () => confirm(preview)
-                : null,
-            child: Text(
-              busy ? 'Confirmando…' : 'Compartir expediente autorizado',
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: consent,
+              onChanged: busy
+                  ? null
+                  : (v) => setState(() => consent = v == true),
+              title: const Text(
+                'Autorizo enviar únicamente este expediente a Métrica. Entiendo que retirar el acceso no elimina las copias ya entregadas.',
+              ),
             ),
-          ),
-        ],
+            if (error != null) Notice(error!, icon: Icons.error_outline),
+          ],
+        ),
       ),
     ),
   );

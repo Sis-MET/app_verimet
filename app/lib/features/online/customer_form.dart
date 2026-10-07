@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'draft_controller.dart' show normalizedDecimal;
 import 'mobile_api.dart';
 import 'mobile_session.dart';
@@ -81,7 +82,11 @@ class _CustomerFormState extends State<CustomerForm> {
   bool busy = false, dirty = false, leaving = false;
   String? error;
   Future<void> save() async {
-    if (busy || !form.currentState!.validate()) return;
+    if (busy) return;
+    if (!form.currentState!.validate()) {
+      revealFirstFormError(context, form);
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -179,13 +184,29 @@ class _CustomerFormState extends State<CustomerForm> {
     },
     child: OnlinePage(
       title: widget.title,
+      // La accion queda fija a la vista: antes habia que bajar hasta el final
+      // del formulario para encontrarla.
+      floating: WizardNavPill.action(
+        label: busy
+            ? 'Guardando…'
+            : pending != null
+            ? 'Reintentar guardado'
+            : widget.submitLabel,
+        icon: Icons.check_rounded,
+        onNext: busy ? null : save,
+      ),
       child: Form(
         key: form,
         onChanged: () {
           if (!dirty) setState(() => dirty = true);
         },
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            WizardNavPill.contentPadding,
+          ),
           children: [
             if (widget.notice != null) Notice(widget.notice!),
             if (widget.preview != null) widget.preview!,
@@ -369,16 +390,6 @@ class _CustomerFormState extends State<CustomerForm> {
                 absorbing: busy || pending != null,
                 child: widget.afterFields!,
               ),
-            FilledButton(
-              onPressed: busy ? null : save,
-              child: Text(
-                busy
-                    ? 'Guardando…'
-                    : pending != null
-                    ? 'Reintentar guardado'
-                    : widget.submitLabel,
-              ),
-            ),
           ],
         ),
       ),

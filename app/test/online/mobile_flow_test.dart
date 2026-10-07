@@ -63,21 +63,27 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final button = find.widgetWithText(
-        FilledButton,
-        'Compartir expediente autorizado',
+      // La accion es la pildora fija: se habilita con mensaje y
+      // consentimiento.
+      InkWell share() => tester.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const ValueKey('wizard-next')),
+          matching: find.byType(InkWell),
+        ),
       );
-      expect(tester.widget<FilledButton>(button).onPressed, isNull);
+      expect(find.text('Compartir expediente'), findsOneWidget);
+      expect(share().onTap, isNull);
       await tester.enterText(
         find.byType(TextField),
         'Solicito revisar este caso.',
       );
       await tester.pump();
-      expect(tester.widget<FilledButton>(button).onPressed, isNull);
+      expect(share().onTap, isNull);
+      await tester.ensureVisible(find.byType(CheckboxListTile));
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(button);
-      await tester.tap(button);
+      expect(share().onTap, isNotNull);
+      await tester.tap(find.text('Compartir expediente'));
       await tester.pumpAndSettle();
       final sent = server.requests.singleWhere(
         (r) => r.path.contains('confirm_ivmet_alert_share'),
