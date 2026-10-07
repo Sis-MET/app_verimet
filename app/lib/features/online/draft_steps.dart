@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/section_label.dart';
+import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/surface_card.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'draft_controller.dart';
 import 'flexible_trial_fields.dart';
 import 'mobile_api.dart';
@@ -26,6 +28,7 @@ class DraftSteps {
     required this.fields,
     required this.onGoToStep,
     required this.onSaveDraft,
+    required this.onToggleOmission,
   });
 
   final DraftController capture;
@@ -41,9 +44,15 @@ class DraftSteps {
   /// asistente —toca red y estado de navegacion—, aqui solo esta el boton.
   final AsyncCallback onSaveDraft;
 
+  /// Omitir o volver a incluir una prueba. Omitir vive en ⋮; volver a
+  /// incluirla, tambien en la tarjeta de la prueba omitida.
+  final ValueChanged<Json> onToggleOmission;
+
   List<Widget> preparation(BuildContext context) => [
-    const Text(
-      'Registra las condiciones ambientales. Si utilizas pesas patrón, selecciona sus certificados; también puedes comprobar con productos o cargas de trabajo.',
+    WizardStepHeading(
+      title: draftStepTitles[0],
+      caption:
+          'Elige los certificados de las pesas que usarás y registra el ambiente. Sin pesas patrón, identifica las cargas en cada prueba.',
     ),
     const SectionLabel('Pesas patrón y certificados'),
     if (objects(capture.bundle['patterns']).isEmpty)
@@ -114,7 +123,7 @@ class DraftSteps {
       ),
     ),
     const Notice(
-      'Los datos se guardan automáticamente. Un certificado vencido no aporta trazabilidad a la verificación.',
+      'Un certificado vencido no aporta trazabilidad a la verificación.',
     ),
   ];
 
@@ -123,53 +132,98 @@ class DraftSteps {
         .where((t) => t['type'] == draftStepTypes[capture.step])
         .toList();
     return [
-      if (tests.isEmpty)
+      if (tests.isEmpty) ...[
+        WizardStepHeading(title: draftStepTitles[capture.step]),
         const Notice(
           'Esta prueba no está incluida en la configuración de la balanza. Continúa al siguiente paso.',
         ),
+      ],
       for (final test in tests) ..._trial(context, test),
     ];
+  }
+
+  /// Que hacer en la prueba, en una o dos lineas. Con cargas flexibles
+  /// recuerda que la carga sugerida es orientativa: antes era un aviso aparte.
+  String _instruction(Json test) {
+    final action = switch (test['type']) {
+      'eccentricity' => 'Registra la indicación en cada posición de la carga.',
+      'repeatability' => 'Repite la misma carga y registra cada indicación.',
+      _ => 'Registra la indicación para cada carga del rango.',
+    };
+    if (capture.flexible) {
+      return '$action Anota la carga que usaste: la sugerida es orientativa.';
+    }
+    return '$action ${objects(test['points']).length} puntos · '
+        '${valueLabel(test['unit'])}.';
+  }
+
+  /// Prueba omitida: el motivo y la vuelta atras, sin lecturas a la vista.
+  /// Las lecturas ya escritas se conservan.
+  Widget _omitted(BuildContext context, Json test, Json input) {
+    final palette = IndustryPalette.of(context);
+    return SurfaceCard(
+      key: const ValueKey('omitted-test'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.do_not_disturb_on_outlined,
+                size: 20,
+                color: palette.accentInk,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Prueba omitida',
+                style: AppTextStyles.figure(context, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Indica por qué. Si la vuelves a incluir, recuperas las lecturas que ya registraste.',
+            style: TextStyle(fontSize: 12, height: 1.4, color: palette.muted),
+          ),
+          const SizedBox(height: 12),
+          LabeledInput(
+            label: 'Motivo de omisión',
+            child: TextFormField(
+              controller: fields['${test['id']}:reason'],
+              enabled: !capture.locked,
+              maxLength: 500,
+              maxLines: 3,
+              validator: (value) => (value ?? '').trim().isEmpty
+                  ? 'Debes justificar la omisión.'
+                  : null,
+            ),
+          ),
+          if (!capture.locked)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => onToggleOmission(input),
+                icon: const Icon(Icons.playlist_add_check),
+                label: const Text('Volver a incluir la prueba'),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   List<Widget> _trial(BuildContext context, Json test) {
     final input = capture.testInput(test['id'] as String);
     final unit = valueLabel(test['unit']);
     return [
-      Text(switch (test['type']) {
-        'eccentricity' =>
-          'Registra la indicación en cada posición de la carga.',
-        'repeatability' => 'Repite la misma carga y registra cada indicación.',
-        _ => 'Registra la indicación para cada carga del rango de medición.',
-      }),
-      if (!capture.flexible)
-        Notice(
-          '${objects(test['points']).length} puntos · $unit',
-          icon: Icons.science_outlined,
-        ),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Omitir esta prueba'),
-        subtitle: const Text('Requiere indicar el motivo.'),
-        value: input['omitted'] == true,
-        onChanged: capture.locked
-            ? null
-            : (value) {
-                input['omitted'] = value;
-                capture.changed();
-              },
+      WizardStepHeading(
+        title: draftStepTitles[capture.step],
+        caption: input['omitted'] == true ? null : _instruction(test),
       ),
       if (input['omitted'] == true)
-        LabeledInput(
-          label: 'Motivo de omisión',
-          child: TextFormField(
-            controller: fields['${test['id']}:reason'],
-            enabled: !capture.locked,
-            maxLength: 500,
-            maxLines: 3,
-            validator: (value) => (value ?? '').trim().isEmpty
-                ? 'Debes justificar la omisión.'
-                : null,
-          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _omitted(context, test, input),
         )
       else if (capture.flexible)
         FlexibleTrialFields(
@@ -246,8 +300,10 @@ class DraftSteps {
     ],
   );
   List<Widget> summary(BuildContext context) => [
-    const Text(
-      'Revisa las condiciones, las pesas patrón y todas las lecturas antes de finalizar.',
+    WizardStepHeading(
+      title: draftStepTitles[4],
+      caption:
+          'Revisa las condiciones, las pesas patrón y todas las lecturas antes de finalizar.',
     ),
     _heading('Condiciones y pesas patrón', 0),
     SurfaceCard(

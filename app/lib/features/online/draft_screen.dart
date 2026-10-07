@@ -4,9 +4,11 @@ import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/numeric_keypad.dart';
 import '../../shared/widgets/section_label.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'draft_controller.dart';
 import 'draft_steps.dart';
 import 'history_screen.dart';
+import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
@@ -114,6 +116,7 @@ class _DraftWizardState extends State<_DraftWizard>
     with WidgetsBindingObserver {
   DraftController get capture => widget.controller;
   final form = GlobalKey<FormState>();
+  final scaffold = GlobalKey<ScaffoldState>();
   final Map<String, TextEditingController> fields = {};
 
   /// Lo que se ve en cada paso. Se rehace en cada `build` porque no guarda
@@ -123,17 +126,17 @@ class _DraftWizardState extends State<_DraftWizard>
     fields: fields,
     onGoToStep: _go,
     onSaveDraft: _save,
+    onToggleOmission: _toggleOmission,
   );
   late ScrollController scroll;
 
   /// Teclado numerico propio de las lecturas. Mientras escribe ocupa el sitio
-  /// de la barra de pasos.
+  /// de la pildora de navegacion.
   final keypad = NumericKeypadController();
   bool navigating = false;
   bool allowPop = false;
   bool restoringScroll = false;
   bool confirming = false;
-  late bool headerHidden;
 
   @override
   void initState() {
@@ -166,7 +169,6 @@ class _DraftWizardState extends State<_DraftWizard>
     }
     scroll = ScrollController(initialScrollOffset: capture.offset)
       ..addListener(_scrolled);
-    headerHidden = capture.offset > _hideAfter;
     capture.addListener(_updated);
     capture.start();
   }
@@ -187,25 +189,9 @@ class _DraftWizardState extends State<_DraftWizard>
     if (mounted) setState(() {});
   }
 
-  /// La cabecera se pliega al bajar y vuelve arriba del todo. Los umbrales
-  /// distintos y la longitud minima evitan un bucle: al plegarla la lista
-  /// gana su alto, y si el contenido apenas desbordaba, el desplazamiento se
-  /// recortaba a cero, la cabecera volvia, la lista volvia a desbordar...
-  static const _hideAfter = 48.0;
-  static const _showBefore = 8.0;
-  static const _minimumOverflow = 220.0;
-
   void _scrolled() {
     if (restoringScroll || !scroll.hasClients) return;
-    final position = scroll.position;
-    capture.setOffset(position.pixels);
-    final hidden = headerHidden
-        ? position.pixels > _showBefore
-        : position.pixels > _hideAfter &&
-              position.maxScrollExtent > _minimumOverflow;
-    if (hidden != headerHidden && mounted) {
-      setState(() => headerHidden = hidden);
-    }
+    capture.setOffset(scroll.position.pixels);
   }
 
   @override
@@ -226,18 +212,21 @@ class _DraftWizardState extends State<_DraftWizard>
     super.dispose();
   }
 
-  Future<void> _go(int target) async {
+  /// Ir a un paso. "Siguiente" valida el paso actual; el panel de pasos lleva
+  /// a cualquiera sin validar ([validate] en false), y lo que quede incompleto
+  /// se marca en el panel y lo frena la finalizacion.
+  Future<void> _go(int target, {bool validate = true}) async {
     if (navigating || capture.locked) return;
-    if (target > capture.step && !form.currentState!.validate()) return;
+    if (validate && target > capture.step && !form.currentState!.validate()) {
+      revealFirstFormError(context, form);
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => navigating = true);
     restoringScroll = true;
     await capture.goTo(target);
     if (!mounted) return;
-    setState(() {
-      navigating = false;
-      headerHidden = capture.offset > _hideAfter;
-    });
+    setState(() => navigating = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && scroll.hasClients) {
         scroll.jumpTo(capture.offset.clamp(0, scroll.position.maxScrollExtent));
@@ -246,8 +235,21 @@ class _DraftWizardState extends State<_DraftWizard>
     });
   }
 
+  void _tell(String message, {SnackBarAction? action}) =>
+      showWizardMessage(context, message, action: action);
+
+  /// Omitir o volver a incluir la prueba del paso. Las lecturas se conservan:
+  /// al incluirla de nuevo vuelven tal cual.
+  void _toggleOmission(Json input) {
+    if (capture.locked) return;
+    keypad.close();
+    input['omitted'] = input['omitted'] != true;
+    capture.changed();
+  }
+
   Future<void> _leave() async {
     if (navigating || capture.finalizing) return;
+    keypad.close();
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => navigating = true);
     final saved = await capture.pause();
@@ -261,6 +263,22 @@ class _DraftWizardState extends State<_DraftWizard>
         if (mounted) Navigator.of(context).pop();
       });
     }
+  }
+
+  /// Atras del sistema: primero cierra el panel de pasos o el teclado, despues
+  /// retrocede un paso. Nunca sale de la captura: un gesto accidental en el
+  /// borde no deja al operario fuera; se sale con ⋮ › Guardar y salir.
+  void _onSystemBack() {
+    if (closeWizardDrawer(scaffold)) return;
+    if (keypad.visible) {
+      keypad.close();
+      return;
+    }
+    if (capture.step > 0 && !capture.locked) {
+      unawaited(_go(capture.step - 1));
+      return;
+    }
+    _tell('Es el primer paso. Para salir usa ⋮ › Guardar y salir.');
   }
 
   Future<void> _save() async {
@@ -333,6 +351,15 @@ class _DraftWizardState extends State<_DraftWizard>
     if (confirming || capture.finalizing) return;
     if (!capture.locked && capture.completionIssue != null) {
       setState(() => capture.error = capture.completionIssue);
+      if (scroll.hasClients) {
+        unawaited(
+          scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          ),
+        );
+      }
       return;
     }
     confirming = true;
@@ -402,6 +429,14 @@ class _DraftWizardState extends State<_DraftWizard>
     });
   }
 
+  _SaveState get _saveState {
+    if (capture.localError != null) return _SaveState.error;
+    if (capture.pendingFinalize != null) return _SaveState.waiting;
+    if (capture.syncing) return _SaveState.syncing;
+    if (capture.dirty) return _SaveState.local;
+    return _SaveState.synced;
+  }
+
   String get _saveStatus {
     if (capture.localError != null) return capture.localError!;
     if (!capture.localSaved) return 'Guardando en este dispositivo…';
@@ -411,247 +446,333 @@ class _DraftWizardState extends State<_DraftWizard>
     if (capture.syncing) {
       return 'Guardado en este dispositivo · enviando al servidor…';
     }
+    if (capture.dirty && capture.draftIssue != null) {
+      return 'Guardado en este dispositivo · se enviará al servidor cuando los datos estén completos';
+    }
     if (capture.dirty) {
       return 'Guardado en este dispositivo · pendiente de enviar';
     }
     return 'Guardado en este dispositivo y en el servidor';
   }
 
+  void _explainSave() {
+    final canSend =
+        capture.localError == null &&
+        capture.dirty &&
+        capture.draftIssue == null &&
+        !capture.syncing &&
+        !capture.locked;
+    _tell(
+      _saveStatus,
+      action: capture.localError != null
+          ? SnackBarAction(label: 'Reintentar', onPressed: _save)
+          : canSend
+          ? SnackBarAction(label: 'Enviar ahora', onPressed: _save)
+          : null,
+    );
+  }
+
+  /// Un paso por prueba y dos de marco. "Completo" no es "visitado": una
+  /// prueba lo esta cuando tiene todas sus lecturas o un motivo de omision.
+  List<WizardStep> _wizardSteps() {
+    final step = capture.step;
+    final certificates = (capture.raw['certificates'] as List).length;
+    final environmentIssue =
+        decimalError(capture.raw['temperature'] as String, environment: true) !=
+            null ||
+        decimalError(
+              capture.raw['humidity'] as String,
+              environment: true,
+              humidity: true,
+            ) !=
+            null;
+    WizardStep test(int index) {
+      final plan = capture.tests
+          .where((t) => t['type'] == draftStepTypes[index])
+          .firstOrNull;
+      if (plan == null) {
+        return WizardStep(
+          title: draftStepTitles[index],
+          detail: 'No incluida en la configuración',
+          progress: WizardProgress.complete,
+          enabled: !capture.locked,
+        );
+      }
+      final input = capture.testInput(plan['id'] as String);
+      final readings = objects(input['readings']);
+      final filled = readings
+          .where((r) => (r['indication'] as String).trim().isNotEmpty)
+          .length;
+      final complete = capture.testComplete(input);
+      return WizardStep(
+        title: draftStepTitles[index],
+        detail: input['omitted'] == true
+            ? complete
+                  ? 'Omitida'
+                  : 'Omitida · falta el motivo'
+            : complete
+            ? 'Lecturas completas'
+            : '$filled de ${readings.length} lecturas',
+        progress: complete
+            ? WizardProgress.complete
+            : index < step
+            ? WizardProgress.review
+            : WizardProgress.pending,
+        enabled: !capture.locked,
+      );
+    }
+
+    return [
+      WizardStep(
+        title: draftStepTitles[0],
+        detail: [
+          certificates == 0
+              ? 'Sin pesas patrón'
+              : '$certificates ${certificates == 1 ? 'certificado' : 'certificados'}',
+          if ((capture.raw['temperature'] as String).isNotEmpty)
+            '${capture.raw['temperature']} °C',
+          if ((capture.raw['humidity'] as String).isNotEmpty)
+            '${capture.raw['humidity']} %',
+        ].join(' · '),
+        progress: environmentIssue
+            ? WizardProgress.review
+            : step > 0
+            ? WizardProgress.complete
+            : WizardProgress.pending,
+        enabled: !capture.locked,
+      ),
+      for (var index = 1; index <= 3; index++) test(index),
+      WizardStep(
+        title: draftStepTitles[4],
+        detail: capture.locked
+            ? 'Finalización en curso'
+            : 'Observaciones y finalizar',
+        progress: capture.finalizedResult != null
+            ? WizardProgress.complete
+            : WizardProgress.pending,
+      ),
+    ];
+  }
+
+  /// La prueba del paso actual, si el paso es de una prueba configurada.
+  Json? get _currentTest {
+    if (capture.step < 1 || capture.step > 3) return null;
+    final plan = capture.tests
+        .where((t) => t['type'] == draftStepTypes[capture.step])
+        .firstOrNull;
+    return plan == null ? null : capture.testInput(plan['id'] as String);
+  }
+
+  Future<void> _showEquipment() async {
+    keypad.close();
+    final equipment = capture.equipment;
+    final ranges = objects(capture.bundle['ranges']);
+    final selected = (capture.raw['certificates'] as List).toSet();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            children: [
+              Kicker('Balanza'),
+              const SizedBox(height: 2),
+              Text(
+                customerEquipmentCode(equipment),
+                style: AppTextStyles.figure(context, size: 26),
+              ),
+              if (!registeredByCustomer(equipment))
+                DetailField('Código Métrica', equipment['cod_metrica']),
+              DetailField(
+                'Marca y modelo',
+                '${valueLabel(equipment['marca'])} · ${valueLabel(equipment['modelo'])}',
+              ),
+              DetailField('Serie', equipment['serie']),
+              DetailField('Ubicación', equipment['ubicacion']),
+              for (final range in ranges)
+                DetailField(
+                  'Rango ${range['numero_rango']}',
+                  '${rangeCapacityLabel(range)} ${range['unidad']}'
+                      ' · d = ${rangeDivisionLabel(range)} ${range['unidad']}',
+                ),
+              const SectionLabel('Pesas patrón elegidas'),
+              if (selected.isEmpty)
+                const Text('Ninguna: se usan productos o cargas de trabajo.')
+              else
+                for (final pattern in objects(capture.bundle['patterns']))
+                  for (final cert in objects(pattern['certificates']))
+                    if (selected.contains(cert['id']))
+                      DetailField(
+                        '${pattern['code']} · ${pattern['description']}',
+                        '${cert['number']}${cert['expired'] == true ? ' · VENCIDO' : ''}',
+                      ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _optionsMenu() {
+    final test = _currentTest;
+    return PopupMenuButton<_MenuAction>(
+      tooltip: 'Más opciones',
+      icon: const Icon(Icons.more_vert),
+      onOpened: keypad.close,
+      onSelected: (action) => switch (action) {
+        _MenuAction.omission => _toggleOmission(test!),
+        _MenuAction.equipment => unawaited(_showEquipment()),
+        _MenuAction.server => unawaited(_compareServer()),
+        _MenuAction.leave => unawaited(_leave()),
+      },
+      itemBuilder: (context) => [
+        if (test != null && !capture.locked)
+          wizardMenuItem(
+            _MenuAction.omission,
+            test['omitted'] == true
+                ? Icons.playlist_add_check
+                : Icons.do_not_disturb_on_outlined,
+            test['omitted'] == true
+                ? 'Incluir esta prueba'
+                : 'Omitir esta prueba',
+          ),
+        wizardMenuItem(
+          _MenuAction.equipment,
+          Icons.info_outline,
+          'Datos de la balanza',
+        ),
+        if (capture.conflict && capture.draftId != null)
+          wizardMenuItem(
+            _MenuAction.server,
+            Icons.cloud_sync_outlined,
+            'Ver datos del servidor',
+          ),
+        wizardMenuItem(
+          _MenuAction.leave,
+          Icons.logout,
+          'Guardar y salir',
+          enabled: !navigating && !capture.finalizing,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final palette = IndustryPalette.of(context);
     final step = capture.step;
+    final wizard = _wizardSteps();
+    final last = step == draftStepTitles.length - 1;
+
     return PopScope(
       canPop: allowPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop || navigating) return;
-        // Atras primero cierra el teclado, como con el del sistema.
-        if (keypad.visible) {
-          keypad.close();
-          return;
-        }
-        if (step > 0 && !capture.locked) {
-          unawaited(_go(step - 1));
-        } else {
-          unawaited(_leave());
-        }
+        if (!didPop && !navigating) _onSystemBack();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Verificación · ${customerEquipmentCode(capture.equipment)}',
-          ),
-        ),
-        body: SafeArea(
-          child: NumericKeypadScope(
-            controller: keypad,
-            child: Column(
+      child: NumericKeypadScope(
+        controller: keypad,
+        child: WizardScaffold(
+          scaffoldKey: scaffold,
+          kicker: 'Verificación intermedia',
+          title: customerEquipmentCode(capture.equipment),
+          steps: wizard,
+          current: step,
+          onSelectStep: (index) => unawaited(_go(index, validate: false)),
+          // Al abrir el panel se cierra el teclado propio.
+          onDrawerOpened: keypad.close,
+          actions: [
+            // Cambia con cada escritura: escucha su propia senal y no la de
+            // toda la captura.
+            ListenableBuilder(
+              listenable: capture.status,
+              builder: (context, _) => _SaveStatusButton(
+                state: _saveState,
+                text: _saveStatus,
+                onPressed: _explainSave,
+              ),
+            ),
+            _optionsMenu(),
+          ],
+          banner: capture.localError == null
+              ? null
+              : _SaveErrorBanner(message: capture.localError!, onRetry: _save),
+          body: Form(
+            key: form,
+            child: ListView(
+              key: const ValueKey('draft-content'),
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(
+                20,
+                18,
+                20,
+                WizardNavPill.contentPadding,
+              ),
               children: [
-                ClipRect(
-                  child: AnimatedSize(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topCenter,
-                    child: headerHidden
-                        ? const SizedBox.shrink()
-                        : Padding(
-                            key: const ValueKey('draft-step-header'),
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    for (var index = 0; index < 5; index++) ...[
-                                      if (index > 0)
-                                        Expanded(
-                                          child: Divider(
-                                            color: index <= step
-                                                ? palette.accentInk
-                                                : palette.track,
-                                          ),
-                                        ),
-                                      Semantics(
-                                        selected: index == step,
-                                        label:
-                                            'Paso ${index + 1}: ${draftStepTitles[index]}',
-                                        child: IconButton.filledTonal(
-                                          tooltip: draftStepTitles[index],
-                                          onPressed:
-                                              index < step &&
-                                                  !capture.locked &&
-                                                  !navigating
-                                              ? () => _go(index)
-                                              : null,
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: index == step
-                                                ? palette.accentInk
-                                                : palette.surface,
-                                            disabledBackgroundColor:
-                                                index == step
-                                                ? palette.accentInk
-                                                : palette.surface,
-                                            foregroundColor: index == step
-                                                ? palette.card
-                                                : palette.text,
-                                            disabledForegroundColor:
-                                                index == step
-                                                ? palette.card
-                                                : palette.muted,
-                                          ),
-                                          icon: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Paso ${step + 1} de 5',
-                                  style: AppTextStyles.caption(
-                                    context,
-                                    size: 12,
-                                  ),
-                                ),
-                                Text(
-                                  draftStepTitles[step],
-                                  style: AppTextStyles.figure(
-                                    context,
-                                    size: 25,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                // Cambia con cada escritura: escucha su propia
-                                // senal y no la de toda la captura.
-                                ListenableBuilder(
-                                  listenable: capture.status,
-                                  builder: (context, _) => _SaveStatusLine(
-                                    error: capture.localError != null,
-                                    pending: capture.dirty,
-                                    text: _saveStatus,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                if (capture.error != null) Notice(capture.error!, alert: true),
+                if (capture.conflict) ...[
+                  const Notice(
+                    'Se conserva tu captura local. El servidor tiene otra versión; no se sobrescribirá automáticamente.',
                   ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: Form(
-                    key: form,
-                    child: ListView(
-                      key: const ValueKey('draft-content'),
-                      controller: scroll,
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                      children: [
-                        if (capture.localError != null)
-                          OutlinedButton(
-                            onPressed: _save,
-                            child: const Text('Reintentar guardado'),
-                          ),
-                        if (capture.error != null)
-                          Notice(capture.error!, alert: true),
-                        if (capture.conflict) ...[
-                          const Notice(
-                            'Se conserva tu captura local. El servidor tiene otra versión; no se sobrescribirá automáticamente.',
-                          ),
-                          if (capture.draftId != null)
-                            OutlinedButton(
-                              onPressed: _compareServer,
-                              child: const Text('Ver datos del servidor'),
-                            ),
-                        ],
-                        if (capture.draftIssue != null && capture.dirty)
-                          Notice(capture.draftIssue!),
-                        KeyedSubtree(
-                          key: ValueKey(step),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: step == 0
-                                ? steps.preparation(context)
-                                : step == 4
-                                ? steps.summary(context)
-                                : steps.testStep(context),
-                          ),
-                        ),
-                      ],
+                  if (capture.draftId != null)
+                    OutlinedButton(
+                      onPressed: _compareServer,
+                      child: const Text('Ver datos del servidor'),
                     ),
+                ],
+                KeyedSubtree(
+                  key: ValueKey(step),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: step == 0
+                        ? steps.preparation(context)
+                        : last
+                        ? steps.summary(context)
+                        : steps.testStep(context),
                   ),
-                ),
-                const Divider(height: 1),
-                ListenableBuilder(
-                  listenable: keypad,
-                  builder: (context, _) => keypad.visible
-                      ? NumericKeypad(controller: keypad)
-                      : Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  if (step > 0) ...[
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: navigating || capture.locked
-                                            ? null
-                                            : () => _go(step - 1),
-                                        child: const Text('Anterior'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                  ],
-                                  Expanded(
-                                    flex: 2,
-                                    child: step < 4
-                                        ? FilledButton.icon(
-                                            onPressed:
-                                                navigating || capture.locked
-                                                ? null
-                                                : () => _go(step + 1),
-                                            icon: const Icon(
-                                              Icons.arrow_forward,
-                                              size: 18,
-                                            ),
-                                            label: const Text('Siguiente'),
-                                          )
-                                        : FilledButton(
-                                            onPressed:
-                                                navigating ||
-                                                    capture.finalizing ||
-                                                    capture.plan['finalizationEnabled'] !=
-                                                        true
-                                                ? null
-                                                : _finalize,
-                                            child: Text(
-                                              capture.finalizing
-                                                  ? 'Finalizando…'
-                                                  : capture.locked
-                                                  ? 'Confirmar resultado'
-                                                  : 'Guardar y finalizar',
-                                            ),
-                                          ),
-                                  ),
-                                ],
-                              ),
-                              TextButton.icon(
-                                onPressed: navigating || capture.finalizing
-                                    ? null
-                                    : _leave,
-                                icon: const Icon(Icons.save_outlined, size: 17),
-                                label: const Text('Guardar y salir'),
-                              ),
-                            ],
-                          ),
-                        ),
                 ),
               ],
             ),
+          ),
+          // El teclado numerico ocupa el lugar de la pildora.
+          pill: ListenableBuilder(
+            listenable: keypad,
+            builder: (context, _) => keypad.visible
+                ? const SizedBox.shrink()
+                : WizardNavPill(
+                    label: !last
+                        ? 'Siguiente'
+                        : capture.finalizing
+                        ? 'Finalizando…'
+                        : capture.locked
+                        ? 'Confirmar resultado'
+                        : 'Finalizar',
+                    icon: last
+                        ? Icons.check_rounded
+                        : Icons.arrow_forward_rounded,
+                    onBack: step > 0 && !capture.locked && !navigating
+                        ? () => _go(step - 1)
+                        : null,
+                    onNext: !last
+                        ? navigating || capture.locked
+                              ? null
+                              : () => _go(step + 1)
+                        : navigating ||
+                              capture.finalizing ||
+                              capture.plan['finalizationEnabled'] != true
+                        ? null
+                        : _finalize,
+                  ),
+          ),
+          footer: ListenableBuilder(
+            listenable: keypad,
+            builder: (context, _) => keypad.visible
+                ? NumericKeypad(controller: keypad)
+                : const SizedBox.shrink(),
           ),
         ),
       ),
@@ -659,39 +780,99 @@ class _DraftWizardState extends State<_DraftWizard>
   }
 }
 
-class _SaveStatusLine extends StatelessWidget {
-  const _SaveStatusLine({
-    required this.error,
-    required this.pending,
+enum _MenuAction { omission, equipment, server, leave }
+
+enum _SaveState { error, waiting, syncing, local, synced }
+
+/// Estado del guardado como un icono del AppBar: antes era una linea de texto
+/// fija bajo los pasos. El texto completo va en el tooltip y al tocarlo.
+class _SaveStatusButton extends StatelessWidget {
+  const _SaveStatusButton({
+    required this.state,
     required this.text,
+    required this.onPressed,
   });
-  final bool error;
-  final bool pending;
+  final _SaveState state;
   final String text;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final palette = IndustryPalette.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          error
-              ? Icons.error_outline
-              : pending
-              ? Icons.save_outlined
-              : Icons.cloud_done_outlined,
-          size: 16,
-          color: error ? palette.fail : palette.muted,
+    final Widget glyph = switch (state) {
+      _SaveState.error => Icon(
+        Icons.error_outline,
+        key: const ValueKey('error'),
+        color: palette.fail,
+      ),
+      _SaveState.waiting => Icon(
+        Icons.hourglass_top_rounded,
+        key: const ValueKey('waiting'),
+        color: palette.accentInk,
+      ),
+      _SaveState.syncing => SizedBox.square(
+        key: const ValueKey('syncing'),
+        dimension: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: palette.accentInk,
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 11.5, color: palette.muted),
-          ),
+      ),
+      _SaveState.local => Icon(
+        Icons.cloud_upload_outlined,
+        key: const ValueKey('local'),
+        color: palette.muted,
+      ),
+      _SaveState.synced => Icon(
+        Icons.cloud_done_outlined,
+        key: const ValueKey('synced'),
+        color: palette.muted,
+      ),
+    };
+    return IconButton(
+      tooltip: text,
+      onPressed: onPressed,
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: glyph,
+      ),
+    );
+  }
+}
+
+/// Aviso fijo bajo el AppBar mientras el telefono no puede guardar: lo escrito
+/// sigue en pantalla pero no esta en el disco.
+class _SaveErrorBanner extends StatelessWidget {
+  const _SaveErrorBanner({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        color: palette.failSurface,
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, size: 18, color: palette.failInk),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(fontSize: 12.5, color: palette.failInk),
+              ),
+            ),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Reintentar guardado'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

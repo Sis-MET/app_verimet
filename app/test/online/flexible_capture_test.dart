@@ -326,7 +326,7 @@ void main() {
           'TextInputType.none',
         );
         expect(find.byType(NumericKeypad), findsOneWidget);
-        expect(find.text('Guardar y salir'), findsNothing);
+        expect(find.byKey(const ValueKey('wizard-nav')), findsNothing);
 
         for (final key in ['1', 'comma', '5', 'sign']) {
           await press(key);
@@ -370,7 +370,7 @@ void main() {
         await press('done');
         await tester.pumpAndSettle();
         expect(find.byType(NumericKeypad), findsNothing);
-        expect(find.text('Guardar y salir'), findsOneWidget);
+        expect(find.byKey(const ValueKey('wizard-nav')), findsOneWidget);
 
         // Atrás cierra primero el teclado y no sale del paso.
         await focus(indication);

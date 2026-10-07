@@ -14,6 +14,31 @@ muestra todas las lecturas y permite editar cada sección. Guardar y salir
 conserva un borrador incompleto, accesible desde Mis borradores. La finalización
 guarda primero y utiliza la evaluación existente del servidor.
 
+## Pantalla de captura
+
+Sigue el marco de la calibración de ServiceMET, para que el paso tenga la
+pantalla:
+
+- **AppBar limpio.** A la izquierda, ≡ abre el panel de pasos; al centro, el
+  código de la balanza y «Paso 2 de 5 · Excentricidad»; a la derecha, el estado
+  del guardado (un icono: en el dispositivo, enviando, en el servidor o error;
+  al tocarlo explica el estado y ofrece reintentar o enviar) y ⋮ con las
+  acciones extra: omitir o incluir la prueba del paso, datos de la balanza,
+  ver datos del servidor (si hay conflicto) y guardar y salir.
+- **Panel de pasos** a la izquierda, con cada paso marcado como completo, por
+  revisar (en óxido) o pendiente, y una línea de detalle («3 de 5 lecturas»,
+  «Omitida», «1 certificado · 21,5 °C»). Lleva a cualquier paso sin validar;
+  lo incompleto queda marcado y la finalización lo frena.
+- Bajo el AppBar, una línea de 3 px con un tramo por paso.
+- **Píldora flotante** abajo a la derecha: Anterior y la acción del paso
+  («Siguiente» o «Finalizar»). El teclado numérico ocupa su lugar mientras
+  está abierto. «Siguiente» valida el paso y, si falta algo, lleva al primer
+  campo marcado.
+- Atrás del sistema cierra el panel o el teclado y después retrocede un paso.
+  Nunca sale de la captura: en el primer paso avisa cómo salir.
+- Omitir una prueba se hace desde ⋮; la prueba omitida muestra solo el motivo
+  y «Volver a incluir la prueba», que recupera las lecturas ya escritas.
+
 ## Persistencia
 
 `DraftController` separa las cadenas crudas introducidas por el operador del

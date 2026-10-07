@@ -350,9 +350,6 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Notice(
-        'Las cargas son sugeridas. Registra la carga realmente utilizada; puede ser una pesa patrón, un producto o una carga de trabajo.',
-      ),
       select('source', 'Origen de las cargas', loadSources),
       field(
         'description',

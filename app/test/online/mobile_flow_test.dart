@@ -279,14 +279,14 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets(
-    'el encabezado de pasos se oculta al desplazar y el AppBar no duplica guardado',
+    'la captura deja el AppBar limpio: pasos en el panel y acciones en ⋮',
     (tester) async {
       final server = FixtureServer();
       final session = MobileSession(server.api, recovery: server.recovery);
       await tester.runAsync(
         () => session.login('operador', 'fixture-password'),
       );
-      tester.view.physicalSize = const Size(430, 700);
+      tester.view.physicalSize = const Size(430, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
@@ -296,21 +296,60 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byTooltip('Guardar borrador'), findsNothing);
-      expect(find.byKey(const ValueKey('draft-step-header')), findsOneWidget);
-      await tester.drag(
-        find.byKey(const ValueKey('draft-content')),
-        const Offset(0, -250),
-      );
-      await tester.pumpAndSettle();
+      // Solo donde se esta, sin fila de pasos ni texto de guardado fijo.
       expect(find.byKey(const ValueKey('draft-step-header')), findsNothing);
-
-      await tester.drag(
-        find.byKey(const ValueKey('draft-content')),
-        const Offset(0, 1000),
+      expect(
+        find.text('Paso 1 de 5 · Pesas patrón y ambiente'),
+        findsOneWidget,
       );
+      expect(find.text('Guardar y salir'), findsNothing);
+      expect(find.byKey(const ValueKey('wizard-nav')), findsOneWidget);
+
+      // "Siguiente" con un dato invalido lleva al campo y no avanza.
+      await tester.enterText(fieldLabeled('Temperatura (°C)'), '1,23456');
+      await tester.tap(find.text('Siguiente'));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('draft-step-header')), findsOneWidget);
+      expect(
+        find.text('Completa los datos marcados para continuar.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Paso 1 de 5'), findsOneWidget);
+      await tester.enterText(fieldLabeled('Temperatura (°C)'), '21,5');
+
+      // Los pasos estan en el panel lateral y llevan a cualquiera.
+      await tester.tap(find.byTooltip('Pasos'));
+      await tester.pumpAndSettle();
+      expect(find.text('Linealidad'), findsOneWidget);
+      expect(find.text('1 certificado'), findsNothing);
+      await tester.tap(find.text('Linealidad'));
+      await tester.pumpAndSettle();
+      expect(find.text('Paso 4 de 5 · Linealidad'), findsOneWidget);
+
+      // Omitir la prueba es una accion de ⋮.
+      await tester.tap(find.byTooltip('Más opciones'));
+      await tester.pumpAndSettle();
+      expect(find.text('Datos de la balanza'), findsOneWidget);
+      expect(find.text('Guardar y salir'), findsOneWidget);
+      await tester.tap(find.text('Omitir esta prueba'));
+      await tester.pumpAndSettle();
+      expect(find.text('Prueba omitida'), findsOneWidget);
+      await tester.tap(find.text('Volver a incluir la prueba'));
+      await tester.pumpAndSettle();
+      expect(find.text('Prueba omitida'), findsNothing);
+
+      // Atras retrocede un paso; en el primero no sale, avisa como salir.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Paso 3 de 5'), findsOneWidget);
+      await tester.tap(find.byTooltip('Anterior'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Paso 1 de 5'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Es el primer paso'), findsOneWidget);
+      expect(find.byType(DraftScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       session.dispose();
@@ -339,7 +378,7 @@ void main() {
     await tester.ensureVisible(indication);
     await tester.enterText(indication, '0,123456789');
     await nextStep(tester);
-    expect(find.text('Paso 5 de 5'), findsOneWidget);
+    expect(find.textContaining('Paso 5 de 5'), findsOneWidget);
     final save = find.text('Guardar borrador privado');
     await tester.ensureVisible(save);
     await tester.tap(save);
@@ -362,7 +401,7 @@ void main() {
       false,
     );
     expect(
-      find.text('Guardado en este dispositivo y en el servidor'),
+      find.byTooltip('Guardado en este dispositivo y en el servidor'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -395,12 +434,10 @@ void main() {
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
-    final finalize = find.text('Guardar y finalizar');
-    await tester.ensureVisible(finalize);
-    await tester.tap(finalize);
+    await tester.tap(find.text('Finalizar'));
     await tester.pumpAndSettle();
     expect(find.text('Finalizar verificación intermedia'), findsWidgets);
-    await tester.tap(find.text('Finalizar'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Finalizar'));
     await tester.pumpAndSettle();
     expect(find.text('Resultado guardado'), findsOneWidget);
     final request = server.requests.singleWhere(
@@ -515,14 +552,16 @@ void main() {
       await tester.enterText(fieldLabeled('Indicación'), '10,001');
       await nextStep(tester);
       expect(find.text('Repetibilidad'), findsOneWidget);
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.byTooltip('Más opciones'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Omitir esta prueba'));
       await tester.pumpAndSettle();
       await tester.enterText(
         fieldLabeled('Motivo de omisión'),
         'Carga no disponible',
       );
       await nextStep(tester);
-      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      expect(find.textContaining('Paso 4 de 5'), findsOneWidget);
       final indication = fieldLabeled('Indicación');
       await tester.enterText(indication, '10,');
       await tester.pumpAndSettle();
@@ -530,14 +569,11 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       session.dispose();
       await start(tester, server);
-      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      expect(find.textContaining('Paso 4 de 5'), findsOneWidget);
       expect(tester.widget<TextFormField>(indication).controller!.text, '10,');
-      await tester.tap(find.text('Anterior'));
+      await tester.tap(find.byTooltip('Anterior'));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
-        true,
-      );
+      expect(find.text('Prueba omitida'), findsOneWidget);
       expect(
         tester
             .widget<TextFormField>(fieldLabeled('Motivo de omisión'))
@@ -545,7 +581,9 @@ void main() {
             .text,
         'Carga no disponible',
       );
-      await tester.tap(find.byTooltip('Pesas patrón y ambiente'));
+      await tester.tap(find.byTooltip('Pasos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pesas patrón y ambiente').last);
       await tester.pumpAndSettle();
       expect(
         tester
@@ -565,7 +603,7 @@ void main() {
       await nextStep(tester);
       await tester.enterText(indication, '10,002');
       await nextStep(tester);
-      expect(find.text('Paso 5 de 5'), findsOneWidget);
+      expect(find.textContaining('Paso 5 de 5'), findsOneWidget);
       await tester.scrollUntilVisible(
         fieldLabeled('Observaciones'),
         250,
@@ -615,7 +653,7 @@ void main() {
     await tester.tap(find.text('BAL-014'));
     await tester.pumpAndSettle();
     expect(find.text('Tienes 1 captura sin enviar'), findsNothing);
-    expect(find.text('Paso 1 de 5'), findsOneWidget);
+    expect(find.textContaining('Paso 1 de 5'), findsOneWidget);
     final temperature = fieldLabeled('Temperatura (°C)');
     expect(
       tester.widget<TextFormField>(temperature).controller!.text,

@@ -7,22 +7,61 @@ import 'mobile_api.dart';
 Future<T?> openPage<T>(BuildContext context, Widget page) =>
     Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));
 
+/// Pagina interior: AppBar con su titulo y, a la derecha, las acciones
+/// extra (⋮). Con [floating], la accion principal va fija en la pildora
+/// abajo a la derecha, como en los asistentes; el contenido deja
+/// `WizardNavPill.contentPadding` libre al final.
 class OnlinePage extends StatelessWidget {
   const OnlinePage({
     required this.title,
     required this.child,
     this.actions,
+    this.floating,
     super.key,
   });
   final String title;
   final Widget child;
   final List<Widget>? actions;
+  final Widget? floating;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(title), actions: actions),
-    body: SafeArea(child: child),
+    body: SafeArea(
+      child: floating == null
+          ? child
+          : FloatingActionLayout(action: floating!, child: child),
+    ),
   );
 }
+
+/// Contenido con la pildora de accion flotando abajo a la derecha.
+class FloatingActionLayout extends StatelessWidget {
+  const FloatingActionLayout({
+    required this.child,
+    required this.action,
+    super.key,
+  });
+  final Widget child;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(child: child),
+      Positioned(right: 16, bottom: 16, child: action),
+    ],
+  );
+}
+
+/// Menu ⋮ de una pagina. Sin opciones no se muestra.
+Widget? pageMenu(List<PopupMenuEntry<VoidCallback>> items) => items.isEmpty
+    ? null
+    : PopupMenuButton<VoidCallback>(
+        tooltip: 'Más opciones',
+        icon: const Icon(Icons.more_vert),
+        onSelected: (action) => action(),
+        itemBuilder: (context) => items,
+      );
 
 /// Nota al pie de una pantalla: alcance legal, privacidad, aviso de estado.
 ///
@@ -98,6 +137,122 @@ class Notice extends StatelessWidget {
   }
 }
 
+Widget _remoteSwitcher({
+  required AsyncSnapshot<Json> snapshot,
+  required String dataKey,
+  required VoidCallback retry,
+  required Widget Function(Json data) builder,
+  Widget Function(Widget child)? frame,
+}) {
+  Widget framed(Widget child) => frame == null ? child : frame(child);
+  return AnimatedSwitcher(
+    duration: const Duration(milliseconds: 200),
+    reverseDuration: const Duration(milliseconds: 150),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.015),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      ),
+    ),
+    child: snapshot.connectionState != ConnectionState.done
+        ? framed(
+            const Center(
+              key: ValueKey('remote-loading'),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        : snapshot.hasError
+        ? framed(
+            Center(
+              key: const ValueKey('remote-error'),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Notice(
+                      snapshot.error is MobileFailure
+                          ? (snapshot.error as MobileFailure).message
+                          : 'No se pudo cargar la información.',
+                    ),
+                    OutlinedButton(
+                      onPressed: retry,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        : KeyedSubtree(
+            key: ValueKey('remote-data-$dataKey'),
+            child: builder(snapshot.data!),
+          ),
+  );
+}
+
+/// Pagina que carga sus datos y con ellos arma tambien el AppBar y la
+/// pildora: las acciones extra de una ficha van en ⋮ y la principal, fija
+/// abajo a la derecha.
+class RemotePage extends StatefulWidget {
+  const RemotePage({
+    required this.title,
+    required this.load,
+    required this.builder,
+    this.dataKey = '',
+    this.actions,
+    this.floating,
+    super.key,
+  });
+  final String title;
+  final Future<Json> Function() load;
+  final Widget Function(Json data) builder;
+  final String dataKey;
+  final List<Widget> Function(Json data)? actions;
+  final Widget? Function(Json data)? floating;
+
+  @override
+  State<RemotePage> createState() => _RemotePageState();
+}
+
+class _RemotePageState extends State<RemotePage> {
+  late Future<Json> future = widget.load();
+
+  @override
+  void didUpdateWidget(RemotePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dataKey != widget.dataKey) future = widget.load();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Json>(
+    future: future,
+    builder: (context, snapshot) {
+      final data =
+          snapshot.connectionState == ConnectionState.done && !snapshot.hasError
+          ? snapshot.data
+          : null;
+      return OnlinePage(
+        title: widget.title,
+        actions: data == null ? null : widget.actions?.call(data),
+        floating: data == null ? null : widget.floating?.call(data),
+        child: _remoteSwitcher(
+          snapshot: snapshot,
+          dataKey: widget.dataKey,
+          retry: () => setState(() => future = widget.load()),
+          builder: widget.builder,
+        ),
+      );
+    },
+  );
+}
+
 class RemotePanel extends StatefulWidget {
   const RemotePanel({
     required this.load,
@@ -123,65 +278,18 @@ class _RemotePanelState extends State<RemotePanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    Widget frame(Widget child) => widget.frameTitle == null
-        ? child
-        : OnlinePage(title: widget.frameTitle!, child: child);
-    return FutureBuilder<Json>(
-      future: future,
-      builder: (context, snapshot) => AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        reverseDuration: const Duration(milliseconds: 150),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.015),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        ),
-        child: snapshot.connectionState != ConnectionState.done
-            ? frame(
-                const Center(
-                  key: ValueKey('remote-loading'),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            : snapshot.hasError
-            ? frame(
-                Center(
-                  key: const ValueKey('remote-error'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Notice(
-                          snapshot.error is MobileFailure
-                              ? (snapshot.error as MobileFailure).message
-                              : 'No se pudo cargar la información.',
-                        ),
-                        OutlinedButton(
-                          onPressed: () =>
-                              setState(() => future = widget.load()),
-                          child: const Text('Reintentar'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            : KeyedSubtree(
-                key: ValueKey('remote-data-${widget.dataKey}'),
-                child: widget.builder(snapshot.data!),
-              ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => FutureBuilder<Json>(
+    future: future,
+    builder: (context, snapshot) => _remoteSwitcher(
+      snapshot: snapshot,
+      dataKey: widget.dataKey,
+      retry: () => setState(() => future = widget.load()),
+      builder: widget.builder,
+      frame: widget.frameTitle == null
+          ? null
+          : (child) => OnlinePage(title: widget.frameTitle!, child: child),
+    ),
+  );
 }
 
 String valueLabel(Object? value) =>
