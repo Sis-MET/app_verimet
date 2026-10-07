@@ -10,10 +10,14 @@ import 'package:ivmet/features/online/mobile_api.dart';
 class MemoryDraftStore implements DraftRecoveryStore {
   final documents = <String, String>{};
   bool failWrites = false;
+
+  /// Escrituras pedidas al disco, para medir cuantas provoca la captura.
+  int writes = 0;
   @override
   Future<String?> read(String owner) async => documents[owner];
   @override
   Future<void> write(String owner, String document) async {
+    writes++;
     if (failWrites) throw StateError('Disk full');
     documents[owner] = document;
   }

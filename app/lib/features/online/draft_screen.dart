@@ -166,7 +166,7 @@ class _DraftWizardState extends State<_DraftWizard>
     }
     scroll = ScrollController(initialScrollOffset: capture.offset)
       ..addListener(_scrolled);
-    headerHidden = capture.offset > 12;
+    headerHidden = capture.offset > _hideAfter;
     capture.addListener(_updated);
     capture.start();
   }
@@ -187,10 +187,22 @@ class _DraftWizardState extends State<_DraftWizard>
     if (mounted) setState(() {});
   }
 
+  /// La cabecera se pliega al bajar y vuelve arriba del todo. Los umbrales
+  /// distintos y la longitud minima evitan un bucle: al plegarla la lista
+  /// gana su alto, y si el contenido apenas desbordaba, el desplazamiento se
+  /// recortaba a cero, la cabecera volvia, la lista volvia a desbordar...
+  static const _hideAfter = 48.0;
+  static const _showBefore = 8.0;
+  static const _minimumOverflow = 220.0;
+
   void _scrolled() {
     if (restoringScroll || !scroll.hasClients) return;
-    capture.setOffset(scroll.offset);
-    final hidden = scroll.offset > 12;
+    final position = scroll.position;
+    capture.setOffset(position.pixels);
+    final hidden = headerHidden
+        ? position.pixels > _showBefore
+        : position.pixels > _hideAfter &&
+              position.maxScrollExtent > _minimumOverflow;
     if (hidden != headerHidden && mounted) {
       setState(() => headerHidden = hidden);
     }
@@ -224,7 +236,7 @@ class _DraftWizardState extends State<_DraftWizard>
     if (!mounted) return;
     setState(() {
       navigating = false;
-      headerHidden = capture.offset > 12;
+      headerHidden = capture.offset > _hideAfter;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && scroll.hasClients) {
@@ -514,31 +526,15 @@ class _DraftWizardState extends State<_DraftWizard>
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      capture.localError != null
-                                          ? Icons.error_outline
-                                          : capture.dirty
-                                          ? Icons.save_outlined
-                                          : Icons.cloud_done_outlined,
-                                      size: 16,
-                                      color: capture.localError != null
-                                          ? palette.fail
-                                          : palette.muted,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        _saveStatus,
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: palette.muted,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                // Cambia con cada escritura: escucha su propia
+                                // senal y no la de toda la captura.
+                                ListenableBuilder(
+                                  listenable: capture.status,
+                                  builder: (context, _) => _SaveStatusLine(
+                                    error: capture.localError != null,
+                                    pending: capture.dirty,
+                                    text: _saveStatus,
+                                  ),
                                 ),
                               ],
                             ),
@@ -659,6 +655,43 @@ class _DraftWizardState extends State<_DraftWizard>
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SaveStatusLine extends StatelessWidget {
+  const _SaveStatusLine({
+    required this.error,
+    required this.pending,
+    required this.text,
+  });
+  final bool error;
+  final bool pending;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = IndustryPalette.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          error
+              ? Icons.error_outline
+              : pending
+              ? Icons.save_outlined
+              : Icons.cloud_done_outlined,
+          size: 16,
+          color: error ? palette.fail : palette.muted,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 11.5, color: palette.muted),
+          ),
+        ),
+      ],
     );
   }
 }

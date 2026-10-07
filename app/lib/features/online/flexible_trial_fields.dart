@@ -241,12 +241,10 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
   }
 
   Widget? _suggestionButton(Json reading) {
-    final suggestions = indicationSuggestions(
-      ranges,
-      reading['load'] as String,
-      unit,
-    );
-    if (locked || suggestions.isEmpty) return null;
+    if (locked ||
+        !hasIndicationSuggestions(ranges, reading['load'] as String, unit)) {
+      return null;
+    }
     return IconButton(
       key: ValueKey('${reading['pointId']}:suggestions'),
       tooltip: 'Sugerir indicación según la división de escala',
@@ -314,36 +312,39 @@ class _FlexibleTrialFieldsState extends State<FlexibleTrialFields> {
     changed();
   }
 
-  Widget readingFields(Json r) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      field(
-        '${r['pointId']}:indication',
-        r['indication'] as String,
-        'Indicación ($unit)',
-        (v) => r['indication'] = v,
-        required: true,
-        hint: _precisionHint(r['load'] as String),
-        suffixIcon: _suggestionButton(r),
-      ),
-      field(
-        '${r['pointId']}:zero',
-        r['zero'] as String,
-        'Retorno a cero (opcional)',
-        (v) => r['zero'] = v,
-      ),
-      if (type == 'linearity' &&
-          indicationError(r['indication'] as String, r['load'] as String) !=
-              null)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            'Diferencia indicación − carga: ${indicationError(r['indication'] as String, r['load'] as String)} $unit',
-            style: const TextStyle(fontSize: 12),
-          ),
+  Widget readingFields(Json r) {
+    final difference = type == 'linearity'
+        ? indicationError(r['indication'] as String, r['load'] as String)
+        : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field(
+          '${r['pointId']}:indication',
+          r['indication'] as String,
+          'Indicación ($unit)',
+          (v) => r['indication'] = v,
+          required: true,
+          hint: _precisionHint(r['load'] as String),
+          suffixIcon: _suggestionButton(r),
         ),
-    ],
-  );
+        field(
+          '${r['pointId']}:zero',
+          r['zero'] as String,
+          'Retorno a cero (opcional)',
+          (v) => r['zero'] = v,
+        ),
+        if (difference != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Diferencia indicación − carga: $difference $unit',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Column(

@@ -20,11 +20,14 @@ class IndicationPrecision {
   String get divisionLabel => _formatScaled(scaledDivision, decimals);
 }
 
+// Se compilan una vez: cada lectura en pantalla pasa por aqui en cada
+// redibujado de su paso.
+final _scaledPattern = RegExp(r'^(-?)([0-9]{1,19})(?:\.([0-9]{0,9}))?$');
+final _trailingZeros = RegExp(r'0+$');
+
 BigInt? _scaledNumber(Object? value) {
   final text = value?.toString().trim().replaceAll(',', '.') ?? '';
-  final match = RegExp(
-    r'^(-?)([0-9]{1,19})(?:\.([0-9]{0,9}))?$',
-  ).firstMatch(text);
+  final match = _scaledPattern.firstMatch(text);
   if (match == null) return null;
   final fraction = (match.group(3) ?? '').padRight(9, '0');
   final scaled =
@@ -36,7 +39,7 @@ BigInt? _scaledNumber(Object? value) {
 int _decimalPlaces(Object? value) {
   final normalized = value?.toString().trim().replaceAll(',', '.') ?? '';
   if (!normalized.contains('.')) return 0;
-  final fraction = normalized.split('.').last.replaceFirst(RegExp(r'0+$'), '');
+  final fraction = normalized.split('.').last.replaceFirst(_trailingZeros, '');
   return fraction.length.clamp(0, 9);
 }
 
@@ -172,6 +175,12 @@ String indicationFromLoad(List<Json> ranges, String load, String unit) {
       ? load.trim()
       : _formatScaled(value, precision.decimals);
 }
+
+/// Hay sugerencias de indicacion para [load] sin generarlas: la ficha de una
+/// lectura solo necesita saber si muestra el boton.
+bool hasIndicationSuggestions(List<Json> ranges, String load, String unit) =>
+    _scaledNumber(load) != null &&
+    indicationPrecisionForLoad(ranges, load, unit) != null;
 
 /// Returns ServiceMET-style indication choices around the load in steps of d.
 List<String> indicationSuggestions(

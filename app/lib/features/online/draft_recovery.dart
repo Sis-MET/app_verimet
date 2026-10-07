@@ -36,15 +36,38 @@ class DraftRecovery {
     ).where((d) => d['requestId'] == document['active']).firstOrNull;
   });
 
+  /// Saves still waiting in the queue, by owner and draft.
+  final Map<String, _QueuedSave> _queued = {};
+
+  /// Every change starts a write, but a draft never has more than one write
+  /// waiting: a newer snapshot replaces the queued one instead of queuing
+  /// another full read/modify/write. Without this, a burst of keystrokes (or
+  /// one write per scrolled pixel) left a backlog of disk syncs that kept the
+  /// screen busy long after the operator stopped.
+  ///
+  /// The returned future completes when a write containing this snapshot, or
+  /// a newer one of the same draft, is on disk.
   Future<void> save(String owner, Json snapshot, {required bool active}) {
     // Detach now: later keystrokes must not mutate an enqueued snapshot.
-    final copy = object(jsonDecode(jsonEncode(snapshot)));
-    return _run(() async {
+    final encoded = jsonEncode(snapshot);
+    final key = jsonEncode([owner, snapshot['requestId']]);
+    final waiting = _queued[key];
+    if (waiting != null) {
+      waiting
+        ..encoded = encoded
+        ..active = active;
+      return waiting.done;
+    }
+    final queued = _queued[key] = _QueuedSave(encoded, active);
+    return queued.done = _run(() async {
+      // From here on a newer snapshot needs a write of its own.
+      _queued.remove(key);
+      final copy = object(jsonDecode(queued.encoded));
       final document = await _read(owner);
       final drafts = objects(document['drafts']);
       drafts.removeWhere((d) => d['requestId'] == copy['requestId']);
       document['drafts'] = [copy, ...drafts];
-      if (active) {
+      if (queued.active) {
         document['active'] = copy['requestId'];
       } else if (document['active'] == copy['requestId']) {
         document.remove('active');
@@ -61,4 +84,11 @@ class DraftRecovery {
     if (document['active'] == requestId) document.remove('active');
     await store.write(owner, jsonEncode(document));
   });
+}
+
+class _QueuedSave {
+  _QueuedSave(this.encoded, this.active);
+  String encoded;
+  bool active;
+  late Future<void> done;
 }

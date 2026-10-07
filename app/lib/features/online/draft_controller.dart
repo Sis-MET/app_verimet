@@ -9,6 +9,8 @@ import 'mobile_session.dart';
 import 'trial_capture.dart';
 
 String normalizedDecimal(String value) => value.trim().replaceAll(',', '.');
+final _environmentDecimal = RegExp(r'^-?[0-9]{1,6}(\.[0-9]{1,3})?$');
+final _readingDecimal = RegExp(r'^-?[0-9]{1,10}(\.[0-9]{1,9})?$');
 String? decimalError(
   String? value, {
   bool environment = false,
@@ -16,9 +18,7 @@ String? decimalError(
 }) {
   final text = normalizedDecimal(value ?? '');
   if (text.isEmpty) return null;
-  final pattern = environment
-      ? RegExp(r'^-?[0-9]{1,6}(\.[0-9]{1,3})?$')
-      : RegExp(r'^-?[0-9]{1,10}(\.[0-9]{1,9})?$');
+  final pattern = environment ? _environmentDecimal : _readingDecimal;
   if (!pattern.hasMatch(text)) {
     return environment
         ? 'Usa hasta 3 decimales.'
@@ -160,8 +160,34 @@ class DraftController extends ChangeNotifier {
   Future<bool>? _syncing;
   Timer? _timer;
 
+  /// Avisa de cambios que solo tocan la linea de guardado (en este dispositivo,
+  /// enviando, en el servidor). Van aparte de [notifyListeners] para que cada
+  /// escritura terminada no reconstruya todo el paso con sus campos.
+  final status = DraftStatus();
+
+  /// Sube con cada cambio de lo capturado. Lo que se deriva de la captura
+  /// —el payload, sus avisos— se recalcula una vez por revision y no en cada
+  /// `build`.
+  int _input = 0;
+  int _payloadInput = -1;
+  String _payloadJson = '';
+  int _issueInput = -1;
+  String? _draftIssue;
+  int _completionInput = -1;
+  String? _completionIssue;
+  Timer? _offsetTimer;
+
   bool get localSaved => _storedRevision == _revision && localError == null;
-  bool get dirty => syncedHash != jsonEncode(payload);
+  bool get dirty => syncedHash != _currentPayloadJson;
+
+  String get _currentPayloadJson {
+    if (_payloadInput != _input) {
+      _payloadJson = jsonEncode(payload);
+      _payloadInput = _input;
+    }
+    return _payloadJson;
+  }
+
   bool get locked =>
       finalizing || pendingFinalize != null || finalizedResult != null;
   double get offset => (offsets['$step'] as num?)?.toDouble() ?? 0;
@@ -222,16 +248,24 @@ class DraftController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  void _status() {
+    if (!_disposed) status.changed();
+  }
+
   Future<bool> persist() async {
     if (_removed) return true;
+    _offsetTimer?.cancel();
     final revision = ++_revision;
+    _status();
     // save detaches the snapshot synchronously, before its first await.
     final write = session.recovery.save(owner, snapshot, active: _active);
     try {
       await write;
-      _storedRevision = revision;
+      // Escrituras coalescidas: una posterior ya confirmada no retrocede.
+      if (revision > _storedRevision) _storedRevision = revision;
+      final recovered = localError != null;
       localError = null;
-      _notify();
+      recovered ? _notify() : _status();
       return true;
     } catch (_) {
       localError =
@@ -248,15 +282,24 @@ class DraftController extends ChangeNotifier {
 
   void changed() {
     if (locked) return;
+    _input++;
     unawaited(persist());
     _schedule();
     _notify();
   }
 
+  /// La posicion de lectura viaja con la siguiente escritura. Si el operario
+  /// solo desplaza, se guarda cuando se detiene: antes cada pixel desplazado
+  /// lanzaba una escritura en disco y un redibujado de todo el paso.
   void setOffset(double offset) {
     if (offset < 0 || offset == this.offset) return;
     offsets['$step'] = offset;
-    unawaited(persist());
+    _offsetTimer?.cancel();
+    if (_disposed || _removed) return;
+    _offsetTimer = Timer(
+      const Duration(milliseconds: 700),
+      () => unawaited(persist()),
+    );
   }
 
   Future<bool> goTo(int target) async {
@@ -284,6 +327,14 @@ class DraftController extends ChangeNotifier {
   }
 
   String? get draftIssue {
+    if (_issueInput != _input) {
+      _draftIssue = _findDraftIssue();
+      _issueInput = _input;
+    }
+    return _draftIssue;
+  }
+
+  String? _findDraftIssue() {
     if (decimalError(raw['temperature'] as String, environment: true) != null ||
         decimalError(
               raw['humidity'] as String,
@@ -325,6 +376,14 @@ class DraftController extends ChangeNotifier {
             );
 
   String? get completionIssue {
+    if (_completionInput != _input) {
+      _completionIssue = _findCompletionIssue();
+      _completionInput = _input;
+    }
+    return _completionIssue;
+  }
+
+  String? _findCompletionIssue() {
     if (draftIssue != null) return draftIssue;
     final inputs = objects(raw['tests']);
     if (inputs.isEmpty || !inputs.every(testComplete)) {
@@ -370,9 +429,10 @@ class DraftController extends ChangeNotifier {
         session.stage != SessionStage.ready) {
       return false;
     }
+    final shown = (error, conflict);
     syncing = true;
     error = null;
-    _notify();
+    shown.$1 == null ? _status() : _notify();
     try {
       // Finish an ambiguous attempt before sending newer input. A successful
       // older response never marks newer keystrokes as synchronized.
@@ -428,7 +488,8 @@ class DraftController extends ChangeNotifier {
       return false;
     } finally {
       syncing = false;
-      _notify();
+      // Solo un error o un conflicto nuevos cambian el contenido del paso.
+      (error, conflict) == (null, shown.$2) ? _status() : _notify();
     }
   }
 
@@ -507,7 +568,14 @@ class DraftController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _offsetTimer?.cancel();
     session.removeListener(_sessionChanged);
+    status.dispose();
     super.dispose();
   }
+}
+
+/// Senal de la linea de guardado de una captura.
+class DraftStatus extends ChangeNotifier {
+  void changed() => notifyListeners();
 }

@@ -17,9 +17,14 @@ guarda primero y utiliza la evaluación existente del servidor.
 ## Persistencia
 
 `DraftController` separa las cadenas crudas introducidas por el operador del
-payload normalizado de la API. Cada cambio, selección y desplazamiento inicia
-una escritura local sin debounce: incluye paso, posición de desplazamiento,
-condiciones, certificados, motivos y todas las lecturas. Omitir una prueba
+payload normalizado de la API. Cada cambio y selección inicia una escritura
+local sin debounce: incluye paso, posición de desplazamiento, condiciones,
+certificados, motivos y todas las lecturas. Un borrador tiene a lo sumo una
+escritura en curso y una en espera: un cambio nuevo reemplaza el estado de la
+que espera en lugar de encolar otra. La posición de desplazamiento viaja con la
+siguiente escritura o se guarda 0,7 s después de dejar de desplazar; antes cada
+píxel lanzaba una escritura (ver
+[rendimiento de la captura](operator-agenda-and-schedules.md#rendimiento-de-la-captura)). Omitir una prueba
 oculta sus lecturas pero las conserva para deshacer la omisión. También se
 conservan textos transitorios como `-` o `10,`, que todavía no acepta el servidor.
 

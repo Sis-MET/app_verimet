@@ -139,9 +139,12 @@ void setGroupLoad(Json trial, int group, String value) {
   }
 }
 
+final _decimalPattern = RegExp(r'^-?[0-9]{1,10}(\.[0-9]{1,9})?$');
+final _trailingZeros = RegExp(r'0+$');
+
 BigInt? _decimal(String? text) {
   final value = (text ?? '').trim().replaceAll(',', '.');
-  if (!RegExp(r'^-?[0-9]{1,10}(\.[0-9]{1,9})?$').hasMatch(value)) return null;
+  if (!_decimalPattern.hasMatch(value)) return null;
   final parts = value.replaceFirst('-', '').split('.');
   final number = BigInt.parse(
     '${parts[0]}${(parts.length == 2 ? parts[1] : '').padRight(9, '0')}',
@@ -153,7 +156,7 @@ String _format(BigInt number) {
   final digits = number.abs().toString().padLeft(10, '0');
   final fraction = digits
       .substring(digits.length - 9)
-      .replaceFirst(RegExp(r'0+$'), '');
+      .replaceFirst(_trailingZeros, '');
   return '${number.isNegative ? '-' : ''}${digits.substring(0, digits.length - 9)}${fraction.isEmpty ? '' : '.$fraction'}';
 }
 

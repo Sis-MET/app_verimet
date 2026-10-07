@@ -98,6 +98,8 @@ void main() {
       first.testInput('trial-normative-fixture')['reason'] = 'Pendiente  ';
       await first.goTo(3);
       first.setOffset(140);
+      // La posicion se guarda cuando el operario deja de desplazar.
+      await Future<void>.delayed(const Duration(milliseconds: 750));
       final saved = await server.recovery.active(session.recoveryOwner);
       final restored = create(recovered: saved);
       expect(restored.raw, first.raw);
@@ -116,6 +118,43 @@ void main() {
       );
     },
   );
+
+  test('a scroll burst writes the position once, after it stops', () async {
+    final controller = create();
+    await controller.persist();
+    final store = server.recovery.store as MemoryDraftStore;
+    final before = store.writes;
+    for (var pixel = 1; pixel <= 120; pixel++) {
+      controller.setOffset(pixel.toDouble());
+    }
+    expect(store.writes, before, reason: 'no write per scrolled pixel');
+    await Future<void>.delayed(const Duration(milliseconds: 750));
+    expect(store.writes, before + 1);
+    final saved = await server.recovery.active(session.recoveryOwner);
+    expect(create(recovered: saved).offset, 120);
+  });
+
+  test('a burst of keys queues one write, with the newest input', () async {
+    final controller = create();
+    await controller.persist();
+    final store = server.recovery.store as MemoryDraftStore;
+    final before = store.writes;
+    for (final text in ['1', '10', '10,', '10,1', '10,12']) {
+      edit(controller, text);
+    }
+    await controller.persist();
+    expect(store.writes - before, 1);
+    expect(controller.localSaved, true);
+    final saved = await server.recovery.active(session.recoveryOwner);
+    expect(
+      objects(
+        create(
+          recovered: saved,
+        ).testInput('trial-normative-fixture')['readings'],
+      ).single['indication'],
+      '10,12',
+    );
+  });
 
   test(
     'writes during a slow save are sent afterward with the acknowledged version',
