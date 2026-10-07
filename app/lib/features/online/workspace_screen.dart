@@ -8,7 +8,10 @@ import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/section_label.dart';
 import '../../shared/widgets/segmented_pills.dart';
+import '../../shared/widgets/status_tag.dart';
+import '../../core/domain/compliance_status.dart';
 import '../../shared/widgets/tile_grid.dart';
+import 'agenda_screen.dart';
 import 'catalog_screen.dart';
 import 'history_screen.dart';
 import 'mobile_api.dart';
@@ -16,6 +19,7 @@ import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'customer_configuration.dart';
 import 'draft_screen.dart';
+import 'team_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({required this.session, super.key});
@@ -133,6 +137,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         }),
                       ),
                       AppSection.verificar => CatalogScreen(session: session),
+                      AppSection.agenda => AgendaScreen(session: session),
                       AppSection.areas => _Plants(
                         session: session,
                         view: plantsView,
@@ -233,6 +238,14 @@ class _Home extends StatelessWidget {
     final palette = IndustryPalette.of(context);
     final bootstrap = session.bootstrap;
     final alerts = (bootstrap['openAlerts'] as num?)?.toInt() ?? 0;
+    final agenda = object(bootstrap['agenda'] ?? const <String, dynamic>{});
+    final dueToday = (agenda['dueToday'] as num?)?.toInt() ?? 0;
+    final doneToday = (agenda['doneToday'] as num?)?.toInt() ?? 0;
+    final overdue = (agenda['overdue'] as num?)?.toInt() ?? 0;
+    final unassigned = (agenda['unassigned'] as num?)?.toInt() ?? 0;
+    final withoutEquipment =
+        bootstrap['equipmentScope'] == 'ASSIGNED' &&
+        ((bootstrap['equipmentCount'] as num?)?.toInt() ?? 0) == 0;
 
     return ListView(
       padding: kShellContentPadding,
@@ -244,15 +257,47 @@ class _Home extends StatelessWidget {
               'Hola, ${session.user!['name']} · '
               '${session.quality ? 'Jefe de calidad' : 'Operador'}',
         ),
+        if (withoutEquipment)
+          const Notice(
+            'Aún no tienes balanzas asignadas. El jefe de calidad te las asigna desde Plantas › Operadores.',
+            icon: Icons.person_search_outlined,
+          ),
+        if (session.quality && unassigned > 0) ...[
+          Notice(
+            '$unassigned ${unassigned == 1 ? 'balanza no tiene' : 'balanzas no tienen'} operador asignado: nadie las verá en su agenda.',
+            icon: Icons.warning_amber_outlined,
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => onPlants(_PlantsView.operators),
+              icon: const Icon(Icons.groups_outlined, size: 18),
+              label: const Text('Asignar operadores'),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         TileGrid(
           cells: [
+            // Hoy y no el total de balanzas: el total ya se lee en Verificar,
+            // y lo que se decide al abrir la app es que toca verificar.
+            // Las atrasadas van aparte, en oxido, para no confundirlas con
+            // las de hoy.
             TileCell(
               MetricTile(
-                label: 'Balanzas',
-                value: '${bootstrap['equipmentCount']}',
-                caption: 'habilitadas',
-                onTap: () => onSection(AppSection.verificar),
+                key: const ValueKey('home-today'),
+                label: 'Hoy',
+                value: '$dueToday',
+                caption: doneToday > 0
+                    ? 'por verificar · $doneToday ${doneToday == 1 ? 'hecha' : 'hechas'}'
+                    : 'por verificar',
+                footer: overdue == 0
+                    ? null
+                    : StatusTag(
+                        '$overdue ${overdue == 1 ? 'atrasada' : 'atrasadas'}',
+                        status: ComplianceStatus.noConforme,
+                      ),
+                onTap: () => onSection(AppSection.agenda),
               ),
             ),
             TileCell(
@@ -324,7 +369,7 @@ class _Home extends StatelessWidget {
   }
 }
 
-enum _PlantsView { plantsAndAreas, patterns }
+enum _PlantsView { plantsAndAreas, patterns, operators }
 
 /// Plantas: la estructura del cliente, en dos pastillas.
 ///
@@ -364,21 +409,36 @@ class _Plants extends StatelessWidget {
                     '${areas.length} ${areas.length == 1 ? 'área' : 'áreas'}',
               ),
               const SizedBox(height: 14),
+              // Con tres pastillas los rotulos se acortan: la cabecera ya dice
+              // que son plantas.
               SegmentedPills<_PlantsView>(
                 selected: view,
                 onSelect: onView,
-                segments: const [
-                  PillSegment(_PlantsView.plantsAndAreas, 'Plantas y áreas'),
-                  PillSegment(_PlantsView.patterns, 'Pesas patrón'),
-                ],
+                segments: session.quality
+                    ? const [
+                        PillSegment(_PlantsView.plantsAndAreas, 'Áreas'),
+                        PillSegment(_PlantsView.patterns, 'Patrones'),
+                        PillSegment(_PlantsView.operators, 'Operadores'),
+                      ]
+                    : const [
+                        PillSegment(
+                          _PlantsView.plantsAndAreas,
+                          'Plantas y áreas',
+                        ),
+                        PillSegment(_PlantsView.patterns, 'Pesas patrón'),
+                      ],
               ),
             ],
           ),
         ),
         Expanded(
-          child: view == _PlantsView.patterns
-              ? PatternsPanel(session: session)
-              : _PlantList(session: session, plants: plants, areas: areas),
+          child: switch (view) {
+            _PlantsView.patterns => PatternsPanel(session: session),
+            _PlantsView.operators when session.quality => OperatorsPanel(
+              session: session,
+            ),
+            _ => _PlantList(session: session, plants: plants, areas: areas),
+          },
         ),
       ],
     );

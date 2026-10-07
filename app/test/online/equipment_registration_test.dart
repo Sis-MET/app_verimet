@@ -265,7 +265,9 @@ void main() {
       expect(find.text('Editar balanza'), findsOneWidget);
       expect(find.text('Enviar a Métrica'), findsOneWidget);
       expect(find.text('Validar ficha'), findsNothing);
-      await scrollTo(tester, find.text('Dar de baja esta balanza'));
+      // Dar de baja es una accion rara: va en ⋮.
+      await tester.tap(find.byTooltip('Más opciones'));
+      await tester.pumpAndSettle();
       expect(find.text('Dar de baja esta balanza'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

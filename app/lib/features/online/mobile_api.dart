@@ -173,7 +173,14 @@ class MobileFailure implements Exception {
     'INVALID_AREA' => 'Revisa el nombre del área.',
     'PLANT_SCOPE_INVALID' => 'No tienes acceso a esa planta.',
     'EQUIPMENT_NOT_ACCESSIBLE' =>
-      'La balanza ya no está disponible. Actualiza el catálogo.',
+      'La balanza ya no está disponible para ti. Actualiza el catálogo o consulta al jefe de calidad si te la asignó.',
+    'INVALID_CHECK_SCHEDULE' =>
+      'Revisa la periodicidad: intervalo, días elegidos y primera fecha.',
+    'OPERATOR_NOT_IN_PLANT' =>
+      'Ese operador no trabaja en esta planta. Métrica habilita las plantas de cada usuario en RimMET.',
+    'INVALID_ASSIGNMENT' => 'Revisa los operadores y balanzas elegidos.',
+    'INVALID_AGENDA_RANGE' => 'La agenda muestra hasta dos meses a la vez.',
+    'INVALID_AGENDA_FILTER' => 'Revisa los filtros de la agenda.',
     'EQUIPMENT_IN_USE' =>
       'La balanza ya tiene capturas o verificaciones: sus datos técnicos no se pueden cambiar.',
     'EQUIPMENT_HAS_OPEN_DRAFTS' =>

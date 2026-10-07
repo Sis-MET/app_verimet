@@ -19,6 +19,9 @@ enum IndustryIcon {
   /// Ajustes: tres correderas.
   sliders,
 
+  /// Agenda: hoja de calendario con dos anillas.
+  calendar,
+
   /// Alerta critica.
   warning,
 
@@ -135,6 +138,12 @@ class _IndustryIconPainter extends CustomPainter {
         canvas.drawCircle(const Offset(9, 7), 2, paint);
         canvas.drawCircle(const Offset(15, 12), 2, paint);
         canvas.drawCircle(const Offset(8, 17), 2, paint);
+      case IndustryIcon.calendar:
+        canvas.drawRect(const Rect.fromLTWH(3.5, 5.5, 17, 15), paint);
+        canvas.drawLine(const Offset(3.5, 10), const Offset(20.5, 10), paint);
+        canvas.drawLine(const Offset(8, 3), const Offset(8, 7.5), paint);
+        canvas.drawLine(const Offset(16, 3), const Offset(16, 7.5), paint);
+        canvas.drawRect(const Rect.fromLTWH(13, 14, 4, 3.5), paint);
       case IndustryIcon.warning:
         canvas.drawPath(
           Path()

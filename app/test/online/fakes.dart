@@ -403,8 +403,160 @@ final fixtureVerificationData = <String, dynamic>{
   ],
 };
 
+/// Agenda del mes en curso, relativa a [today]: una balanza hoy, otra la
+/// semana que viene, una hecha ayer y una atrasada.
+Json fixtureAgenda(DateTime today) {
+  String key(int days) {
+    final day = DateTime.utc(today.year, today.month, today.day + days);
+    return '${day.year.toString().padLeft(4, '0')}-'
+        '${day.month.toString().padLeft(2, '0')}-'
+        '${day.day.toString().padLeft(2, '0')}';
+  }
+
+  Json equipment(String id, String code, String department, List<String> who) =>
+      {
+        'id': id,
+        'cod_metrica': '0001-01-$id',
+        'cod_interno': code,
+        'planta': 'Planta uno',
+        'plantId': 'plant-fixture',
+        'departamento': department,
+        'assignees': [
+          for (final name in who) {'id': 'user-$name', 'name': name},
+        ],
+      };
+
+  return {
+    'today': key(0),
+    'from': key(-40),
+    'to': key(40),
+    'equipmentCount': 4,
+    'items': [
+      {
+        'date': key(0),
+        'equipment': equipment('equipment-fixture', 'BAL-014', 'Producción', [
+          'Ana',
+        ]),
+        'tests': [
+          {'type': 'linearity', 'state': 'DUE_TODAY', 'doneOn': null},
+          {'type': 'repeatability', 'state': 'DUE_TODAY', 'doneOn': null},
+        ],
+      },
+      {
+        'date': key(0),
+        'equipment': equipment('equipment-2', 'BAL-020', 'Despacho', []),
+        'tests': [
+          {'type': 'eccentricity', 'state': 'DONE', 'doneOn': key(0)},
+        ],
+      },
+      {
+        'date': key(7),
+        'equipment': equipment('equipment-fixture', 'BAL-014', 'Producción', [
+          'Ana',
+        ]),
+        'tests': [
+          {'type': 'linearity', 'state': 'SCHEDULED', 'doneOn': null},
+        ],
+      },
+    ],
+    'overdue': [
+      {
+        'dueOn': key(-3),
+        'equipment': equipment('equipment-3', 'CAM-001', 'Báscula', ['Beto']),
+        'tests': [
+          {'type': 'linearity', 'dueOn': key(-3)},
+        ],
+      },
+    ],
+  };
+}
+
+const fixtureTeam = {
+  'plantId': 'plant-fixture',
+  'equipmentCount': 3,
+  'unassignedCount': 1,
+  'members': [
+    {
+      'id': 'user-ana',
+      'name': 'Ana Quispe',
+      'username': 'ana.quispe',
+      'assignedCount': 2,
+    },
+    {
+      'id': 'user-beto',
+      'name': 'Beto Mamani',
+      'username': 'beto.mamani',
+      'assignedCount': 0,
+    },
+  ],
+};
+
+const fixtureTeamMember = {
+  'plantId': 'plant-fixture',
+  'member': {'id': 'user-ana', 'name': 'Ana Quispe', 'username': 'ana.quispe'},
+  'items': [
+    {
+      'id': 'equipment-fixture',
+      'cod_interno': 'BAL-014',
+      'cod_metrica': '0001-01-001',
+      'marca': 'Mettler',
+      'modelo': 'IND570',
+      'departamento': 'Producción',
+      'assigned': true,
+      'assigneeCount': 1,
+    },
+    {
+      'id': 'equipment-2',
+      'cod_interno': 'BAL-020',
+      'cod_metrica': '0001-01-002',
+      'marca': 'Ohaus',
+      'modelo': 'Defender',
+      'departamento': 'Despacho',
+      'assigned': false,
+      'assigneeCount': 0,
+    },
+    {
+      'id': 'equipment-3',
+      'cod_interno': 'CAM-001',
+      'cod_metrica': '0001-01-003',
+      'marca': 'Toledo',
+      'modelo': 'Camionera',
+      'departamento': 'Báscula',
+      'assigned': true,
+      'assigneeCount': 2,
+    },
+  ],
+};
+
+const fixtureEquipmentTeam = {
+  'equipmentId': 'equipment-fixture',
+  'plantId': 'plant-fixture',
+  'members': [
+    {
+      'id': 'user-ana',
+      'name': 'Ana Quispe',
+      'username': 'ana.quispe',
+      'assigned': true,
+    },
+    {
+      'id': 'user-beto',
+      'name': 'Beto Mamani',
+      'username': 'beto.mamani',
+      'assigned': false,
+    },
+  ],
+};
+
 class FixtureServer {
   Json bundle = {...fixtureBundle};
+  Json bootstrap = {...fixtureBootstrap};
+  late Json agenda = fixtureAgenda(DateTime.now());
+  Json team = fixtureTeam;
+  Json teamMember = fixtureTeamMember;
+  Json equipmentTeam = fixtureEquipmentTeam;
+
+  /// Cuerpos recibidos por `ivmet_customer_assign_equipment`.
+  final List<Json> assignments = [];
   final recovery = DraftRecovery(MemoryDraftStore());
   final Map<String, Json> savedDrafts = {};
   final Map<String, Json> saveReceipts = {};
@@ -490,6 +642,18 @@ class FixtureServer {
       saveReceipts[body['save_id'] as String] = receipt;
       return (200, receipt);
     }
+    if (request.path.contains('ivmet_customer_assign_equipment')) {
+      assignments.add(body);
+      final assignment = object(body['assignment']);
+      return (
+        200,
+        {
+          ...assignment,
+          'assigned':
+              (assignment['equipmentIds'] ?? assignment['userIds']).length,
+        },
+      );
+    }
     if (request.path.contains('ivmet_mobile_finalize_draft')) {
       return (
         200,
@@ -520,7 +684,15 @@ class FixtureServer {
         );
       case 'bootstrap':
         bootstrapCalls++;
-        return (200, fixtureBootstrap);
+        return (200, bootstrap);
+      case 'agenda':
+        return (200, agenda);
+      case 'team':
+        return (200, team);
+      case 'team-member':
+        return (200, teamMember);
+      case 'equipment-team':
+        return (200, equipmentTeam);
       case 'instruments':
         final items =
             instruments ??

@@ -14,7 +14,7 @@ import 'industry_icons.dart';
 /// que el marco le recorte el final del scroll.
 const EdgeInsets kShellContentPadding = EdgeInsets.fromLTRB(18, 16, 18, 132);
 
-/// Los cuatro apartados de la app.
+/// Los cinco apartados de la app.
 ///
 /// El shell que los conmuta lo implementa `features/online/workspace_screen`,
 /// que mantiene el apartado activo en su propio estado. Antes existia aqui un
@@ -23,6 +23,7 @@ const EdgeInsets kShellContentPadding = EdgeInsets.fromLTRB(18, 16, 18, 132);
 enum AppSection {
   inicio('Inicio', IndustryIcon.home),
   verificar('Verificar', IndustryIcon.clipboardCheck),
+  agenda('Agenda', IndustryIcon.calendar),
   areas('Plantas', IndustryIcon.grid),
   ajustes('Ajustes', IndustryIcon.sliders);
 

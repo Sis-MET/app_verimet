@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/di/core_providers.dart';
 import '../../core/storage/draft_recovery_store.dart';
+import '../../core/utils/calendar_dates.dart';
 import 'draft_recovery.dart';
 import 'mobile_api.dart';
 
@@ -179,7 +180,7 @@ class MobileSession extends ChangeNotifier {
         error =
             'Tu licencia no está activa. Solicita a Métrica revisar el contrato y los cupos de tu cuenta.';
       } else {
-        final data = await api.read('bootstrap');
+        final data = await api.read('bootstrap', clockFilters());
         if (check != _check || _disposed) return;
         if (jsonEncode(bootstrap['plants']) != jsonEncode(data['plants']) ||
             jsonEncode(bootstrap['areas']) != jsonEncode(data['areas'])) {
