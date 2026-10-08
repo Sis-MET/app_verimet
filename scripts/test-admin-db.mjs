@@ -93,15 +93,24 @@ test('contrato administrativo de RimMET sobre PostgreSQL aislado', async (t) => 
           graceDays: 0,
           active: true,
         };
+        // Las migraciones posteriores siembran planes (el gratuito y los que
+        // ofrece la app): la numeración sigue al último código generado.
+        const last = (
+          await db.query(
+            "select max(substring(codigo from 6)::int)::int as n from public.planes_comerciales where codigo ~ '^PLAN-[0-9]+$'",
+          )
+        ).rows[0].n;
+        assert.ok(last >= 123);
+        const code = (n) => `PLAN-${String(n).padStart(6, '0')}`;
         const request = randomUUID();
         const created = await mutate('plan.save', payload, request);
-        assert.equal(created.codigo, 'PLAN-000124');
+        assert.equal(created.codigo, code(last + 1));
         assert.deepEqual(await mutate('plan.save', payload, request), created);
         const second = await mutate('plan.save', {
           ...payload,
           code: 'MANUAL-IGNORADO',
         });
-        assert.equal(second.codigo, 'PLAN-000125');
+        assert.equal(second.codigo, code(last + 2));
         const batch = await Promise.all(
           Array.from({ length: 5 }, (_, i) =>
             mutate('plan.save', { ...payload, name: `Plan ${i}` }),
