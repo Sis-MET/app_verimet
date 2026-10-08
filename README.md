@@ -16,6 +16,10 @@ calibraciones formales.
   comparte expresamente**, junto con su verificación y PDF.
 - La app usa HTTPS hacia Supabase. Solo el worker corporativo accede a DataMET
   y a la base SQL Server `IvMET` desde la red de Metrica.
+- Cualquier empresa crea su cuenta desde la app y empieza en el plan
+  **Gratuito**, con límites de plantas, balanzas, usuarios y verificaciones;
+  pide un plan superior desde la app y Métrica lo habilita en RimMET. Ver
+  [docs/self-service-plans.md](docs/self-service-plans.md).
 
 ---
 
@@ -244,13 +248,13 @@ app movil:
 
 | Feature | Que resuelve | En la app |
 | --- | --- | --- |
-| `auth` | Supabase Auth, sesion y cambio obligatorio de contraseña. | `online/online_entry.dart` |
+| `auth` | Supabase Auth, sesion, cambio obligatorio de contraseña, alta de empresas y recuperacion por correo. | `online/online_entry.dart`, `online/self_service_access.dart` |
 | `instruments` | Balanzas del cliente: listado, detalle, estado. | `online/catalog_screen.dart` |
 | `eccentricity_test` | Prueba de excentricidad. | `eccentricity_test/domain/` |
 | `repeatability_test` | Prueba de repetibilidad. | `repeatability_test/domain/` |
 | `linearity_test` | Prueba de linealidad. | `linearity_test/domain/` |
 | `verification_reports` | Historial privado y expedientes compartidos. | `online/history_screen.dart`, `online/verification_report.dart` |
-| `clients` | Empresas cliente (tenants), sucursales y areas. | `online/customer_configuration.dart` |
+| `clients` | Empresas cliente (tenants), sucursales y areas; plantas y usuarios de las autoregistradas; plan, limites y solicitudes. | `online/customer_configuration.dart`, `online/company_plants.dart`, `online/company_users.dart`, `online/plan_screen.dart` |
 | `dashboard` | Resumen operativo del cliente. La gestion interna vive en RimMET. | `online/workspace_screen.dart` |
 | `sync` | Integracion servidor a servidor; no existe cola offline movil. | solo servidor |
 

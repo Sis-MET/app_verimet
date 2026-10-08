@@ -271,3 +271,79 @@ idempotente) reemplaza:
 
 Errores: `OPERATOR_NOT_IN_PLANT`, `EQUIPMENT_NOT_ACCESSIBLE`,
 `INVALID_ASSIGNMENT`, `IDEMPOTENCY_CONFLICT`.
+
+## Planes, autoregistro y solicitudes
+
+Entrega descrita en [Autoregistro y planes](self-service-plans.md).
+
+### Alta y recuperación (sin sesión)
+
+- `POST /functions/v1/ivmet-signup` `{action:"start", email, company, name,
+  plantName, phone, city, country, acceptTerms:true, termsVersion:"ivmet-terms-v1"}`
+  → `{sent:true}`. Envía un código al correo. Errores: `INVALID_EMAIL`,
+  `INVALID_SIGNUP`, `TERMS_REQUIRED`, `EMAIL_ALREADY_REGISTERED` (409),
+  `CODE_RATE_LIMITED` (429), `EMAIL_UNAVAILABLE`.
+- `POST /functions/v1/ivmet-signup` con los mismos datos más
+  `{action:"complete", code, password}` (12–200) → la misma respuesta que
+  `ivmet-login`. Errores: `INVALID_CODE`, `PASSWORD_POLICY_FAILED`,
+  `EMAIL_ALREADY_REGISTERED`, `SELF_SERVICE_UNAVAILABLE`.
+- `POST /functions/v1/ivmet-password-reset` `{action:"start", email}` →
+  `{sent:true}` exista o no la cuenta; `{action:"complete", email, code,
+  password}` → la respuesta de `ivmet-login`. Solo cuentas cuyo usuario es su
+  correo.
+
+### Cuentas del equipo (jefe de calidad de una empresa autoregistrada)
+
+`POST /functions/v1/ivmet-team-account` con su `Authorization`:
+
+- `{action:"create", requestId, username, name, role, plantIds, password}` →
+  `{id}`. `username`: 3–50 de `a-z0-9._-`, sin `@`. La cuenta debe cambiar la
+  contraseña al entrar.
+- `{action:"reset", requestId, userId, password}` → `{id}`.
+
+Reintentar con el mismo `requestId` no duplica. Errores: `PLAN_LIMIT_USERS`,
+`USERNAME_EXISTS`, `INVALID_USERNAME`, `INVALID_MEMBER`, `PLANT_SCOPE_INVALID`,
+`SELF_CHANGE_NOT_ALLOWED`, `SELF_SERVICE_REQUIRED`, `QUALITY_MANAGER_REQUIRED`.
+
+### Lecturas
+
+`bootstrap` agrega `plan`; la sección `plan` devuelve lo mismo más `offers`:
+
+```json
+{ "id": "…", "name": "Gratuito", "seats": 2, "seatsAvailable": 2,
+  "subscriptionStatus": "ACTIVE", "periodEndsAt": null,
+  "limits": { "plants": 1, "equipment": 5, "monthlyVerifications": 20, "patterns": 3 },
+  "features": { "fullReport": false, "customSchedules": false },
+  "catalog": { "visible": true, "order": 1, "selfService": true, "summary": "…" },
+  "usage": { "plants": 1, "equipment": 4, "users": 1, "patterns": 0,
+    "monthlyVerifications": 3, "openDrafts": 1, "monthStartsAt": "…" },
+  "selfService": true, "contactEmail": "ana@empresa.bo",
+  "upgradeRequest": null, "offers": [ … ] }
+```
+
+Un límite `null` es sin límite. `periodEndsAt` nulo: el plan no vence.
+`ivmet_customer_read` agrega `members` y `plants` (jefe de una empresa
+autoregistrada).
+
+### Escrituras (`ivmet_customer_mutate`)
+
+| Acción | Payload | Quién |
+| --- | --- | --- |
+| `plant.save` | `{id?, version?, name, city, address, active}` | jefe, autoregistrada |
+| `member.update` | `{id, version, name, role, plantIds, active, reason}` | jefe, autoregistrada |
+| `upgrade.request` | `{planId, reason, message, phone}` | jefe |
+| `upgrade.cancel` | `{id, version}` | jefe |
+
+`reason`: `PLANTS`, `EQUIPMENT`, `USERS`, `VERIFICATIONS`, `PATTERNS`,
+`FULL_REPORT`, `CUSTOM_SCHEDULES` o `GENERAL`. Sin correo de la empresa el
+teléfono es obligatorio (`CONTACT_REQUIRED`). Una abierta por empresa
+(`UPGRADE_REQUEST_OPEN`).
+
+### Límites
+
+`PLAN_LIMIT_PLANTS`, `PLAN_LIMIT_EQUIPMENT`, `PLAN_LIMIT_USERS`,
+`PLAN_LIMIT_VERIFICATIONS`, `PLAN_LIMIT_PATTERNS` y
+`PLAN_FEATURE_CUSTOM_SCHEDULES`. Las verificaciones del mes se comprueban al
+guardar el **primer** borrador de una captura; guardar o finalizar uno ya
+empezado no se bloquea. Sin `customSchedules`, cada `schedule` debe ser
+`fixed` con día/1, semana/1–2, mes/1, 2, 3 o 6, o año/1.
