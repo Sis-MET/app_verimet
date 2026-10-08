@@ -3,9 +3,11 @@ import 'package:printing/printing.dart';
 
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'commercial_plan.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'plan_screen.dart';
 import 'verification_report.dart';
 
 /// Una verificacion finalizada: su expediente, su informe y lo que se puede
@@ -46,6 +48,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       final user = widget.session.user;
       final bytes = await buildVerificationReport(
         data,
+        full: widget.session.plan.has(PlanFeature.fullReport),
         generatedBy: user == null
             ? null
             : '${valueLabel(user['name'] ?? user['username'])}'
@@ -144,6 +147,26 @@ class _VerificationScreenState extends State<VerificationScreen> {
             'Resultado de una verificación intermedia. No constituye certificado de calibración ni verificación legal.',
             icon: Icons.science_outlined,
           ),
+          if (!widget.session.plan.has(PlanFeature.fullReport)) ...[
+            const Notice(
+              'Tu plan genera el informe resumido: identificación, condiciones y resultado de cada prueba. El completo agrega las lecturas, el croquis, los gráficos y la trazabilidad de los patrones.',
+              icon: Icons.picture_as_pdf_outlined,
+            ),
+            if (widget.session.quality)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('report-upgrade'),
+                  onPressed: () => showPlanLimit(
+                    context,
+                    widget.session,
+                    const PlanLimit(feature: PlanFeature.fullReport),
+                  ),
+                  icon: const Icon(Icons.trending_up_rounded, size: 18),
+                  label: const Text('Ver el informe completo'),
+                ),
+              ),
+          ],
           const SizedBox(height: 8),
           Text(
             verdictLabel(v['veredicto_global']),

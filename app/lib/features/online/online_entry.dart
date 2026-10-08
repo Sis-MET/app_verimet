@@ -8,6 +8,7 @@ import 'mobile_api.dart';
 import 'offline_recovery.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'self_service_access.dart';
 import 'workspace_screen.dart';
 
 class OnlineEntry extends ConsumerStatefulWidget {
@@ -313,15 +314,19 @@ class _AccessFormState extends State<AccessForm> {
                         )
                       else
                         LabeledInput(
-                          label: 'Usuario',
+                          label: 'Usuario o correo',
                           child: TextFormField(
                             controller: username,
                             enabled: !busy,
                             autocorrect: false,
-                            autofillHints: const [AutofillHints.username],
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [
+                              AutofillHints.username,
+                              AutofillHints.email,
+                            ],
                             textInputAction: TextInputAction.next,
                             validator: (v) => v == null || v.trim().isEmpty
-                                ? 'Ingresa tu usuario.'
+                                ? 'Ingresa tu usuario o tu correo.'
                                 : null,
                           ),
                         ),
@@ -397,10 +402,44 @@ class _AccessFormState extends State<AccessForm> {
                         TextButton(
                           onPressed: busy ? null : widget.session.logout,
                           child: const Text('Cerrar sesión'),
+                        )
+                      else ...[
+                        TextButton(
+                          key: const ValueKey('access-forgot'),
+                          onPressed: busy || configError != null
+                              ? null
+                              : () => openPage<void>(
+                                  context,
+                                  PasswordResetScreen(
+                                    session: widget.session,
+                                    email: username.text,
+                                  ),
+                                ),
+                          child: const Text('¿Olvidaste tu contraseña?'),
                         ),
+                        const SizedBox(height: 18),
+                        const Divider(),
+                        const SizedBox(height: 14),
+                        Text(
+                          '¿Tu empresa aún no usa IvMET?',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          key: const ValueKey('access-signup'),
+                          onPressed: busy || configError != null
+                              ? null
+                              : () => openPage<void>(
+                                  context,
+                                  SignupScreen(session: widget.session),
+                                ),
+                          icon: const Icon(Icons.add_business_outlined),
+                          label: const Text('Crear cuenta de empresa'),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       const Text(
-                        'Cuentas asignadas por Métrica. Se requiere conexión a internet.',
+                        'Si tu empresa ya usa IvMET, pide tu usuario al jefe de calidad. Se requiere conexión a internet.',
                       ),
                     ],
                   ),

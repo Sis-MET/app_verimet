@@ -26,6 +26,7 @@ una línea de 3 px con un tramo por paso; abajo a la derecha, la píldora
 | Captura de la verificación | Pesas patrón y ambiente · Excentricidad · Repetibilidad · Linealidad · Resumen | Omitir o incluir la prueba, datos de la balanza, ver datos del servidor, guardar y salir |
 | Configurar verificaciones | Pruebas y periodicidad · Errores permisibles | Salir (sin guardar) |
 | Registrar o editar balanza | Área · Identificación · Datos técnicos | Salir (sin guardar) |
+| Crear cuenta de empresa | Tu empresa · Tu cuenta · Código | — |
 
 ## Páginas de una sola vista
 
@@ -43,6 +44,13 @@ píldora. El contenido deja `WizardNavPill.contentPadding` libre al final.
 | Áreas de una planta | Nueva área | Sugerir áreas desde Ubicación |
 | Balanzas de una planta (jefe) | Registrar balanza | — |
 | Balanzas de un operador / operadores de una balanza | Guardar | — |
+| Mi plan | Solicitar plan superior (jefe, sin solicitud abierta) | Cancelar solicitud |
+| Usuarios (empresa autoregistrada) | Nuevo usuario | Editar y contraseña temporal, en cada fila |
+| Plantas › Plantas y áreas (empresa autoregistrada) | Nueva planta | Editar planta, dentro de cada planta |
+| Recuperar contraseña | Enviar código · Guardar contraseña | — |
+
+El aviso de límite del plan es una hoja inferior con una sola acción
+(«Solicitar plan superior»), no un cuadro más en la pantalla.
 
 Las pestañas de la barra inferior (Inicio, Verificar, Agenda, Plantas,
 Ajustes) no llevan píldora: la barra flotante ocupa ese lugar.

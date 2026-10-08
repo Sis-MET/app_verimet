@@ -26,7 +26,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.enterText(fieldLabeled('Usuario'), 'operador');
+    await tester.enterText(fieldLabeled('Usuario o correo'), 'operador');
     await tester.enterText(fieldLabeled('Contraseña'), 'fixture-password');
     await tester.tap(find.text('Ingresar'));
     await tester.pumpAndSettle();

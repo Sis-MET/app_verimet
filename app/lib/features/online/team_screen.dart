@@ -20,8 +20,9 @@ import 'online_widgets.dart';
 ///
 /// Es la tercera pastilla de Plantas, solo para el jefe de calidad. Los
 /// usuarios y sus plantas los habilita Metrica en RimMET con los cupos del
-/// contrato; aqui se decide que balanzas verifica cada operador. Un operador
-/// sin balanzas no ve ninguna.
+/// contrato, o el propio jefe en Ajustes › Usuarios si la empresa se registro
+/// desde la app; aqui se decide que balanzas verifica cada operador. Un
+/// operador sin balanzas no ve ninguna.
 class OperatorsPanel extends StatefulWidget {
   const OperatorsPanel({required this.session, super.key});
   final MobileSession session;
@@ -112,8 +113,10 @@ class _OperatorsPanelState extends State<OperatorsPanel> {
               ),
             const SectionLabel('Operadores'),
             if (members.isEmpty)
-              const Notice(
-                'Esta planta no tiene operadores. Métrica crea los usuarios y les habilita plantas en RimMET, dentro de los cupos del plan.',
+              Notice(
+                widget.session.plan.selfService
+                    ? 'Esta planta no tiene operadores. Créalos en Ajustes › Usuarios, dentro de los cupos de tu plan.'
+                    : 'Esta planta no tiene operadores. Métrica crea los usuarios y les habilita plantas en RimMET, dentro de los cupos del plan.',
               )
             else
               SurfaceList(

@@ -23,6 +23,7 @@ Future<ScheduleChoice?> showScheduleEditor(
   required CheckSchedule initial,
   required String testLabel,
   bool offerApplyToAll = false,
+  bool customAllowed = true,
 }) => showModalBottomSheet<ScheduleChoice>(
   context: context,
   isScrollControlled: true,
@@ -34,6 +35,7 @@ Future<ScheduleChoice?> showScheduleEditor(
       initial: initial,
       testLabel: testLabel,
       offerApplyToAll: offerApplyToAll,
+      customAllowed: customAllowed,
     ),
   ),
 );
@@ -45,32 +47,55 @@ Future<ScheduleChoice?> showScheduleEditor(
 /// calendario. Debajo, de lo general a lo fino: como se cuenta (fechas fijas o
 /// desde la ultima), los accesos rapidos y, solo cuando aplican, los dias de
 /// la semana o del mes. "Personalizada" abre el intervalo libre.
+///
+/// Sin [customAllowed] (el plan gratuito) solo quedan los accesos rapidos con
+/// fechas fijas, que es lo que Supabase acepta para ese plan: "Personalizada"
+/// y "Desde la ultima" muestran el candado y dicen donde estan.
 class ScheduleEditor extends StatefulWidget {
   const ScheduleEditor({
     required this.initial,
     required this.testLabel,
     this.offerApplyToAll = false,
+    this.customAllowed = true,
     super.key,
   });
 
   final CheckSchedule initial;
   final String testLabel;
   final bool offerApplyToAll;
+  final bool customAllowed;
 
   @override
   State<ScheduleEditor> createState() => _ScheduleEditorState();
 }
 
 class _ScheduleEditorState extends State<ScheduleEditor> {
-  late CheckSchedule schedule = widget.initial.completed(DateTime.now());
+  late CheckSchedule schedule = _allowed(
+    widget.initial.completed(DateTime.now()),
+  );
   late bool custom = schedule.preset == SchedulePreset.custom;
   bool applyToAll = false;
+
+  /// Se toco algo que el plan no incluye: lo dice el aviso del editor.
+  bool locked = false;
+
+  /// Una regla a medida que el plan ya no admite arranca como mensual.
+  CheckSchedule _allowed(CheckSchedule value) =>
+      widget.customAllowed || value.preset != SchedulePreset.custom
+      ? value
+      : CheckSchedule.preset(SchedulePreset.monthly, value.startsOn!);
+
+  void _lock() => setState(() => locked = true);
 
   DateTime get start => schedule.startsOn!;
 
   void _update(CheckSchedule next) => setState(() => schedule = next);
 
   void _choosePreset(SchedulePreset preset) {
+    if (preset == SchedulePreset.custom && !widget.customAllowed) {
+      _lock();
+      return;
+    }
     if (preset == SchedulePreset.custom) {
       setState(() => custom = true);
       return;
@@ -83,7 +108,10 @@ class _ScheduleEditorState extends State<ScheduleEditor> {
 
   /// Desde la ultima solo hay intervalo: los dias de la semana o del mes se
   /// conservan por si se vuelve a fechas fijas, pero no se guardan.
-  void _chooseMode(ScheduleMode mode) => _update(schedule.copyWith(mode: mode));
+  void _chooseMode(ScheduleMode mode) =>
+      mode == ScheduleMode.rolling && !widget.customAllowed
+      ? _lock()
+      : _update(schedule.copyWith(mode: mode));
 
   /// Semana del mes en que cae la primera fecha: el 7 es el primer miercoles.
   int get _startWeekOfMonth => ((start.day - 1) ~/ 7 + 1).clamp(1, 4);
@@ -216,12 +244,26 @@ class _ScheduleEditorState extends State<ScheduleEditor> {
                       ChoicePill(
                         key: ValueKey('preset-${option.name}'),
                         label: option.label,
+                        icon:
+                            option == SchedulePreset.custom &&
+                                !widget.customAllowed
+                            ? Icons.lock_outline
+                            : null,
                         selected: option == preset,
                         onTap: () => _choosePreset(option),
                       ),
                   ],
                 ),
               ],
+              if (locked)
+                Padding(
+                  key: const ValueKey('schedule-locked'),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _Hint(
+                    'Tu plan usa las periodicidades predefinidas con fechas fijas. '
+                    'La periodicidad a medida y contar desde la última están en planes superiores: pídelo en Ajustes › Mi plan.',
+                  ),
+                ),
               if (custom || !schedule.fixed) ...[
                 const SectionLabel('Repetir cada'),
                 _Stepper(

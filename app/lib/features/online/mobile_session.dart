@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/di/core_providers.dart';
 import '../../core/storage/draft_recovery_store.dart';
 import '../../core/utils/calendar_dates.dart';
+import 'commercial_plan.dart';
 import 'draft_recovery.dart';
 import 'mobile_api.dart';
 
@@ -109,6 +110,10 @@ class MobileSession extends ChangeNotifier {
   }
 
   bool get quality => user?['role'] == 'cliente_jefe_calidad';
+
+  /// Plan de la empresa con su uso, segun el ultimo `bootstrap`.
+  CommercialPlan get plan =>
+      CommercialPlan(object(bootstrap['plan'] ?? const <String, dynamic>{}));
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -144,6 +149,23 @@ class MobileSession extends ChangeNotifier {
     }
   }
 
+  /// Crea la empresa con el codigo recibido y entra con su sesion. Los
+  /// errores los muestra la pantalla de alta: no cambian la de acceso.
+  Future<void> signup(Json data) async {
+    error = null;
+    await api.signupComplete(data);
+    workspaceVersion++;
+    await refresh();
+  }
+
+  /// Fija una contraseña nueva con el codigo recibido y entra.
+  Future<void> resetPassword(String email, String code, String password) async {
+    error = null;
+    await api.passwordResetComplete(email, code, password);
+    workspaceVersion++;
+    await refresh();
+  }
+
   Future<void> refresh() async {
     if (_checking || _disposed) return;
     if (!api.hasSession) {
@@ -165,7 +187,8 @@ class MobileSession extends ChangeNotifier {
       if (user == null) {
         await api.clear();
         stage = SessionStage.login;
-        error = 'El usuario está deshabilitado. Consulta con Métrica.';
+        error =
+            'El usuario está deshabilitado. Consulta con el jefe de calidad de tu empresa.';
       } else if (![
         'cliente_operador',
         'cliente_jefe_calidad',
@@ -178,7 +201,7 @@ class MobileSession extends ChangeNotifier {
       } else if (access['allowed'] != true) {
         stage = SessionStage.blocked;
         error =
-            'Tu licencia no está activa. Solicita a Métrica revisar el contrato y los cupos de tu cuenta.';
+            'Tu acceso no está activo: tu cuenta no tiene cupo vigente en el plan de tu empresa. Pide al jefe de calidad que lo revise.';
       } else {
         final data = await api.read('bootstrap', clockFilters());
         if (check != _check || _disposed) return;

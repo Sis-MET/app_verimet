@@ -11,14 +11,18 @@ import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/status_tag.dart';
 import '../../core/domain/compliance_status.dart';
 import '../../shared/widgets/tile_grid.dart';
+import '../../shared/widgets/wizard_chrome.dart';
 import 'agenda_screen.dart';
 import 'catalog_screen.dart';
+import 'company_plants.dart';
+import 'company_users.dart';
 import 'history_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'customer_configuration.dart';
 import 'draft_screen.dart';
+import 'plan_screen.dart';
 import 'team_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -356,6 +360,13 @@ class _Home extends StatelessWidget {
             ),
           ],
         ),
+        // El plan va en una linea, no como un cuadro mas: avisa cuanto queda
+        // y lleva a pedir uno superior.
+        if (session.quality &&
+            (session.plan.selfService || session.plan.limited)) ...[
+          const SizedBox(height: 12),
+          PlanStrip(session: session),
+        ],
         const SectionLabel('Alcance de la app'),
         const Notice(
           'Tus verificaciones son privadas. Métrica solo recibe el expediente que autorice el jefe de calidad.',
@@ -458,7 +469,8 @@ class _PlantList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    final manages = managesPlants(session);
+    final list = ListView(
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 140),
       children: [
         Text(
@@ -477,8 +489,10 @@ class _PlantList extends StatelessWidget {
           ),
         ),
         if (plants.isEmpty)
-          const Notice(
-            'No tienes plantas asignadas. Solicita su habilitación en RimMET.',
+          Notice(
+            manages
+                ? 'No trabajas en ninguna planta. Crea una o asígnate desde Ajustes › Usuarios.'
+                : 'No tienes plantas asignadas. Solicita su habilitación en RimMET.',
           )
         else
           TileGrid(
@@ -503,6 +517,19 @@ class _PlantList extends StatelessWidget {
           ),
       ],
     );
+    // Crear plantas es de la empresa que se gestiona sola; en las demás las
+    // habilita Métrica.
+    return manages
+        ? FloatingActionLayout(
+            action: WizardNavPill.action(
+              key: const ValueKey('plants-create'),
+              label: 'Nueva planta',
+              icon: Icons.add,
+              onNext: () => createPlant(context, session),
+            ),
+            child: list,
+          )
+        : list;
   }
 
   String _areaCount(Json plant, String code) {
@@ -536,7 +563,7 @@ class _Settings extends ConsumerWidget {
               DetailField('Plan', session.access['planName']),
               DetailField(
                 'Fin del período',
-                dateLabel(session.access['periodEndsAt']),
+                periodLabel(session.access['periodEndsAt']),
               ),
               if (session.access['subscriptionStatus'] == 'GRACE')
                 DetailField(
@@ -545,6 +572,34 @@ class _Settings extends ConsumerWidget {
                 ),
             ],
           ),
+        ),
+        const SectionLabel('Empresa'),
+        TileGrid(
+          minTileHeight: 110,
+          cells: [
+            TileCell(
+              ActionTile(
+                key: const ValueKey('settings-plan'),
+                icon: Icons.workspace_premium_outlined,
+                label: 'Mi plan',
+                caption: 'Uso, límites y planes',
+                onTap: () => openPlan(context, session),
+              ),
+            ),
+            if (managesPlants(session))
+              TileCell(
+                ActionTile(
+                  key: const ValueKey('settings-users'),
+                  icon: Icons.manage_accounts_outlined,
+                  label: 'Usuarios',
+                  caption: 'Cuentas y contraseñas del equipo',
+                  onTap: () => openPage<void>(
+                    context,
+                    CompanyUsersScreen(session: session),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SectionLabel('Cómo se ve la app'),
         TileGrid(

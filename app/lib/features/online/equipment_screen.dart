@@ -8,6 +8,7 @@ import '../../shared/widgets/surface_card.dart';
 import '../../shared/widgets/tile_grid.dart';
 import '../../shared/widgets/wizard_chrome.dart';
 import 'check_schedule.dart';
+import 'commercial_plan.dart';
 import 'customer_configuration.dart';
 import 'draft_screen.dart';
 import 'equipment_check_configuration.dart';
@@ -18,6 +19,7 @@ import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'plan_screen.dart';
 import 'team_screen.dart';
 
 /// Ficha de una balanza: sus datos, su plan de verificacion y la vigencia de
@@ -61,6 +63,20 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     } else {
       setState(() => revision++);
     }
+  }
+
+  /// Cada captura nueva ocupa un lugar del mes del plan; Supabase lo vuelve
+  /// a comprobar al guardar el primer borrador.
+  Future<void> _start(Json data) async {
+    if (session.plan.full(PlanResource.monthlyVerifications)) {
+      await showPlanLimit(
+        context,
+        session,
+        const PlanLimit(resource: PlanResource.monthlyVerifications),
+      );
+      return;
+    }
+    await configure(DraftScreen(session: session, bundle: data));
   }
 
   static bool _canStart(Json data) =>
@@ -108,9 +124,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       key: const ValueKey('start-verification'),
       label: 'Iniciar verificación',
       icon: Icons.play_arrow_rounded,
-      onNext: _canStart(data)
-          ? () => configure(DraftScreen(session: session, bundle: data))
-          : null,
+      onNext: _canStart(data) ? () => _start(data) : null,
     ),
     builder: (data) {
       final palette = IndustryPalette.of(context);

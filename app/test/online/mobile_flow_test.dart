@@ -112,7 +112,7 @@ void main() {
   }
 
   Future<void> login(WidgetTester tester) async {
-    await tester.enterText(fieldLabeled('Usuario'), 'operador');
+    await tester.enterText(fieldLabeled('Usuario o correo'), 'operador');
     await tester.enterText(fieldLabeled('Contraseña'), 'fixture-password');
     await tester.tap(find.text('Ingresar'));
     await tester.pumpAndSettle();
@@ -132,7 +132,7 @@ void main() {
       expect(find.text('VPN'), findsNothing);
       await tester.tap(find.text('Ingresar'));
       await tester.pumpAndSettle();
-      expect(find.text('Ingresa tu usuario.'), findsOneWidget);
+      expect(find.text('Ingresa tu usuario o tu correo.'), findsOneWidget);
       await login(tester);
       expect(tester.takeException(), isNull, reason: 'Inicio');
       expect(find.text('Cliente aislado'), findsOneWidget);
@@ -268,7 +268,7 @@ void main() {
     final server = FixtureServer()..allowed = false;
     await start(tester, server);
     await login(tester);
-    expect(find.textContaining('Tu licencia no está activa'), findsOneWidget);
+    expect(find.textContaining('Tu acceso no está activo'), findsOneWidget);
     expect(server.bootstrapCalls, 0);
     expect(find.text('Cliente aislado'), findsNothing);
     await tester.pumpWidget(const SizedBox());

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'company_plants.dart';
 import 'customer_form.dart';
 import 'equipment_validation.dart';
 import 'mobile_api.dart';
@@ -46,6 +47,18 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
   Future<void> edit(Widget form) async {
     await openPage<bool>(context, form);
     if (mounted) setState(() => revision++);
+  }
+
+  /// Si se desactivó, la planta ya no está en la lista: se vuelve atrás.
+  Future<void> _editPlant() async {
+    final saved = await editPlant(context, widget.session, plantId!);
+    if (!saved || !mounted) return;
+    await widget.session.refresh();
+    if (!mounted) return;
+    final stillActive = objects(
+      widget.session.bootstrap['plants'],
+    ).any((plant) => plant['id'] == plantId);
+    stillActive ? setState(() => revision++) : Navigator.of(context).pop();
   }
 
   void areaForm([Json? area]) => edit(
@@ -96,6 +109,12 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
               Icons.auto_fix_high_outlined,
               'Sugerir áreas desde Ubicación',
             ),
+            if (managesPlants(widget.session))
+              wizardMenuItem<VoidCallback>(
+                _editPlant,
+                Icons.edit_outlined,
+                'Editar planta',
+              ),
           ]),
       ],
       child: section == 'areas' && plantId == null

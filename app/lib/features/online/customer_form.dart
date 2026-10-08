@@ -4,10 +4,12 @@ import 'package:uuid/uuid.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'commercial_plan.dart';
 import 'draft_controller.dart' show normalizedDecimal;
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'plan_screen.dart';
 
 /// Motor de formularios del area de cliente.
 ///
@@ -37,11 +39,14 @@ class CustomerField {
     this.kind = 'text',
     this.options = const {},
     this.max = 150,
+    this.min = 0,
     this.readOnly = false,
+    this.hint,
   });
   final String keyName, label, kind;
   final bool required, readOnly;
-  final int max;
+  final int max, min;
+  final String? hint;
   final Map<String, String> options;
 }
 
@@ -59,6 +64,7 @@ class CustomerForm extends StatefulWidget {
     this.afterFields,
     this.submitLabel = 'Guardar',
     this.externalDirty = false,
+    this.send,
     super.key,
   });
   final MobileSession session;
@@ -70,6 +76,10 @@ class CustomerForm extends StatefulWidget {
   final Widget? preview;
   final Widget? afterFields;
   final bool externalDirty;
+
+  /// Envio propio en lugar de `ivmet_customer_mutate`: recibe el payload y
+  /// el UUID congelados (las cuentas del equipo van por una Edge Function).
+  final Future<Object?> Function(Json payload, String requestId)? send;
   @override
   State<CustomerForm> createState() => _CustomerFormState();
 }
@@ -96,11 +106,15 @@ class _CustomerFormState extends State<CustomerForm> {
       pending ??= object(
         jsonDecode(jsonEncode(widget.payload?.call(sent) ?? sent)),
       );
-      await widget.session.api.rpc('ivmet_customer_mutate', {
-        'action': widget.action,
-        'payload': pending,
-        'request_id': requestId,
-      });
+      if (widget.send case final send?) {
+        await send(pending!, requestId);
+      } else {
+        await widget.session.api.rpc('ivmet_customer_mutate', {
+          'action': widget.action,
+          'payload': pending,
+          'request_id': requestId,
+        });
+      }
       if (!mounted) return;
       setState(() {
         leaving = true;
@@ -117,6 +131,9 @@ class _CustomerFormState extends State<CustomerForm> {
           requestId = const Uuid().v4();
         }
       });
+      if (PlanLimit.fromCode(failure.code) case final limit?) {
+        await showPlanLimit(context, widget.session, limit);
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -357,7 +374,7 @@ class _CustomerFormState extends State<CustomerForm> {
                           decoration: InputDecoration(
                             hintText: field.kind == 'date'
                                 ? 'AAAA-MM-DD'
-                                : null,
+                                : field.hint,
                           ),
                           onChanged: (v) {
                             values[field.keyName] = v;
@@ -366,6 +383,10 @@ class _CustomerFormState extends State<CustomerForm> {
                           validator: (v) {
                             if (field.required && (v ?? '').trim().isEmpty) {
                               return 'Completa este campo.';
+                            }
+                            if ((v ?? '').trim().isNotEmpty &&
+                                (v ?? '').trim().length < field.min) {
+                              return 'Usa al menos ${field.min} caracteres.';
                             }
                             if (field.kind == 'decimal' &&
                                 (v ?? '').trim().isNotEmpty &&

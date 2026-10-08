@@ -101,10 +101,15 @@ String verificationReportFilename(ReportJson data) {
   return 'verificacion_${_safeFilePart(code)}_$date.pdf';
 }
 
+/// Con [full] en false (el plan gratuito) el informe es resumido: conserva la
+/// identificacion, las condiciones, el resumen de resultados y los avisos
+/// legales, y deja fuera las lecturas de cada prueba y la trazabilidad de los
+/// patrones.
 Future<Uint8List> buildVerificationReport(
   ReportJson data, {
   DateTime? generatedAt,
   String? generatedBy,
+  bool full = true,
 }) async {
   final verification = _map(data['verification']);
   final users = _map(data['users']);
@@ -198,18 +203,30 @@ Future<Uint8List> buildVerificationReport(
     ]),
     pw.SizedBox(height: 8),
     _labeledText('Observaciones generales', verification['observaciones']),
-    _section('Trazabilidad de los patrones'),
-    if (patterns.isEmpty)
-      _empty('No se registraron certificados de pesas patrón.')
-    else
-      _patternsTable(patterns),
+    if (full) ...[
+      _section('Trazabilidad de los patrones'),
+      if (patterns.isEmpty)
+        _empty('No se registraron certificados de pesas patrón.')
+      else
+        _patternsTable(patterns),
+    ],
     _section('Resumen de resultados'),
     _testsSummary(tests),
+    if (!full) ...[
+      pw.SizedBox(height: 12),
+      _notice(
+        'Informe resumido. El informe completo agrega las lecturas de cada '
+        'prueba, el croquis de excentricidad, los gráficos y la trazabilidad '
+        'de las pesas patrón. Está disponible en los planes superiores de IvMET.',
+      ),
+    ],
   ];
 
-  for (final test in tests) {
-    widgets.add(pw.NewPage());
-    widgets.addAll(_testSection(test, regularFont));
+  if (full) {
+    for (final test in tests) {
+      widgets.add(pw.NewPage());
+      widgets.addAll(_testSection(test, regularFont));
+    }
   }
 
   widgets.addAll([

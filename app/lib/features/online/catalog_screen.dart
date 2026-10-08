@@ -7,11 +7,13 @@ import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/tile_grid.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'commercial_plan.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'equipment_registration.dart';
 import 'equipment_screen.dart';
+import 'plan_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({required this.session, this.plantId, super.key});
@@ -51,6 +53,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
   /// Alta de una balanza de esta planta; al terminar se abre su ficha para
   /// configurar las verificaciones.
   Future<void> _register(BuildContext context) async {
+    if (widget.session.plan.full(PlanResource.equipment)) {
+      await showPlanLimit(
+        context,
+        widget.session,
+        const PlanLimit(resource: PlanResource.equipment),
+      );
+      return;
+    }
     final receipt = await openPage<Json>(
       context,
       EquipmentRegistrationScreen.create(

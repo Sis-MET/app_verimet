@@ -10,10 +10,12 @@ import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/wizard_chrome.dart';
 
 import 'check_schedule.dart';
+import 'commercial_plan.dart';
 import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'plan_screen.dart';
 import 'schedule_editor.dart';
 
 class _CheckConfiguration {
@@ -304,6 +306,9 @@ class _EquipmentCheckConfigurationScreenState
           requestId = const Uuid().v4();
         }
       });
+      if (PlanLimit.fromCode(failure.code) case final limit?) {
+        await showPlanLimit(context, widget.session, limit);
+      }
     } catch (_) {
       if (mounted) {
         setState(
@@ -442,6 +447,7 @@ class _EquipmentCheckConfigurationScreenState
       initial: check.schedule,
       testLabel: label(check.type),
       offerApplyToAll: enabled.length > 1,
+      customAllowed: widget.session.plan.has(PlanFeature.customSchedules),
     );
     if (choice == null || !mounted) return;
     setState(() {

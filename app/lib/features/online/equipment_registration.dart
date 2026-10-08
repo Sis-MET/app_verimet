@@ -9,11 +9,13 @@ import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/labeled_field.dart';
 import '../../shared/widgets/segmented_pills.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'commercial_plan.dart';
 import 'customer_form.dart';
 import 'draft_controller.dart' show normalizedDecimal;
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'plan_screen.dart';
 
 /// Balanzas que la empresa incorpora sin que Métrica tenga acceso a ellas.
 ///
@@ -390,6 +392,9 @@ class _RegistrationFormState extends State<_RegistrationForm> {
           requestId = const Uuid().v4();
         }
       });
+      if (PlanLimit.fromCode(failure.code) case final limit?) {
+        await showPlanLimit(context, widget.session, limit);
+      }
     } catch (_) {
       if (mounted) {
         setState(

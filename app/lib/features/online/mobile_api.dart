@@ -55,6 +55,10 @@ class MobileFailure implements Exception {
   final int? status;
   bool get offline => code == 'NETWORK_UNAVAILABLE';
   bool get unauthorized => status == 401 || code == 'SESSION_CHANGED';
+
+  /// El plan de la empresa no admite la operación: se ofrece uno superior.
+  bool get planLimit =>
+      code.startsWith('PLAN_LIMIT_') || code.startsWith('PLAN_FEATURE_');
   String get message => switch (code) {
     'INVALID_CREDENTIALS' => 'Usuario o contraseña incorrectos.',
     'NETWORK_UNAVAILABLE' =>
@@ -193,6 +197,58 @@ class MobileFailure implements Exception {
       'Métrica ya recibió estos datos de la balanza.',
     'MESSAGE_REQUIRED' => 'Escribe un mensaje para Métrica.',
     'REASON_REQUIRED' => 'Indica el motivo.',
+    'EMAIL_ALREADY_REGISTERED' =>
+      'Ese correo ya tiene una cuenta en IvMET. Ingresa con tu correo y contraseña, o recupera la contraseña.',
+    'INVALID_EMAIL' => 'Revisa el correo electrónico.',
+    'INVALID_SIGNUP' =>
+      'Revisa los datos: el nombre de la empresa y el tuyo deben tener al menos 2 caracteres.',
+    'TERMS_REQUIRED' => 'Acepta las condiciones de uso para crear la cuenta.',
+    'INVALID_CODE' =>
+      'El código no es válido o ya venció. Revisa tu correo o pide uno nuevo.',
+    'CODE_RATE_LIMITED' =>
+      'Ya enviamos un código hace poco. Espera un minuto antes de pedir otro.',
+    'EMAIL_UNAVAILABLE' =>
+      'No se pudo enviar el correo. Inténtalo de nuevo en unos minutos.',
+    'SELF_SERVICE_UNAVAILABLE' =>
+      'El registro de empresas está pausado. Inténtalo más tarde.',
+    'AUTH_UNAVAILABLE' =>
+      'El servicio de acceso no responde. Inténtalo de nuevo en unos minutos.',
+    'ACCOUNT_DISABLED' =>
+      'La cuenta está deshabilitada. Consulta con el jefe de calidad de tu empresa.',
+    'PASSWORD_POLICY_FAILED' => 'Usa una contraseña de al menos 12 caracteres.',
+    'PLAN_LIMIT_PLANTS' => 'Tu plan no admite más plantas.',
+    'PLAN_LIMIT_EQUIPMENT' => 'Tu plan no admite más balanzas.',
+    'PLAN_LIMIT_USERS' => 'Tu plan no tiene más cupos de usuario.',
+    'PLAN_LIMIT_VERIFICATIONS' =>
+      'Tu plan ya usó las verificaciones de este mes.',
+    'PLAN_LIMIT_PATTERNS' => 'Tu plan no admite más pesas patrón activas.',
+    'PLAN_FEATURE_CUSTOM_SCHEDULES' =>
+      'Tu plan usa las periodicidades predefinidas. La periodicidad a medida está en planes superiores.',
+    'SELF_SERVICE_REQUIRED' =>
+      'Métrica gestiona las plantas y los usuarios de tu empresa en RimMET.',
+    'USERNAME_EXISTS' =>
+      'Ese usuario ya existe en IvMET. Prueba con otro, por ejemplo agregando el nombre de tu empresa.',
+    'INVALID_USERNAME' =>
+      'El usuario lleva de 3 a 50 letras minúsculas, números, punto o guion, sin espacios ni @.',
+    'INVALID_MEMBER' => 'Revisa el nombre y el rol del usuario.',
+    'SELF_CHANGE_NOT_ALLOWED' =>
+      'No puedes quitarte el rol de jefe de calidad, desactivar tu cuenta ni restablecer tu propia contraseña.',
+    'USER_NOT_FOUND' => 'El usuario ya no está disponible.',
+    'INVALID_PLANT' =>
+      'Revisa el nombre, la ciudad y la dirección de la planta.',
+    'PLANT_HAS_EQUIPMENT' =>
+      'La planta tiene balanzas activas. Dalas de baja antes de desactivarla.',
+    'LAST_PLANT' => 'Tu empresa necesita al menos una planta activa.',
+    'UPGRADE_REQUEST_OPEN' =>
+      'Ya tienes una solicitud abierta. Métrica te contactará.',
+    'UPGRADE_REQUEST_NOT_OPEN' => 'La solicitud ya fue atendida o cancelada.',
+    'PLAN_NOT_AVAILABLE' =>
+      'Ese plan ya no está disponible. Actualiza la pantalla.',
+    'CONTACT_REQUIRED' =>
+      'Deja un teléfono para que Métrica pueda contactarte.',
+    'INVALID_UPGRADE_REQUEST' => 'Revisa los datos de la solicitud.',
+    'SUBSCRIPTION_NOT_ACTIVE' =>
+      'El plan de tu empresa no está vigente. Revisa Mi plan.',
     _ when status == 401 => 'La sesión venció. Ingresa nuevamente.',
     _ when status == 429 =>
       'Demasiados intentos. Espera antes de volver a intentar.',
@@ -355,6 +411,48 @@ class MobileApi {
 
   Future<Json> read(String section, [Json filters = const {}]) =>
       rpc('ivmet_mobile_read', {'section': section, 'filters': filters});
+
+  /// Alta de una empresa. `start` envia el codigo al correo; `complete` lo
+  /// verifica, crea la empresa y abre la sesion como [login].
+  Future<void> signupStart(Json data) =>
+      _request('/functions/v1/ivmet-signup', {...data, 'action': 'start'});
+
+  Future<void> signupComplete(Json data) =>
+      _openWith('/functions/v1/ivmet-signup', {...data, 'action': 'complete'});
+
+  /// Recuperar la contraseña con un codigo al correo. Solo las cuentas cuyo
+  /// usuario es su correo; `start` responde igual exista o no.
+  Future<void> passwordResetStart(String email) => _request(
+    '/functions/v1/ivmet-password-reset',
+    {'action': 'start', 'email': email.trim()},
+  );
+
+  Future<void> passwordResetComplete(
+    String email,
+    String code,
+    String password,
+  ) => _openWith('/functions/v1/ivmet-password-reset', {
+    'action': 'complete',
+    'email': email.trim(),
+    'code': code.trim(),
+    'password': password,
+  });
+
+  Future<void> _openWith(String path, Json body) async {
+    await clear();
+    final generation = _epoch;
+    final data = await _request(path, body);
+    await _accept(
+      data['accessToken'] as String,
+      data['refreshToken'] as String,
+      generation,
+    );
+  }
+
+  /// Cuentas del equipo de una empresa autoregistrada: `create` o `reset`,
+  /// con la contraseña temporal que el jefe de calidad entrega.
+  Future<Json> teamAccount(Json body) =>
+      authorized('/functions/v1/ivmet-team-account', body);
   Future<void> changePassword(String password) async {
     await authorized('/functions/v1/ivmet-change-password', {
       'password': password,
