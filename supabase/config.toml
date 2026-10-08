@@ -41,6 +41,15 @@ enable_signup = false
 enable_signup = false
 double_confirm_changes = true
 enable_confirmations = false
+# Los registros públicos siguen cerrados: `ivmet-signup` crea la cuenta y el
+# código de 6 dígitos que llega en la plantilla de Magic Link la confirma.
+otp_length = 6
+otp_expiry = 900
+max_frequency = "60s"
+
+[auth.email.template.magic_link]
+subject = "Tu código de IvMET"
+content_path = "./supabase/templates/codigo-ivmet.html"
 
 [edge_runtime]
 enabled = true
@@ -51,4 +60,15 @@ verify_jwt = false
 
 [functions.ivmet-change-password]
 # El handler valida con Auth.getUser(token), también con claves asimétricas.
+verify_jwt = false
+
+[functions.ivmet-signup]
+# Público: el código enviado al correo es lo que autoriza el alta.
+verify_jwt = false
+
+[functions.ivmet-password-reset]
+verify_jwt = false
+
+[functions.ivmet-team-account]
+# El handler valida con Auth.getUser(token), como ivmet-change-password.
 verify_jwt = false

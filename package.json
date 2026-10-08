@@ -13,7 +13,7 @@
     "db:test:operations": "node --test scripts/test-operations-db.mjs",
     "db:test:mobile": "node --test scripts/test-mobile-db.mjs scripts/test-registered-equipment-db.mjs scripts/test-operator-agenda-db.mjs",
     "db:test:plans": "node --test scripts/test-self-service-db.mjs",
-    "test:mobile-auth": "node --experimental-vm-modules --test scripts/test-mobile-auth.mjs",
+    "test:mobile-auth": "node --experimental-vm-modules --test scripts/test-mobile-auth.mjs scripts/test-self-service-auth.mjs",
     "preinstall": "only-allow pnpm",
     "backend:dev": "pnpm --filter @ivmet/backend dev",
     "backend:build": "pnpm --filter @ivmet/backend build",
