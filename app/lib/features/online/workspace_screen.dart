@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../settings/presentation/providers/settings_providers.dart';
+import '../../core/constants/app_config.dart';
 import '../../shared/theme/app_typography.dart';
 import '../../shared/theme/industry_palette.dart';
 import '../../shared/widgets/app_shell.dart';
@@ -12,6 +13,7 @@ import '../../shared/widgets/status_tag.dart';
 import '../../core/domain/compliance_status.dart';
 import '../../shared/widgets/tile_grid.dart';
 import '../../shared/widgets/wizard_chrome.dart';
+import 'account_deletion.dart';
 import 'agenda_screen.dart';
 import 'catalog_screen.dart';
 import 'company_plants.dart';
@@ -23,6 +25,7 @@ import 'online_widgets.dart';
 import 'customer_configuration.dart';
 import 'draft_screen.dart';
 import 'plan_screen.dart';
+import 'user_manual.dart';
 import 'team_screen.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -546,13 +549,38 @@ class _Settings extends ConsumerWidget {
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
     final large = ref.watch(largeTextProvider);
 
+    // Eliminar es raro y destructivo: va en ⋮, no como un cuadro más.
+    final menu = pageMenu([
+      wizardMenuItem<VoidCallback>(
+        () => openPage<void>(context, AccountDeletionScreen(session: session)),
+        Icons.person_remove_outlined,
+        'Eliminar mi cuenta',
+      ),
+      if (managesPlants(session))
+        wizardMenuItem<VoidCallback>(
+          () => openPage<void>(
+            context,
+            AccountDeletionScreen(session: session, company: true),
+          ),
+          Icons.domain_disabled_outlined,
+          'Eliminar la empresa',
+        ),
+    ]);
     return ListView(
       padding: kShellContentPadding,
       children: [
-        ScreenHeader(
-          kicker: 'Mi cuenta',
-          title: valueLabel(session.user!['name']),
-          subtitle: session.quality ? 'Jefe de calidad' : 'Operador',
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ScreenHeader(
+                kicker: 'Mi cuenta',
+                title: valueLabel(session.user!['name']),
+                subtitle: session.quality ? 'Jefe de calidad' : 'Operador',
+              ),
+            ),
+            KeyedSubtree(key: const ValueKey('settings-menu'), child: menu!),
+          ],
         ),
         const SectionLabel('Sesión y licencia'),
         SurfaceCard(
@@ -560,6 +588,7 @@ class _Settings extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DetailField('Usuario', session.user!['username']),
+              const DetailField('Versión de la app', AppConfig.version),
               DetailField('Plan', session.access['planName']),
               DetailField(
                 'Fin del período',
@@ -599,6 +628,21 @@ class _Settings extends ConsumerWidget {
                   ),
                 ),
               ),
+          ],
+        ),
+        const SectionLabel('Ayuda'),
+        TileGrid(
+          minTileHeight: 110,
+          cells: [
+            TileCell.wide(
+              ActionTile(
+                key: const ValueKey('settings-manual'),
+                icon: Icons.menu_book_outlined,
+                label: 'Manual de uso',
+                caption: 'Cómo usar IvMET, paso a paso y sin conexión',
+                onTap: () => openPage<void>(context, const ManualScreen()),
+              ),
+            ),
           ],
         ),
         const SectionLabel('Cómo se ve la app'),

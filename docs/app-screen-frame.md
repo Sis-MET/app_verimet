@@ -48,9 +48,14 @@ píldora. El contenido deja `WizardNavPill.contentPadding` libre al final.
 | Usuarios (empresa autoregistrada) | Nuevo usuario | Editar y contraseña temporal, en cada fila |
 | Plantas › Plantas y áreas (empresa autoregistrada) | Nueva planta | Editar planta, dentro de cada planta |
 | Recuperar contraseña | Enviar código · Guardar contraseña | — |
+| Eliminar mi cuenta / Eliminar la empresa | Eliminar definitivamente (con contraseña y casilla) | — |
+| Manual de uso | — | Exportar PDF |
+| Sección del manual | Siguiente: _sección_ | — |
 
 El aviso de límite del plan es una hoja inferior con una sola acción
 («Solicitar plan superior»), no un cuadro más en la pantalla.
 
 Las pestañas de la barra inferior (Inicio, Verificar, Agenda, Plantas,
-Ajustes) no llevan píldora: la barra flotante ocupa ese lugar.
+Ajustes) no llevan píldora: la barra flotante ocupa ese lugar. Ajustes sí tiene
+⋮, con lo que no se hace a diario: Eliminar mi cuenta y, para el jefe de una
+empresa autoregistrada, Eliminar la empresa.

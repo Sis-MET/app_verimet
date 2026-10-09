@@ -84,6 +84,10 @@ class SelfServiceServer extends FixtureServer {
   final List<Json> resets = [];
   final List<Json> accounts = [];
   final List<Json> mutations = [];
+  final List<Json> deletions = [];
+
+  /// Error con que responde la eliminación, o null si la acepta.
+  String? deletionError;
 
   Json get plan => {
     ..._free,
@@ -117,6 +121,12 @@ class SelfServiceServer extends FixtureServer {
       requests.add(request);
       resets.add(body);
       return body['action'] == 'start' ? (200, {'sent': true}) : (200, tokens);
+    }
+    if (request.path.contains('ivmet-account-delete')) {
+      requests.add(request);
+      deletions.add(body);
+      if (deletionError case final code?) return (409, {'error': code});
+      return (200, {'deleted': true, 'scope': body['scope']});
     }
     if (request.path.contains('ivmet-team-account')) {
       requests.add(request);
@@ -550,5 +560,101 @@ void main() {
     expect(ascii.decode(summary.take(4).toList()), '%PDF');
     expect(pages(summary), lessThan(pages(full)));
     expect(summary.length, lessThan(full.length));
+  });
+
+  Future<void> openApp(WidgetTester tester, SelfServiceServer server) async {
+    await _phone(tester);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mobileApiProvider.overrideWithValue(server.api),
+          draftRecoveryProvider.overrideWithValue(server.recovery),
+        ],
+        child: const IvmetApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(fieldLabeled('Usuario o correo'), 'operador');
+    await tester.enterText(fieldLabeled('Contraseña'), 'fixture-password');
+    await tester.tap(find.text('Ingresar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajustes').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Más opciones'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'el jefe elimina la empresa con su contraseña y vuelve al acceso',
+    (tester) async {
+      final server = SelfServiceServer();
+      await openApp(tester, server);
+      expect(find.text('Eliminar mi cuenta'), findsOneWidget);
+      await tester.tap(find.text('Eliminar la empresa'));
+      await tester.pumpAndSettle();
+      expect(find.text('Acme Alimentos'), findsOneWidget);
+      expect(
+        find.textContaining('Las verificaciones finalizadas'),
+        findsOneWidget,
+      );
+      InkWell confirm() => tester.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const ValueKey('delete-account-confirm')),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(
+        confirm().onTap,
+        isNull,
+        reason: 'sin contraseña ni confirmación no se puede',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('delete-account-password')),
+        'una-clave-larga-1',
+      );
+      await tester.tap(find.byKey(const ValueKey('delete-account-understood')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar definitivamente'));
+      await tester.pumpAndSettle();
+
+      expect(server.deletions.single, {
+        'action': 'delete',
+        'origin': 'app',
+        'scope': 'company',
+        'username': 'ana@acme.example',
+        'password': 'una-clave-larga-1',
+      });
+      expect(find.text('Ingresar'), findsOneWidget);
+      expect(
+        find.text('Se eliminó la empresa y todas sus cuentas.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('el único jefe de calidad recibe la alternativa', (tester) async {
+    final server = SelfServiceServer()..deletionError = 'LAST_QUALITY_MANAGER';
+    await openApp(tester, server);
+    await tester.tap(find.text('Eliminar mi cuenta'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('delete-account-password')),
+      'una-clave-larga-1',
+    );
+    await tester.tap(find.byKey(const ValueKey('delete-account-understood')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eliminar definitivamente'));
+    await tester.pumpAndSettle();
+    expect(server.deletions.single['scope'], 'account');
+    expect(
+      find.textContaining('Eres el único jefe de calidad'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Ingresar'),
+      findsNothing,
+      reason: 'la sesión sigue abierta',
+    );
   });
 }

@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/app_config.dart';
+
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'trial_capture.dart';
@@ -515,7 +517,7 @@ class DraftController extends ChangeNotifier {
         'draft_id': draftId,
         'expected_version': version,
         'finalize_id': const Uuid().v4(),
-        'app_version_value': 'ivmet-flutter-v1',
+        'app_version_value': 'ivmet-flutter-${AppConfig.version}',
         'device_id_value': '',
       };
     }

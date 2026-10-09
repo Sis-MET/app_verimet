@@ -166,6 +166,30 @@ class MobileSession extends ChangeNotifier {
     await refresh();
   }
 
+  /// La cuenta ya no existe: se cierra la sesión en este teléfono sin pedir
+  /// nada al servidor y se descartan las capturas guardadas aquí.
+  Future<void> accountDeleted(String message) async {
+    try {
+      final owner = recoveryOwner;
+      for (final draft in await recovery.list(owner)) {
+        await recovery.remove(owner, draft['requestId'].toString());
+      }
+    } catch (_) {
+      // Sin borradores locales que descartar.
+    }
+    _check++;
+    _checking = false;
+    user = null;
+    bootstrap = {};
+    offlineDrafts = const [];
+    _offlineOwner = null;
+    workspaceVersion++;
+    await api.clear();
+    stage = SessionStage.login;
+    error = message;
+    _notify();
+  }
+
   Future<void> refresh() async {
     if (_checking || _disposed) return;
     if (!api.hasSession) {

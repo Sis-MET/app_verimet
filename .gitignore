@@ -117,3 +117,4 @@ legacy-api/
 
 # Configuración local de Claude Code
 .claude/
+web/eliminar-cuenta/config.js

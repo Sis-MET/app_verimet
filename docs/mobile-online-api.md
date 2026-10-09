@@ -96,7 +96,7 @@ admitiéndose para compatibilidad; no se cambia el protocolo de un borrador exis
   "draft_id": "UUID del borrador",
   "expected_version": "1",
   "finalize_id": "UUID estable del intento",
-  "app_version_value": "ivmet-flutter-v1",
+  "app_version_value": "ivmet-flutter-1.0.0+1",
   "device_id_value": ""
 }
 ```
@@ -304,6 +304,26 @@ Entrega descrita en [Autoregistro y planes](self-service-plans.md).
 Reintentar con el mismo `requestId` no duplica. Errores: `PLAN_LIMIT_USERS`,
 `USERNAME_EXISTS`, `INVALID_USERNAME`, `INVALID_MEMBER`, `PLANT_SCOPE_INVALID`,
 `SELF_CHANGE_NOT_ALLOWED`, `SELF_SERVICE_REQUIRED`, `QUALITY_MANAGER_REQUIRED`.
+
+### Eliminar la cuenta
+
+Entrega descrita en [Eliminación de cuenta y manual](account-deletion-and-manual.md).
+`POST /functions/v1/ivmet-account-delete`, sin `Authorization`: la usan la app
+y la página web.
+
+- `{action:"code", email}` → `{sent:true}` exista o no la cuenta. Envía un
+  código si el usuario de la cuenta es ese correo.
+- `{action:"delete", scope:"account"|"company", origin:"app"|"web",
+  username, password}` o `{…, email, code}` → `{deleted:true, scope}`.
+  `company` elimina la empresa autoregistrada completa y solo la pide su jefe
+  de calidad.
+
+Errores: `INVALID_CREDENTIALS` (401), `INVALID_CODE` (422),
+`LAST_QUALITY_MANAGER` (409, el único jefe intenta eliminar solo su cuenta),
+`QUALITY_MANAGER_REQUIRED` y `SELF_SERVICE_REQUIRED` (403),
+`ACCOUNT_NOT_FOUND` (404), `CODE_RATE_LIMITED` (429), `EMAIL_UNAVAILABLE`.
+Una cuenta ya eliminada no tiene con qué identificarse: responde
+`INVALID_CREDENTIALS` o `INVALID_CODE`.
 
 ### Lecturas
 

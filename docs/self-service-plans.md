@@ -242,3 +242,5 @@ Métrica sigue funcionando. Una app anterior no ofrece registrarse.
 - **Altas a medias.** Un alta que pidió el código y nunca lo confirmó deja una
   cuenta Auth sin perfil, que no sirve para entrar. Limpiarlas es una tarea
   periódica pendiente.
+- **Eliminar la cuenta o la empresa**, que pide Google Play, está en
+  [Eliminación de cuenta y manual](account-deletion-and-manual.md).

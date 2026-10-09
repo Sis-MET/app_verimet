@@ -11,4 +11,11 @@
 /// El build de Android se detiene si falta (`android/app/build.gradle.kts`).
 abstract final class AppConfig {
   static const String appName = 'IvMET';
+
+  /// Versión y build de `pubspec.yaml`. Viaja en cada verificación
+  /// finalizada (`app_version`) y se muestra en Ajustes: es la que permite
+  /// saber con qué versión se capturó un registro (NB/ISO/IEC 17025 7.5 y
+  /// 7.11.2). `test/core/app_version_test.dart` falla si no coincide con
+  /// `pubspec.yaml`.
+  static const String version = '1.0.0+1';
 }

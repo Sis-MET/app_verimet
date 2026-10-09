@@ -18,7 +18,7 @@ const session = { access_token: 'fixture-access', refresh_token: 'fixture-refres
 // responde cada llamada; `calls` registra lo que el handler pidió.
 async function fixture(name, options = {}) {
   let handler;
-  const calls = { rpc: [], createUser: [], updateUser: [], otp: [], verify: [], getUser: [], errors: [] };
+  const calls = { rpc: [], createUser: [], updateUser: [], otp: [], verify: [], getUser: [], signIn: [], errors: [] };
   const result = (key, fallback) => (key in options ? options[key] : fallback);
   // Lo creado dentro del contexto vm tiene otro Object.prototype.
   const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -43,6 +43,7 @@ async function fixture(name, options = {}) {
   const publicAuth = { auth: {
     async signInWithOtp(input) { calls.otp.push(plain(input)); return result('otp', { data: {}, error: null }); },
     async verifyOtp(input) { calls.verify.push(plain(input)); return result('verify', { data: { session, user: { id: options.userId ?? ownerId } }, error: null }); },
+    async signInWithPassword(input) { calls.signIn.push(plain(input)); return result('signIn', { data: { session, user: { id: options.userId ?? ownerId } }, error: null }); },
   } };
   const context = vm.createContext({
     Request, Response, Headers, AbortSignal, crypto, btoa, Uint8Array, String,
@@ -207,3 +208,64 @@ test('restablecer exige el cambio antes de tocar Auth', async () => {
   assert.equal(f.calls.rpc[0].args.action, 'reset');
   assert.deepEqual(f.calls.updateUser[0], { id: memberId, input: { password: 'temporal-12345' } });
 });
+
+test('eliminar la cuenta exige su contraseña o un código, y bloquea la cuenta Auth', async () => {
+  const alias = { resolve_ivmet_login_alias: () => ({ data: [{ auth_user_id: ownerId, auth_email_interno: 'ana@acme.example' }], error: null }) };
+  const deleted = (args) => ({ data: { deletionId: 'd1', scope: args.scope, users: [ownerId, memberId] }, error: null });
+  let f = await fixture('ivmet-account-delete', { rpc: alias });
+  assert.equal((await f.request({ action: 'delete', scope: 'todo', origin: 'app', username: 'ana', password: 'x' })).status, 400);
+  assert.equal((await f.request({ action: 'delete', scope: 'account', origin: 'app', username: '', password: '' })).status, 401);
+
+  f = await fixture('ivmet-account-delete', { rpc: alias, signIn: { data: { user: null }, error: { status: 400 } } });
+  const wrong = await f.request({ action: 'delete', scope: 'account', origin: 'app', username: 'Ana@Acme.example', password: 'mala' });
+  assert.equal(wrong.status, 401);
+  assert.equal(f.calls.rpc.some(c => c.fn === 'ivmet_account_delete'), false, 'sin contraseña correcta no se elimina nada');
+
+  f = await fixture('ivmet-account-delete', { rpc: { ...alias, ivmet_account_delete: deleted } });
+  const done = await f.request({ action: 'delete', scope: 'company', origin: 'app', username: 'Ana@Acme.example', password: 'una-clave-larga-1' });
+  assert.equal(done.status, 200);
+  assert.deepEqual(await done.json(), { deleted: true, scope: 'company' });
+  assert.deepEqual(f.calls.signIn[0], { email: 'ana@acme.example', password: 'una-clave-larga-1' });
+  assert.deepEqual(f.calls.rpc.find(c => c.fn === 'ivmet_account_delete').args, { target_user: ownerId, scope: 'COMPANY', origin: 'APP' });
+  assert.deepEqual(f.calls.updateUser.map(u => [u.id, u.input.email, u.input.ban_duration]), [
+    [ownerId, `deleted.${ownerId}@users.ivmet.invalid`, '876000h'],
+    [memberId, `deleted.${memberId}@users.ivmet.invalid`, '876000h'],
+  ]);
+  assert.ok(f.calls.rpc.some(c => c.fn === 'ivmet_account_deletion_done' && c.args.deletion_id === 'd1'));
+
+  // Si Auth falla, la eliminación ya ocurrió: queda la constancia abierta.
+  f = await fixture('ivmet-account-delete', { rpc: { ...alias, ivmet_account_delete: deleted }, updateUser: { data: null, error: { message: 'fixture' } } });
+  assert.equal((await f.request({ action: 'delete', scope: 'account', origin: 'app', username: 'ana', password: 'x' })).status, 200);
+  assert.equal(f.calls.rpc.some(c => c.fn === 'ivmet_account_deletion_done'), false);
+
+  // La siguiente eliminación reintenta las constancias abiertas.
+  const open = () => ({ data: [{ id: 'd1', usuarios: [ownerId, memberId] }, { id: 'd0', usuarios: [memberId] }], error: null });
+  f = await fixture('ivmet-account-delete', { rpc: { ...alias, ivmet_account_delete: deleted, ivmet_account_deletions_pending: open } });
+  assert.equal((await f.request({ action: 'delete', scope: 'company', origin: 'app', username: 'ana', password: 'x' })).status, 200);
+  assert.deepEqual(f.calls.updateUser.map(u => u.id), [ownerId, memberId, memberId]);
+  assert.deepEqual(f.calls.rpc.filter(c => c.fn === 'ivmet_account_deletion_done').map(c => c.args.deletion_id), ['d1', 'd0']);
+
+  f = await fixture('ivmet-account-delete', { rpc: { ...alias, ivmet_account_delete: () => ({ data: null, error: { message: 'LAST_QUALITY_MANAGER' } }) } });
+  const last = await f.request({ action: 'delete', scope: 'account', origin: 'app', username: 'ana', password: 'x' });
+  assert.equal(last.status, 409);
+  assert.equal((await last.json()).error, 'LAST_QUALITY_MANAGER');
+  assert.equal(f.calls.updateUser.length, 0);
+});
+
+test('desde la web, el código del correo identifica a quien elimina', async () => {
+  const target = { ivmet_password_reset_target: () => ({ data: ownerId, error: null }) };
+  let f = await fixture('ivmet-account-delete', { rpc: { ivmet_password_reset_target: () => ({ data: null, error: null }) } });
+  assert.deepEqual(await (await f.request({ action: 'code', email: 'nadie@acme.example' })).json(), { sent: true });
+  assert.equal(f.calls.otp.length, 0, 'no revela si la cuenta existe');
+
+  f = await fixture('ivmet-account-delete', { rpc: target, userId: memberId });
+  assert.equal((await f.request({ action: 'delete', scope: 'account', origin: 'web', email: 'ana@acme.example', code: '123456' })).status, 422);
+  assert.equal(f.calls.rpc.some(c => c.fn === 'ivmet_account_delete'), false);
+
+  f = await fixture('ivmet-account-delete', { rpc: { ...target, ivmet_account_delete: (args) => ({ data: { deletionId: 'd2', users: [ownerId] }, error: null }) } });
+  const done = await f.request({ action: 'delete', scope: 'account', origin: 'web', email: 'ana@acme.example', code: '123456' });
+  assert.equal(done.status, 200);
+  assert.deepEqual(f.calls.rpc.find(c => c.fn === 'ivmet_account_delete').args, { target_user: ownerId, scope: 'ACCOUNT', origin: 'WEB' });
+  assert.equal(f.calls.signIn.length, 0);
+});
+

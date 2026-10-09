@@ -9,6 +9,7 @@ import 'offline_recovery.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
 import 'self_service_access.dart';
+import 'user_manual.dart';
 import 'workspace_screen.dart';
 
 class OnlineEntry extends ConsumerStatefulWidget {
@@ -440,6 +441,16 @@ class _AccessFormState extends State<AccessForm> {
                       const SizedBox(height: 16),
                       const Text(
                         'Si tu empresa ya usa IvMET, pide tu usuario al jefe de calidad. Se requiere conexión a internet.',
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          key: const ValueKey('access-manual'),
+                          onPressed: () =>
+                              openPage<void>(context, const ManualScreen()),
+                          icon: const Icon(Icons.menu_book_outlined, size: 18),
+                          label: const Text('Manual de uso'),
+                        ),
                       ),
                     ],
                   ),

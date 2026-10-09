@@ -79,8 +79,19 @@ export function validCode(value: unknown): value is string {
 }
 
 /// Auth limita el envío de correos: dos pedidos seguidos esperan un minuto.
-export function otpFailure(error: { status?: number }): Response {
-  return error.status === 429
-    ? jsonResponse({ error: "CODE_RATE_LIMITED" }, 429)
-    : jsonResponse({ error: "EMAIL_UNAVAILABLE" }, 503);
+/// Cualquier otro fallo (SMTP, plantilla) queda en el registro de la función,
+/// sin el correo de la persona.
+export function otpFailure(
+  error: { status?: number; code?: string; message?: string },
+): Response {
+  if (error.status === 429) {
+    return jsonResponse({ error: "CODE_RATE_LIMITED" }, 429);
+  }
+  console.error(
+    "Auth could not send the IvMET code.",
+    error.status,
+    error.code,
+    error.message,
+  );
+  return jsonResponse({ error: "EMAIL_UNAVAILABLE" }, 503);
 }

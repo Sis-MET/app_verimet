@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Eliminar cuenta de IvMET · Métrica Ltda.</title>
+  <!--
+    Página para eliminar una cuenta de IvMET sin la app, la que pide Google
+    Play. Se publica tal cual junto a config.js (generado con
+    `pnpm web:eliminar-cuenta`); no necesita servidor propio: llama a la Edge
+    Function ivmet-account-delete.
+  -->
+  <style>
+    :root {
+      --bg: #eef0f2; --card: #ffffff; --text: #1d2228; --muted: #5d6670;
+      --line: #d9dde2; --accent: #5a7fa6; --accent-ink: #ffffff; --fail: #a6422e;
+      --ok: #2f7d4f; --radius: 18px;
+      font-family: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14171a; --card: #1d2125; --text: #e8eaed; --muted: #9aa3ad;
+        --line: #30363c; --accent: #8fb3d9; --accent-ink: #14171a; --fail: #e4876f; --ok: #7fc79a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
+    main { max-width: 620px; margin: 0 auto; padding: 32px 16px 48px; }
+    .kicker { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    h1 { font-size: 32px; line-height: 1.15; margin: 4px 0 8px; }
+    h2 { font-size: 19px; margin: 0 0 10px; }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin: 18px 0; }
+    ul { margin: 0 0 12px; padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--line); margin-bottom: 16px; }
+    .tabs button { border: 0; background: transparent; color: var(--muted); padding: 8px 4px; border-radius: 999px; font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+    a { color: var(--accent); }
+    .tabs button[aria-selected="true"] { background: var(--card); color: var(--text); font-weight: 600; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+    input[type=email], input[type=text], input[type=password] {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+      background: var(--bg); color: var(--text); font: inherit;
+    }
+    fieldset { border: 0; padding: 0; margin: 14px 0 0; }
+    legend { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    .choice { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; color: var(--text); font-size: 15px; }
+    .choice input { margin-top: 4px; }
+    button.primary {
+      margin-top: 18px; width: 100%; padding: 14px; border: 0; border-radius: 999px;
+      background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer;
+    }
+    button.primary.danger { background: var(--fail); color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .message { margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--accent); font-size: 14px; }
+    .message.error { border-color: var(--fail); color: var(--fail); }
+    .message.ok { border-color: var(--ok); color: var(--ok); }
+    [hidden] { display: none !important; }
+    footer { margin-top: 28px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <span class="kicker">IvMET · Métrica Ltda.</span>
+  <h1>Eliminar tu cuenta de IvMET</h1>
+  <p class="muted">IvMET es la app de verificaciones intermedias de balanzas de Métrica Ltda. Aquí puedes eliminar tu cuenta, o la empresa completa si eres su jefe de calidad, sin instalar la app. También puedes hacerlo dentro de la app, en Ajustes › menú de tres puntos (⋮) › Eliminar mi cuenta.</p>
+
+  <section class="card">
+    <h2>Qué se elimina y qué se conserva</h2>
+    <p><strong>Se elimina</strong>, en el momento:</p>
+    <ul>
+      <li>Tu usuario, tu contraseña y tu acceso a la app.</li>
+      <li>Tu nombre, tu correo y tu teléfono: donde aparecían, queda «Usuario eliminado».</li>
+      <li>Las capturas que dejaste sin finalizar.</li>
+      <li>Si eliminas la empresa: todas sus cuentas, su nombre, sus plantas, sus datos de contacto, su plan y sus solicitudes.</li>
+    </ul>
+    <p><strong>Se conserva, sin datos personales:</strong> las verificaciones finalizadas y sus lecturas, y el registro de auditoría. Son evidencia inmutable de lo que se midió y cuándo; quedan desvinculadas de las personas y, si eliminas la empresa, también de su nombre.</p>
+  </section>
+
+  <section class="card">
+    <h2>Confirma que la cuenta es tuya</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-email" aria-selected="true">Con mi correo</button>
+      <button type="button" role="tab" id="tab-password" aria-selected="false">Usuario y contraseña</button>
+    </div>
+
+    <form id="by-email">
+      <p class="muted">Si ingresas a IvMET con tu correo, te enviamos un código para confirmar.</p>
+      <label for="email">Correo electrónico</label>
+      <input id="email" type="email" autocomplete="email" required maxlength="100">
+      <button type="button" class="primary" id="send-code">Enviar código</button>
+      <div id="code-step" hidden>
+        <label for="code">Código de 6 dígitos</label>
+        <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+      </div>
+    </form>
+
+    <form id="by-password" hidden>
+      <p class="muted">Para cuentas que ingresan con un usuario (las que crea el jefe de calidad o Métrica).</p>
+      <label for="username">Usuario o correo</label>
+      <input id="username" type="text" autocomplete="username" maxlength="100">
+      <label for="password">Contraseña</label>
+      <input id="password" type="password" autocomplete="current-password" maxlength="200">
+    </form>
+
+    <div id="confirm-step">
+      <fieldset>
+        <legend>Qué quieres eliminar</legend>
+        <label class="choice"><input type="radio" name="scope" value="account" checked> Solo mi cuenta</label>
+        <label class="choice"><input type="radio" name="scope" value="company"> La empresa completa (solo su jefe de calidad, si la registró desde la app)</label>
+      </fieldset>
+      <label class="choice"><input type="checkbox" id="understood"> Entiendo que la eliminación es definitiva y no se puede deshacer.</label>
+      <button type="button" class="primary danger" id="delete">Eliminar definitivamente</button>
+    </div>
+    <div id="message" class="message" role="status" hidden></div>
+  </section>
+
+  <footer>
+    ¿No puedes ingresar o tu cuenta la gestiona Métrica? Escribe a <a href="mailto:sistemas@metrica.com.bo">sistemas@metrica.com.bo</a> desde el correo de tu empresa e indica tu usuario. Atendemos la solicitud y te confirmamos por el mismo medio.
+  </footer>
+</main>
+<script src="config.js"></script>
+<script>
+(() => {
+  const config = window.IVMET_CONFIG || {};
+  const $ = (id) => document.getElementById(id);
+  let method = 'email';
+  let codeSent = false;
+
+  const messages = {
+    INVALID_EMAIL: 'Revisa el correo electrónico.',
+    INVALID_CODE: 'El código no es válido o ya venció. Pide uno nuevo.',
+    INVALID_CREDENTIALS: 'Usuario o contraseña incorrectos.',
+    CODE_RATE_LIMITED: 'Ya enviamos un código hace poco. Espera un minuto antes de pedir otro.',
+    EMAIL_UNAVAILABLE: 'No se pudo enviar el correo. Inténtalo de nuevo en unos minutos.',
+    LAST_QUALITY_MANAGER: 'Eres el único jefe de calidad de la empresa: elige «La empresa completa» o nombra antes a otro jefe en la app.',
+    QUALITY_MANAGER_REQUIRED: 'Solo el jefe de calidad puede eliminar la empresa.',
+    SELF_SERVICE_REQUIRED: 'Esta empresa la gestiona Métrica: puedes eliminar tu cuenta, y la empresa se elimina a pedido escrito a sistemas@metrica.com.bo.',
+    ACCOUNT_NOT_FOUND: 'La cuenta ya no existe o ya fue eliminada.',
+  };
+
+  const show = (text, kind = '') => {
+    const box = $('message');
+    box.textContent = text;
+    box.className = 'message ' + kind;
+    box.hidden = false;
+  };
+
+  const call = async (body) => {
+    if (!config.url || !config.publishableKey) throw { code: 'CONFIG' };
+    let response;
+    try {
+      response = await fetch(config.url.replace(/\/$/, '') + '/functions/v1/ivmet-account-delete', {
+        method: 'POST',
+        headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw { code: 'NETWORK' };
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw { code: data.error || 'UNKNOWN' };
+    return data;
+  };
+  const explain = (failure) =>
+    failure.code === 'CONFIG' ? 'La página no está configurada. Escribe a sistemas@metrica.com.bo.'
+      : failure.code === 'NETWORK' ? 'No hay conexión con el servidor. Inténtalo de nuevo.'
+      : messages[failure.code] || 'No se pudo completar. Inténtalo de nuevo en unos minutos.';
+
+  const select = (next) => {
+    method = next;
+    $('tab-email').setAttribute('aria-selected', String(next === 'email'));
+    $('tab-password').setAttribute('aria-selected', String(next === 'password'));
+    $('by-email').hidden = next !== 'email';
+    $('by-password').hidden = next !== 'password';
+    $('message').hidden = true;
+  };
+  $('tab-email').addEventListener('click', () => select('email'));
+  $('tab-password').addEventListener('click', () => select('password'));
+
+  $('send-code').addEventListener('click', async () => {
+    const email = $('email').value.trim();
+    if (!$('email').checkValidity() || !email) return show(messages.INVALID_EMAIL, 'error');
+    $('send-code').disabled = true;
+    try {
+      await call({ action: 'code', email });
+      codeSent = true;
+      $('code-step').hidden = false;
+      $('send-code').textContent = 'Reenviar código';
+      show('Si ' + email + ' tiene una cuenta de IvMET, le llegó un código de 6 dígitos. Revisa también el correo no deseado.');
+    } catch (failure) {
+      show(explain(failure), 'error');
+    } finally {
+      setTimeout(() => { $('send-code').disabled = false; }, 60000);
+    }
+  });
+
+  $('delete').addEventListener('click', async () => {
+    if (!$('understood').checked) return show('Confirma que entiendes que la eliminación es definitiva.', 'error');
+    const scope = document.querySelector('input[name=scope]:checked').value;
+    const body = { action: 'delete', origin: 'web', scope };
+    if (method === 'email') {
+      if (!codeSent) return show('Primero pide el código a tu correo.', 'error');
+      body.email = $('email').value.trim();
+      body.code = $('code').value.trim();
+      if (!/^\d{6,10}$/.test(body.code)) return show(messages.INVALID_CODE, 'error');
+    } else {
+      body.username = $('username').value.trim();
+      body.password = $('password').value;
+      if (!body.username || !body.password) return show(messages.INVALID_CREDENTIALS, 'error');
+    }
+    $('delete').disabled = true;
+    try {
+      await call(body);
+      $('password').value = '';
+      $('confirm-step').hidden = true;
+      $('by-email').hidden = true;
+      $('by-password').hidden = true;
+      document.querySelector('.tabs').hidden = true;
+      show(scope === 'company'
+        ? 'Listo: la empresa y todas sus cuentas fueron eliminadas.'
+        : 'Listo: tu cuenta fue eliminada.', 'ok');
+    } catch (failure) {
+      show(explain(failure), 'error');
+      $('delete').disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

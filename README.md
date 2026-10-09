@@ -20,6 +20,10 @@ calibraciones formales.
   **Gratuito**, con límites de plantas, balanzas, usuarios y verificaciones;
   pide un plan superior desde la app y Métrica lo habilita en RimMET. Ver
   [docs/self-service-plans.md](docs/self-service-plans.md).
+- Cada usuario puede eliminar su cuenta, y el jefe su empresa, desde la app o
+  desde una página web; la evidencia se conserva sin datos personales. La app
+  trae un manual de uso controlado. Ver
+  [docs/account-deletion-and-manual.md](docs/account-deletion-and-manual.md).
 
 ---
 

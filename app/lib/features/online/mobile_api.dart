@@ -249,6 +249,9 @@ class MobileFailure implements Exception {
     'INVALID_UPGRADE_REQUEST' => 'Revisa los datos de la solicitud.',
     'SUBSCRIPTION_NOT_ACTIVE' =>
       'El plan de tu empresa no está vigente. Revisa Mi plan.',
+    'LAST_QUALITY_MANAGER' =>
+      'Eres el único jefe de calidad de la empresa. Nombra a otro jefe en Ajustes › Usuarios o elimina la empresa completa.',
+    'ACCOUNT_NOT_FOUND' => 'La cuenta ya no existe o ya fue eliminada.',
     _ when status == 401 => 'La sesión venció. Ingresa nuevamente.',
     _ when status == 429 =>
       'Demasiados intentos. Espera antes de volver a intentar.',
@@ -448,6 +451,20 @@ class MobileApi {
       generation,
     );
   }
+
+  /// Elimina la propia cuenta (`account`) o la empresa autoregistrada
+  /// (`company`). Pide la contraseña: es lo que confirma quien la elimina.
+  Future<void> deleteAccount({
+    required String scope,
+    required String username,
+    required String password,
+  }) => _request('/functions/v1/ivmet-account-delete', {
+    'action': 'delete',
+    'origin': 'app',
+    'scope': scope,
+    'username': username,
+    'password': password,
+  });
 
   /// Cuentas del equipo de una empresa autoregistrada: `create` o `reset`,
   /// con la contraseña temporal que el jefe de calidad entrega.

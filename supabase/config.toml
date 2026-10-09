@@ -72,3 +72,8 @@ verify_jwt = false
 [functions.ivmet-team-account]
 # El handler valida con Auth.getUser(token), como ivmet-change-password.
 verify_jwt = false
+
+[functions.ivmet-account-delete]
+# Público: la página web de eliminación la llama sin sesión. Quien la pide se
+# identifica con su contraseña o con un código al correo.
+verify_jwt = false
