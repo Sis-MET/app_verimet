@@ -24,6 +24,8 @@ calibraciones formales.
   desde una página web; la evidencia se conserva sin datos personales. La app
   trae un manual de uso controlado. Ver
   [docs/account-deletion-and-manual.md](docs/account-deletion-and-manual.md).
+- Cumplimiento NB/ISO/IEC 17025 (7.5, 7.11 y 8.4): análisis y brechas en
+  [docs/iso17025/analisis-ivmet.md](docs/iso17025/analisis-ivmet.md).
 
 ---
 
