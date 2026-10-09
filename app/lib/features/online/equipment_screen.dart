@@ -18,6 +18,7 @@ import 'history_screen.dart';
 import 'measurement_suggestions.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
+import 'offline_copy.dart';
 import 'online_widgets.dart';
 import 'plan_screen.dart';
 import 'team_screen.dart';
@@ -66,9 +67,10 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
   }
 
   /// Cada captura nueva ocupa un lugar del mes del plan; Supabase lo vuelve
-  /// a comprobar al guardar el primer borrador.
+  /// a comprobar al guardar el primer borrador. Sin señal cuentan también
+  /// las empezadas en este teléfono que el servidor aún no conoce.
   Future<void> _start(Json data) async {
-    if (session.plan.full(PlanResource.monthlyVerifications)) {
+    if (session.monthlyCapturesFull) {
       await showPlanLimit(
         context,
         session,
@@ -114,7 +116,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
   Widget build(BuildContext context) => RemotePage(
     title: 'Ficha de la balanza',
     dataKey: '$revision',
-    load: () => session.api.read('equipment', {
+    load: () => session.read('equipment', {
       ...clockFilters(),
       'equipmentId': equipmentId,
     }),
@@ -175,6 +177,13 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               ),
             ],
           ),
+          // Sin señal: la ficha, su configuración y sus pesas son las que se
+          // descargaron entonces, y con ellas se captura.
+          if (data[OfflineCopy.savedAtKey] != null)
+            Notice(
+              'Sin conexión: ficha descargada el ${dateTimeLabel(data[OfflineCopy.savedAtKey])}. Puedes verificar; se envía sola al volver la señal.',
+              icon: Icons.wifi_off,
+            ),
           const SizedBox(height: 14),
           SurfaceCard(
             child: Column(

@@ -90,7 +90,7 @@ order by solicitado_at;
 
 - Ajustes › Ayuda › **Manual de uso**, y en el acceso, **Manual de uso** (sin
   sesión). Funciona sin conexión.
-- 22 secciones en seis grupos (empezar, preparar, verificar, registros, cuenta,
+- 23 secciones en seis grupos (empezar, preparar, verificar, registros, cuenta,
   ayuda), con buscador que ignora acentos, pasos que se marcan y la píldora
   «Siguiente: …». Usa los nombres reales de las pantallas y botones.
 - ⋮ › **Exportar PDF**: copia con el bloque de control (código, revisión,

@@ -11,16 +11,21 @@ class MemoryDraftStore implements DraftRecoveryStore {
   final documents = <String, String>{};
   bool failWrites = false;
 
-  /// Escrituras pedidas al disco, para medir cuantas provoca la captura.
+  /// Escrituras de capturas pedidas al disco, para medir cuantas provoca la
+  /// captura. La copia para trabajar sin señal no cuenta.
   int writes = 0;
   @override
   Future<String?> read(String owner) async => documents[owner];
   @override
   Future<void> write(String owner, String document) async {
-    writes++;
+    if (!owner.startsWith('offline:')) writes++;
     if (failWrites) throw StateError('Disk full');
     documents[owner] = document;
   }
+
+  @override
+  Future<void> deletePrefix(String prefix) async =>
+      documents.removeWhere((key, _) => key.startsWith(prefix));
 
   @override
   Future<void> close() async {}
@@ -703,6 +708,7 @@ class FixtureServer {
                 'cod_interno': 'BAL-014',
                 'marca': 'Marca',
                 'modelo': 'Modelo',
+                'planta_id': 'plant-fixture',
                 'planta': 'Planta uno',
                 'area': 'Sin área',
                 'departamento': 'Producción',

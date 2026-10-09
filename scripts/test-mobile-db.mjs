@@ -407,6 +407,49 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       assert.equal((await q(`select count(*)::int n from private.sync_outbox
         where aggregate_type in ('public.verificaciones','public.pruebas','public.lecturas') and not privacy_blocked`))[0].n, 0);
       await identity(operator);
+
+      // Sin señal: se midió hace una hora con un teléfono que atrasa 90 s, y
+      // la configuración cambió mientras tanto. Llega ahora.
+      const ago = seconds => new Date(Date.now() - seconds * 1000).toISOString();
+      await identity(quality);
+      const changed = await configureChecks(equipment, {
+        tests: [{ type: 'linearity', frequencyDays: '30', tolerance: '0.6', loads }],
+      });
+      assert.notEqual(changed.configurationId, normativeVersion);
+      await identity(operator);
+      await assert.rejects(q('select public.ivmet_mobile_save_draft($1,$2,$3,$4,$5,$6) r',
+        [uuid(), equipment, normativeVersion, 0, normativeContent, uuid()]), /PLAN_NOT_ASSIGNED/,
+        'en línea, la configuración retirada ya no se usa');
+      const offlineDraft = (await q('select public.ivmet_mobile_save_draft($1,$2,$3,$4,$5,$6,$7) r',
+        [uuid(), equipment, normativeVersion, 0, normativeContent, uuid(), ago(2 * 3600)]))[0].r;
+      const measured = ago(3600 + 90);
+      const offline = (await q('select public.ivmet_mobile_finalize_draft($1,$2,$3,$4,$5,$6,$7) r',
+        [offlineDraft.id, Number(offlineDraft.version), uuid(), 'fixture-1.0', 'fixture-device', measured, ago(90)]))[0].r;
+      assert.equal(offline.verdict, 'pass');
+      assert.equal(offline.traceability, 'traceable');
+      const times = (await q('select realizado_at,recibido_at from public.verificaciones where id=$1', [offline.id]))[0];
+      assert.ok(Math.abs(times.realizado_at.getTime() - (Date.now() - 3600 * 1000)) < 5000,
+        'la hora de medición se corrige con el desfase del reloj');
+      assert.ok(times.recibido_at > times.realizado_at);
+      const detail = await read('verification', { id: offline.id });
+      assert.equal(new Date(detail.offlineCapture.deviceMeasuredAt).getTime(), new Date(measured).getTime());
+      assert.ok(Math.abs(detail.offlineCapture.clockSkewSeconds - 90) <= 3);
+      assert.equal((await read('verification', { id: finalized.id })).offlineCapture, null);
+
+      // Un reloj adelantado no fecha la medición después de su llegada.
+      const aheadDraft = (await q('select public.ivmet_mobile_save_draft($1,$2,$3,$4,$5,$6,$7) r',
+        [uuid(), equipment, changed.configurationId, 0, {
+          ...normativeContent,
+          tests: [{ ...normativeContent.tests[0], id: (await read('equipment', { equipmentId: equipment }))
+            .plan.tests[0].id, readings: (await read('equipment', { equipmentId: equipment })).plan.tests[0].points
+            .map((p, index) => ({ pointId: p.id, indication: indications[index], zero: '' })) }],
+        }, uuid(), ago(60)]))[0].r;
+      const ahead = (await q('select public.ivmet_mobile_finalize_draft($1,$2,$3,$4,$5,$6) r',
+        [aheadDraft.id, Number(aheadDraft.version), uuid(), 'fixture-1.0', 'fixture-device', ago(-3600)]))[0].r;
+      const aheadTimes = (await q('select realizado_at,recibido_at from public.verificaciones where id=$1', [ahead.id]))[0];
+      assert.ok(aheadTimes.realizado_at <= aheadTimes.recibido_at || aheadTimes.realizado_at - aheadTimes.recibido_at < 1000);
+      await assert.rejects(q('select public.ivmet_mobile_save_draft($1,$2,$3,$4,$5,$6,$7)',
+        [uuid(), equipment, changed.configurationId, 0, normativeContent, uuid(), ago(-3 * 86400)]), /INVALID_CAPTURE_TIME/);
     });
     await t.test('cargas flexibles: cálculo real, grupos independientes, sustitución y recuperación', async () => {
       await identity(quality);

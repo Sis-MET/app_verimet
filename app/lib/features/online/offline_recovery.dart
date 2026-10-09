@@ -8,6 +8,7 @@ import 'draft_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'pending_captures.dart';
 
 /// Lo que el operario dejo a medias, cuando la app no pudo validar la sesion.
 ///
@@ -56,7 +57,7 @@ class OfflineRecoveryScreen extends StatelessWidget {
               style: AppTextStyles.figure(context, size: 25),
             ),
             const Notice(
-              'Están guardadas en este dispositivo y no se han perdido. Puedes seguir capturando ahora; para finalizar y enviarlas hace falta señal.',
+              'Están guardadas en este dispositivo y no se han perdido. Puedes seguir capturando ahora; para finalizar las que faltan hace falta señal. Las ya finalizadas se envían solas al volver la conexión.',
             ),
             if (session.error case final String message)
               Notice(message, icon: Icons.wifi_off, alert: true),
@@ -79,7 +80,7 @@ class OfflineRecoveryScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             OutlinedButton(
-              onPressed: session.logout,
+              onPressed: () => confirmLogout(context, session),
               child: const Text('Cerrar sesión'),
             ),
             const Notice(

@@ -50,6 +50,10 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
   late final bool soleManagerWarning;
   bool deleted = false;
 
+  /// Verificaciones finalizadas en este teléfono que no llegaron al
+  /// servidor: eliminar la cuenta las descartaría.
+  int get unsent => widget.session.uploads.waiting;
+
   @override
   void initState() {
     super.initState();
@@ -70,7 +74,7 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
   }
 
   Future<void> _delete() async {
-    if (busy || !understood || password.text.isEmpty) return;
+    if (busy || !understood || password.text.isEmpty || unsent > 0) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       busy = true;
@@ -115,7 +119,9 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
         key: const ValueKey('delete-account-confirm'),
         label: busy ? 'Eliminando…' : 'Eliminar definitivamente',
         icon: Icons.delete_forever_outlined,
-        onNext: busy || !understood || password.text.isEmpty ? null : _delete,
+        onNext: busy || !understood || password.text.isEmpty || unsent > 0
+            ? null
+            : _delete,
       ),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -163,6 +169,14 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
             'La evidencia de una verificación no se modifica ni se borra: así se puede demostrar lo que se midió. Por eso se conserva, desvinculada de quien la hizo.',
             icon: Icons.verified_outlined,
           ),
+          if (unsent > 0)
+            Notice(
+              unsent == 1
+                  ? 'Tienes 1 verificación finalizada en este teléfono sin enviar. Envíala antes de eliminar la cuenta: al eliminarla se descarta.'
+                  : 'Tienes $unsent verificaciones finalizadas en este teléfono sin enviar. Envíalas antes de eliminar la cuenta: al eliminarla se descartan.',
+              icon: Icons.cloud_upload_outlined,
+              alert: true,
+            ),
           if (soleManagerWarning)
             const Notice(
               'Si eres el único jefe de calidad, primero nombra a otro en Ajustes › Usuarios o elimina la empresa completa.',

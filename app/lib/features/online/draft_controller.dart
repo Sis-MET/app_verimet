@@ -44,12 +44,17 @@ const draftStepTypes = ['', 'eccentricity', 'repeatability', 'linearity', ''];
 /// Captures raw strings locally before sending normalized, valid drafts.
 /// Pending requests are journaled before the network call, so a lost response
 /// is replayed with the exact body and UUID, even after restarting the process.
+///
+/// Sin señal, finalizar deja la captura cerrada en el teléfono
+/// ([queuedFinalize]) con la hora en que se midió; [CaptureUploads] la envía
+/// después con un controlador [background], sin pantalla.
 class DraftController extends ChangeNotifier {
   DraftController({
     required this.session,
     required this.bundle,
     Json? draft,
     Json? recovered,
+    this.background = false,
   }) : owner = session.recoveryOwner {
     requestId =
         recovered?['requestId'] as String? ??
@@ -60,6 +65,17 @@ class DraftController extends ChangeNotifier {
         recovered?['version']?.toString() ??
         draft?['version']?.toString() ??
         '0';
+    startedAt =
+        recovered?['startedAt'] as String? ??
+        draft?['created_at'] as String? ??
+        DateTime.now().toUtc().toIso8601String();
+    measuredAt = recovered?['measuredAt'] as String?;
+    queuedFinalize = recovered?['queuedFinalize'] == null
+        ? null
+        : object(recovered!['queuedFinalize']);
+    attention = recovered?['attention'] == null
+        ? null
+        : object(recovered!['attention']);
     step = ((recovered?['step'] as num?)?.toInt() ?? 0).clamp(0, 4);
     offsets = Map<String, dynamic>.from(recovered?['offsets'] as Map? ?? {});
     final previous = object(recovered?['raw'] ?? draft?['payload'] ?? {});
@@ -98,10 +114,17 @@ class DraftController extends ChangeNotifier {
     finalizedResult = recovered?['finalizedResult'] == null
         ? null
         : object(recovered!['finalizedResult']);
-    if (pendingFinalize != null || finalizedResult != null) step = 4;
+    if (pendingFinalize != null ||
+        finalizedResult != null ||
+        queuedFinalize != null) {
+      step = 4;
+    }
     error = recovered?['conflict'] as String?;
     conflict = error != null;
-    session.addListener(_sessionChanged);
+    if (!background) {
+      session.openCaptures.add(requestId);
+      session.addListener(_sessionChanged);
+    }
   }
 
   static Json _restoreTest(Json test, Json previous) {
@@ -135,6 +158,26 @@ class DraftController extends ChangeNotifier {
   final MobileSession session;
   final String owner;
   final Json bundle;
+
+  /// Envío en segundo plano: no tiene pantalla ni toca la captura que se
+  /// reabre al volver a la app.
+  final bool background;
+
+  /// Cuándo empezó la captura en el teléfono. El servidor acepta la
+  /// configuración que la balanza tenía entonces.
+  late final String startedAt;
+
+  /// Cuándo se finalizó sin señal: la hora en que se midió.
+  String? measuredAt;
+
+  /// Finalizada en el teléfono, esperando enviarse.
+  Json? queuedFinalize;
+
+  /// El servidor rechazó el envío en segundo plano: código, mensaje y hora.
+  Json? attention;
+
+  /// Último error de red o del servidor al guardar o finalizar.
+  MobileFailure? lastFailure;
   Json get plan => object(bundle['plan']);
   Json get equipment => object(bundle['equipment']);
   List<Json> get tests => objects(plan['tests']);
@@ -190,8 +233,14 @@ class DraftController extends ChangeNotifier {
     return _payloadJson;
   }
 
-  bool get locked =>
+  bool get locked => _sending || queuedFinalize != null;
+
+  /// La finalización ya salió hacia el servidor: no se envían más cambios.
+  bool get _sending =>
       finalizing || pendingFinalize != null || finalizedResult != null;
+
+  /// Ya no está en el teléfono: el servidor confirmó el resultado.
+  bool get removed => _removed;
   double get offset => (offsets['$step'] as num?)?.toDouble() ?? 0;
 
   Json testInput(String id) =>
@@ -243,6 +292,10 @@ class DraftController extends ChangeNotifier {
     'pendingFinalize': pendingFinalize,
     'finalizedResult': finalizedResult,
     'conflict': conflict ? error : null,
+    'startedAt': startedAt,
+    'measuredAt': measuredAt,
+    'queuedFinalize': queuedFinalize,
+    'attention': attention,
     'updatedAt': DateTime.now().toUtc().toIso8601String(),
   };
 
@@ -260,7 +313,11 @@ class DraftController extends ChangeNotifier {
     final revision = ++_revision;
     _status();
     // save detaches the snapshot synchronously, before its first await.
-    final write = session.recovery.save(owner, snapshot, active: _active);
+    final write = session.recovery.save(
+      owner,
+      snapshot,
+      active: background ? null : _active,
+    );
     try {
       await write;
       // Escrituras coalescidas: una posterior ya confirmada no retrocede.
@@ -316,7 +373,7 @@ class DraftController extends ChangeNotifier {
 
   void _schedule() {
     _timer?.cancel();
-    if (!_disposed && _active && !locked && !conflict) {
+    if (!background && !_disposed && _active && !locked && !conflict) {
       _timer = Timer(
         const Duration(milliseconds: 650),
         () => unawaited(sync()),
@@ -324,8 +381,24 @@ class DraftController extends ChangeNotifier {
     }
   }
 
+  late bool _online = session.online;
   void _sessionChanged() {
-    if (session.stage == SessionStage.ready) _schedule();
+    if (session.stage != SessionStage.ready) return;
+    if (_online != session.online) {
+      // La pantalla dice si se envía ahora o al volver la señal.
+      _online = session.online;
+      _notify();
+    }
+    _schedule();
+    // Volvió la señal con la captura finalizada en pantalla: se envía desde
+    // aquí, porque el envío en segundo plano no toca una captura abierta.
+    if (session.online &&
+        (queuedFinalize != null || pendingFinalize != null) &&
+        attention == null &&
+        !finalizing &&
+        !_removed) {
+      unawaited(finalize());
+    }
   }
 
   String? get draftIssue {
@@ -426,10 +499,15 @@ class DraftController extends ChangeNotifier {
   Future<bool> _sync() async {
     if (_disposed ||
         !_active ||
-        locked ||
+        _sending ||
         conflict ||
         session.stage != SessionStage.ready) {
       return false;
+    }
+    if (!session.online) {
+      // Queda en el teléfono; se envía cuando vuelva la conexión.
+      lastFailure = const MobileFailure('NETWORK_UNAVAILABLE');
+      return !dirty && pendingSave == null;
     }
     final shown = (error, conflict);
     syncing = true;
@@ -449,6 +527,7 @@ class DraftController extends ChangeNotifier {
             'expected_version': version,
             'content': payload,
             'save_id': const Uuid().v4(),
+            'started_at': startedAt,
           };
         }
         if (!await persist()) return false;
@@ -462,11 +541,16 @@ class DraftController extends ChangeNotifier {
         version = result['version'].toString();
         syncedHash = jsonEncode(request['content']);
         pendingSave = null;
+        lastFailure = null;
         if (!await persist()) return false;
       }
       return true;
     } catch (failure) {
-      error = failure is MobileFailure
+      lastFailure = failure is MobileFailure ? failure : null;
+      // Sin señal no es un error de la captura: queda en el teléfono.
+      error = failure is MobileFailure && failure.offline
+          ? null
+          : failure is MobileFailure
           ? failure.message
           : 'No se pudo guardar en el servidor.';
       conflict =
@@ -503,37 +587,83 @@ class DraftController extends ChangeNotifier {
     return saved;
   }
 
-  Future<Json?> finalize() async {
+  /// Finaliza en el servidor. Sin señal, la deja finalizada en el teléfono y
+  /// devuelve `{'queued': true}`: se envía sola cuando vuelva la conexión.
+  /// Dos llamadas a la vez (la pantalla y el reenvío al volver la señal)
+  /// comparten el mismo envío.
+  Future<Json?> finalize() {
+    final running = _finalizeRun;
+    if (running != null) return running;
+    final run = _finalize();
+    _finalizeRun = run;
+    return run.whenComplete(() => _finalizeRun = null);
+  }
+
+  Future<Json?>? _finalizeRun;
+
+  Future<Json?> _finalize() async {
     if (finalizing) return null;
     if (finalizedResult != null) return _finishRecovery();
     if (pendingFinalize == null) {
-      if (completionIssue != null) {
-        error = completionIssue;
-        _notify();
+      if (queuedFinalize == null) {
+        if (completionIssue != null) {
+          error = completionIssue;
+          _notify();
+          return null;
+        }
+        if (session.stage != SessionStage.ready) {
+          // Sin una cuenta validada en los últimos días no se finaliza.
+          error =
+              'Para finalizar, conéctate a internet: la app necesita validar tu cuenta.';
+          _notify();
+          return null;
+        }
+        if (!session.online) return _queue();
+      }
+      if (!await sync() || dirty || draftId == null) {
+        if (queuedFinalize == null && (lastFailure?.offline ?? false)) {
+          return _queue();
+        }
         return null;
       }
-      if (!await sync() || dirty || draftId == null) return null;
       pendingFinalize = {
         'draft_id': draftId,
         'expected_version': version,
-        'finalize_id': const Uuid().v4(),
+        'finalize_id':
+            queuedFinalize?['finalizeId'] as String? ?? const Uuid().v4(),
         'app_version_value': 'ivmet-flutter-${AppConfig.version}',
         'device_id_value': '',
+        'measured_at': ?measuredAt,
       };
     }
     finalizing = true;
     error = null;
     _notify();
     try {
+      // La hora del teléfono al enviar corrige un reloj mal puesto; no forma
+      // parte de la huella de la finalización.
+      if (pendingFinalize!['measured_at'] != null) {
+        pendingFinalize!['device_clock'] = DateTime.now()
+            .toUtc()
+            .toIso8601String();
+      }
       if (!await persist()) return null;
       finalizedResult = await session.api.rpc(
         'ivmet_mobile_finalize_draft',
         pendingFinalize!,
       );
-      if (_disposed) return null;
+      queuedFinalize = null;
+      attention = null;
+      lastFailure = null;
+      if (_disposed && !background) return null;
       return await _finishRecovery();
     } catch (failure) {
-      error = failure is MobileFailure
+      lastFailure = failure is MobileFailure ? failure : null;
+      // Se cortó la señal con la finalización en camino: quizá llegó. Se
+      // repite la misma al volver la conexión y el servidor no la duplica.
+      error = failure is MobileFailure && failure.offline
+          ? 'Sin señal. La finalización quedó pendiente en este teléfono y se confirma sola al volver la conexión.'
+          : failure is MobileFailure
           ? failure.message
           : 'No se pudo confirmar la finalización. Puedes reintentar.';
       // Only a definite client rejection allows changing the finalized input.
@@ -544,7 +674,7 @@ class DraftController extends ChangeNotifier {
           !failure.unauthorized) {
         pendingFinalize = null;
       }
-      if (!_disposed) await persist();
+      if (!_disposed || background) await persist();
       return null;
     } finally {
       finalizing = false;
@@ -552,11 +682,52 @@ class DraftController extends ChangeNotifier {
     }
   }
 
+  /// Sin señal: la captura queda finalizada en el teléfono, con la hora en
+  /// que se midió, y ya no se edita.
+  Future<Json?> _queue() async {
+    final previous = measuredAt;
+    final now = DateTime.now().toUtc().toIso8601String();
+    measuredAt ??= now;
+    queuedFinalize = {'finalizeId': const Uuid().v4(), 'queuedAt': now};
+    error = null;
+    attention = null;
+    _timer?.cancel();
+    if (!await persist()) {
+      queuedFinalize = null;
+      measuredAt = previous;
+      _notify();
+      return null;
+    }
+    _notify();
+    unawaited(session.uploads.load());
+    return const {'queued': true};
+  }
+
+  /// El servidor rechazó la captura finalizada en el teléfono: vuelve a ser
+  /// editable para corregirla. Conserva la hora en que se midió.
+  Future<bool> reopen() async {
+    if (queuedFinalize == null || _sending) return false;
+    final (queued, rejected) = (queuedFinalize, attention);
+    queuedFinalize = null;
+    attention = null;
+    error = null;
+    if (!await persist()) {
+      queuedFinalize = queued;
+      attention = rejected;
+      _notify();
+      return false;
+    }
+    _notify();
+    unawaited(session.uploads.load());
+    return true;
+  }
+
   Future<Json?> _finishRecovery() async {
     if (!await persist()) return null;
     try {
       await session.recovery.remove(owner, requestId);
       _removed = true;
+      if (!background) unawaited(session.uploads.load());
       return finalizedResult;
     } catch (_) {
       localError =
@@ -571,7 +742,11 @@ class DraftController extends ChangeNotifier {
     _disposed = true;
     _timer?.cancel();
     _offsetTimer?.cancel();
-    session.removeListener(_sessionChanged);
+    if (!background) {
+      session.removeListener(_sessionChanged);
+      // Lo que quedó sin enviar sigue en segundo plano.
+      session.openCaptures.remove(requestId);
+    }
     status.dispose();
     super.dispose();
   }

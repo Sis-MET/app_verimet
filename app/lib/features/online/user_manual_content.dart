@@ -13,7 +13,7 @@ const ivmetUserManual = UserManual(
   control: ManualControl(
     code: 'PENDIENTE: código asignado por Calidad',
     title: 'Manual de uso de IvMET',
-    revision: '00 (borrador)',
+    revision: '01 (borrador)',
     issuedOn: '2026-10-09',
     appliesTo: '1.0.x',
     preparedBy: 'Desarrollo IvMET',
@@ -21,6 +21,11 @@ const ivmetUserManual = UserManual(
     approvedBy: 'PENDIENTE',
     history: [
       ManualRevision('00', '2026-10-09', 'Emisión inicial (borrador).'),
+      ManualRevision(
+        '01',
+        '2026-10-09',
+        'Trabajo sin conexión: copia del teléfono, finalizar sin señal y Por enviar.',
+      ),
     ],
   ),
   sections: [
@@ -40,7 +45,7 @@ const ivmetUserManual = UserManual(
           'la planta y el servidor calcula el resultado al finalizar.',
         ),
         ManualList('Lo que conviene saber desde el inicio', [
-          'Funciona con internet: los datos viven en el servidor y la app guarda además una copia de la captura en el teléfono para no perderla si se corta la señal.',
+          'Los datos viven en el servidor, pero la app trabaja también sin señal: consulta la copia que guardó en el teléfono y deja las verificaciones finalizadas ahí hasta que vuelve la conexión.',
           'Las verificaciones son privadas de tu empresa. Métrica solo recibe lo que el jefe de calidad autoriza enviar.',
           'Hay dos roles: jefe de calidad (configura, asigna y gestiona) y operador (verifica las balanzas que tiene asignadas).',
           'Una verificación finalizada no se edita ni se borra: si hay un error, se anula con motivo y se hace otra.',
@@ -62,7 +67,7 @@ const ivmetUserManual = UserManual(
       blocks: [
         ManualList('Necesitas', [
           'Un teléfono Android con la app IvMET instalada desde Play Store.',
-          'Conexión a internet (datos móviles o wifi) para ingresar, guardar en el servidor y finalizar.',
+          'Conexión a internet (datos móviles o wifi) para registrarte, ingresar y gestionar usuarios, plantas y plan. Para verificar basta con haberte conectado en los últimos 7 días.',
           'Una cuenta: la creas tú al registrar la empresa, te la da el jefe de calidad o, en empresas que gestiona Métrica, Métrica.',
           'Para verificar: las balanzas asignadas y, si las usas, las pesas patrón registradas en tu planta.',
         ]),
@@ -540,18 +545,72 @@ const ivmetUserManual = UserManual(
     ManualSection(
       id: 'borradores',
       group: ManualGroup.records,
-      title: 'Borradores y trabajo sin señal',
+      title: 'Borradores',
       icon: Icons.edit_note,
-      summary:
-          'Qué pasa con la captura si se corta la señal o se cierra la app.',
+      summary: 'Qué pasa con la captura si se cierra la app.',
       blocks: [
         ManualList(null, [
           'La captura se guarda sola en el teléfono y, con señal, en el servidor.',
-          'Sin señal la app protege el contenido, pero puedes recuperar en el teléfono la captura que estabas haciendo.',
           'Al volver a abrir la app, la captura pendiente se recupera en el paso y con las lecturas donde quedó.',
           'Las capturas sin finalizar están en Inicio › «Borradores» y vencen a los 30 días.',
           'Si el servidor tiene otra versión de la misma captura, la app no la sobrescribe: «Ver datos del servidor» muestra las diferencias.',
         ]),
+      ],
+    ),
+    ManualSection(
+      id: 'sin-conexion',
+      group: ManualGroup.records,
+      title: 'Trabajar sin señal',
+      icon: Icons.wifi_off,
+      summary: 'Qué se puede hacer sin conexión y cómo se envía después.',
+      blocks: [
+        ManualParagraph(
+          'Cada vez que la app se conecta, descarga lo necesario para trabajar '
+          'sin señal: Inicio, el catálogo de balanzas, la ficha de cada una '
+          'con su configuración y sus pesas patrón, la agenda de este mes y '
+          'del siguiente y el historial reciente. Sin conexión, una franja '
+          'arriba dice «Sin conexión · datos del…» con la fecha de esa copia.',
+        ),
+        ManualList('Sin señal puedes', [
+          'Consultar Inicio, Verificar, la ficha de las balanzas, la agenda y el historial descargados.',
+          'Capturar una verificación y finalizarla: queda «Finalizada en el teléfono», con la hora en que la terminaste, y ya no se edita.',
+        ]),
+        ManualList('Necesitan señal', [
+          'Registrarte, ingresar y recuperar la contraseña.',
+          'Usuarios, plantas, áreas, pesas patrón, registrar o configurar balanzas, Mi plan y solicitudes.',
+          'Anular una verificación, compartirla con Métrica y eliminar la cuenta.',
+        ]),
+        ManualSteps('Cuando vuelve la señal', [
+          ManualStep(
+            'No hagas nada: con la app abierta, cada verificación se envía sola, de la más antigua a la más nueva.',
+            'La franja dice «Enviando…» y el servidor calcula el resultado de cada una al recibirla.',
+          ),
+          ManualStep(
+            'Revisa Ajustes › «Por enviar» si quieres ver el estado de cada una o tocar «Enviar ahora».',
+          ),
+          ManualStep(
+            'Si el servidor rechaza una (por ejemplo, porque su certificado se anuló), la franja lo avisa en rojo. Ábrela, lee el motivo y toca «Corregir la captura».',
+          ),
+        ]),
+        ManualNote(
+          ManualNoteKind.important,
+          'La app trabaja sin conexión hasta 7 días desde la última vez que '
+          'validó tu cuenta (lo ves en Ajustes › «Trabajo sin conexión»). '
+          'Pasado ese plazo pide señal; lo capturado no se pierde. Mientras '
+          'tengas verificaciones por enviar no puedes cerrar sesión.',
+        ),
+        ManualNote(
+          ManualNoteKind.tip,
+          'Antes de ir a una planta sin cobertura, abre la app con señal unos '
+          'minutos: así descarga las fichas y la agenda al día.',
+        ),
+        ManualNote(
+          ManualNoteKind.norm,
+          'Una verificación hecha sin señal guarda la hora en que se midió '
+          '(corregida si el reloj del teléfono estaba desfasado) y la hora en '
+          'que llegó al servidor; el detalle y el informe muestran las dos.',
+          reference: '7.5 · 7.11.3',
+        ),
       ],
     ),
     ManualSection(
@@ -631,6 +690,7 @@ const ivmetUserManual = UserManual(
           'Se eliminan el acceso, el nombre, el correo y el teléfono; donde aparecían queda «Usuario eliminado».',
           'Se conservan, sin datos personales, las verificaciones finalizadas y la auditoría.',
           'Si eres el único jefe de calidad, nombra a otro en Usuarios o elimina la empresa completa.',
+          'Si tienes verificaciones por enviar, envíalas antes: al eliminar la cuenta se descartan.',
           'Sin la app: https://metrica.com.bo/ivmet/eliminar-cuenta.',
         ]),
         ManualNote(
@@ -651,7 +711,9 @@ const ivmetUserManual = UserManual(
       summary: 'Qué significa un mensaje y qué hacer.',
       blocks: [
         ManualList(null, [
-          '«No hay conexión con Supabase…»: revisa la señal o el wifi y vuelve a intentar. Tu captura queda en el teléfono.',
+          '«Sin conexión. Esto necesita internet…»: esa acción necesita señal. Las verificaciones que capturas se guardan en el teléfono y se envían solas.',
+          '«Sin conexión, y esto no está en la copia del teléfono.»: ábrelo una vez con señal y después quedará disponible sin conexión.',
+          '«Pasaron más de 7 días sin validar tu cuenta.»: conéctate a internet para seguir; tus capturas se conservan.',
           '«El registro cambió en otro dispositivo…»: vuelve a abrir el registro antes de guardar.',
           '«Justifica cada prueba omitida.»: escribe el motivo de omisión.',
           '«Un certificado ya no está disponible para esta planta.»: el certificado se anuló o venció; elige otro.',

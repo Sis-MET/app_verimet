@@ -21,9 +21,11 @@ import 'company_users.dart';
 import 'history_screen.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
+import 'offline_copy.dart';
 import 'online_widgets.dart';
 import 'customer_configuration.dart';
 import 'draft_screen.dart';
+import 'pending_captures.dart';
 import 'plan_screen.dart';
 import 'user_manual.dart';
 import 'team_screen.dart';
@@ -83,6 +85,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     } finally {
       recovering = false;
       if (mounted) setState(() {});
+      // Después de reabrir la captura activa: así el envío en segundo plano
+      // no la toca mientras está en pantalla.
+      if (mounted && recoveryChecked) session.backgroundSync();
     }
   }
 
@@ -90,6 +95,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     if (mounted && widget.session.stage == SessionStage.ready) {
       setState(() {});
       unawaited(_restoreDraft());
+      if (recoveryChecked) widget.session.backgroundSync();
     }
   }
 
@@ -599,6 +605,11 @@ class _Settings extends ConsumerWidget {
                   'Fin de la gracia',
                   dateLabel(session.access['graceEndsAt']),
                 ),
+              if (session.grant case final grant?)
+                DetailField(
+                  'Trabajo sin conexión',
+                  'Hasta el ${dateTimeLabel(grant.expiresAt.toIso8601String())}',
+                ),
             ],
           ),
         ),
@@ -683,17 +694,32 @@ class _Settings extends ConsumerWidget {
             ),
             TileCell(
               ActionTile(
+                key: const ValueKey('settings-pending'),
+                icon: Icons.cloud_upload_outlined,
+                label: 'Por enviar',
+                caption: 'Lo capturado en este teléfono',
+                onTap: () => openPage<void>(
+                  context,
+                  PendingCapturesScreen(session: session),
+                ),
+              ),
+            ),
+            TileCell(
+              ActionTile(
+                key: const ValueKey('settings-logout'),
                 icon: Icons.logout,
                 label: 'Cerrar sesión',
                 caption: 'Salir de esta cuenta',
-                onTap: session.logout,
+                onTap: () => confirmLogout(context, session),
               ),
             ),
           ],
         ),
         const SizedBox(height: 6),
-        const Notice(
-          'La licencia y las plantas autorizadas se validan en cada consulta. No hay modo offline.',
+        Notice(
+          'Sin señal, la app trabaja con la copia del teléfono hasta ${OfflineCopy.validity.inDays} días desde la última validación de tu cuenta: '
+          'consultas lo descargado y capturas y finalizas verificaciones, que se envían solas al volver la conexión. '
+          'Usuarios, plantas, plan y configuración necesitan internet.',
         ),
       ],
     );

@@ -187,6 +187,12 @@ Future<Uint8List> buildVerificationReport(
     _detailGrid([
       ('Fecha de medición', _date(verification['realizado_at'])),
       ('Fecha de recepción', _date(verification['recibido_at'])),
+      if (data['offlineCapture'] is Map)
+        (
+          'Captura sin conexión',
+          'Hora del teléfono: ${_date(_map(data['offlineCapture'])['deviceMeasuredAt'])} · '
+              'desfase del reloj: ${_map(data['offlineCapture'])['clockSkewSeconds']} s',
+        ),
       ('Capturado por', users['capture']),
       ('Finalizado por', users['finalization']),
       ('Temperatura', _withUnit(verification['temperatura_c'], '°C')),

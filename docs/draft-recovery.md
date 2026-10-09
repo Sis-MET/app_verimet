@@ -86,9 +86,12 @@ captura local, detiene el autoguardado y permite consultar la versión del servi
 no mezcla ni sobrescribe valores de otro dispositivo.
 
 Al reabrir la app, `WorkspaceScreen` busca la comprobación activa del usuario.
-La vista recuperada vuelve a consultar el equipo antes de exponer los datos.
-El cierre de sesión conserva los borradores bajo su cuenta original. La app
-sigue necesitando conexión y licencia válida para acceder, enviar y finalizar.
+La vista recuperada vuelve a consultar el equipo antes de exponer los datos;
+sin señal, el permiso de trabajar sin conexión hace de esa validación. El
+cierre de sesión conserva los borradores bajo su cuenta original. Sin señal,
+finalizar deja la captura cerrada en el teléfono (`queuedFinalize`) y
+`CaptureUploads` la envía al volver la conexión: ver
+[trabajo sin conexión](offline-mode.md).
 
 ## Validación
 

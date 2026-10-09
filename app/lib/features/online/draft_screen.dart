@@ -16,6 +16,8 @@ import 'online_widgets.dart';
 export 'draft_controller.dart' show decimalError, normalizedDecimal;
 
 /// Revalidate access before exposing a locally recovered equipment snapshot.
+/// Sin señal no hay con qué revalidar: el permiso de trabajar sin conexión
+/// ya es esa validación, y la captura trae su propia copia de la balanza.
 class RecoveredDraftScreen extends StatelessWidget {
   const RecoveredDraftScreen({
     required this.session,
@@ -25,17 +27,25 @@ class RecoveredDraftScreen extends StatelessWidget {
   final MobileSession session;
   final Json snapshot;
   @override
-  Widget build(BuildContext context) => RemotePanel(
-    frameTitle: 'Recuperar verificación',
-    load: () => session.api.read('equipment', {
-      'equipmentId': object(object(snapshot['bundle'])['equipment'])['id'],
-    }),
-    builder: (_) => DraftScreen(
-      session: session,
-      bundle: object(snapshot['bundle']),
-      recovered: snapshot,
-    ),
-  );
+  Widget build(BuildContext context) => !session.online
+      ? DraftScreen(
+          session: session,
+          bundle: object(snapshot['bundle']),
+          recovered: snapshot,
+        )
+      : RemotePanel(
+          frameTitle: 'Recuperar verificación',
+          load: () => session.api.read('equipment', {
+            'equipmentId': object(
+              object(snapshot['bundle'])['equipment'],
+            )['id'],
+          }),
+          builder: (_) => DraftScreen(
+            session: session,
+            bundle: object(snapshot['bundle']),
+            recovered: snapshot,
+          ),
+        );
 }
 
 class DraftScreen extends StatefulWidget {
@@ -57,29 +67,40 @@ class DraftScreen extends StatefulWidget {
 class _DraftScreenState extends State<DraftScreen> {
   late final Future<DraftController> future = _load();
   Future<DraftController> _load() async {
-    final local = await widget.session.recovery.list(
-      widget.session.recoveryOwner,
-    );
-    final recovered =
-        widget.recovered ??
-        local.where((d) {
-          if (widget.draft != null) {
-            return d['requestId'] == widget.draft!['request_uuid'];
-          }
-          final bundle = object(d['bundle']);
-          return object(bundle['equipment'])['id'] ==
-                  object(widget.bundle['equipment'])['id'] &&
-              object(bundle['plan'])['id'] ==
-                  object(widget.bundle['plan'])['id'];
-        }).firstOrNull;
-    final controller = DraftController(
-      session: widget.session,
-      bundle: recovered == null ? widget.bundle : object(recovered['bundle']),
-      draft: widget.draft,
-      recovered: recovered,
-    );
-    if (!mounted) controller.dispose();
-    return controller;
+    final uploads = widget.session.uploads;
+    // Si justo se está enviando, se espera: la pantalla abre lo que quedó.
+    await uploads.hold();
+    try {
+      final local = await widget.session.recovery.list(
+        widget.session.recoveryOwner,
+      );
+      final requested = widget.recovered?['requestId'];
+      final recovered = requested != null
+          // Lo más reciente del disco, no la copia con la que se llegó aquí.
+          // Si ya no está, se envió mientras tanto.
+          ? local.where((d) => d['requestId'] == requested).firstOrNull ??
+                (throw const _AlreadySent())
+          : local.where((d) {
+              if (widget.draft != null) {
+                return d['requestId'] == widget.draft!['request_uuid'];
+              }
+              final bundle = object(d['bundle']);
+              return object(bundle['equipment'])['id'] ==
+                      object(widget.bundle['equipment'])['id'] &&
+                  object(bundle['plan'])['id'] ==
+                      object(widget.bundle['plan'])['id'];
+            }).firstOrNull;
+      final controller = DraftController(
+        session: widget.session,
+        bundle: recovered == null ? widget.bundle : object(recovered['bundle']),
+        draft: widget.draft,
+        recovered: recovered,
+      );
+      if (!mounted) controller.dispose();
+      return controller;
+    } finally {
+      uploads.release();
+    }
   }
 
   @override
@@ -90,7 +111,15 @@ class _DraftScreenState extends State<DraftScreen> {
       return OnlinePage(
         title: 'Recuperar verificación',
         child: Center(
-          child: snapshot.hasError
+          child: snapshot.error is _AlreadySent
+              ? const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Notice(
+                    'Esta verificación ya llegó al servidor. Búscala en el historial.',
+                    icon: Icons.cloud_done_outlined,
+                  ),
+                )
+              : snapshot.hasError
               ? const Padding(
                   padding: EdgeInsets.all(20),
                   child: Notice(
@@ -364,13 +393,16 @@ class _DraftWizardState extends State<_DraftWizard>
     }
     confirming = true;
     if (!capture.locked) {
+      final online = capture.session.online;
       final confirmed = await showDialog<bool>(
         context: context,
         useRootNavigator: false,
         builder: (context) => AlertDialog(
           title: const Text('Finalizar verificación intermedia'),
-          content: const Text(
-            'Se guardarán los datos y se calculará el resultado. La verificación intermedia quedará privada y no se podrá editar. No equivale a una calibración acreditada ni a una verificación legal.',
+          content: Text(
+            online
+                ? 'Se guardarán los datos y se calculará el resultado. La verificación intermedia quedará privada y no se podrá editar. No equivale a una calibración acreditada ni a una verificación legal.'
+                : 'No hay señal: la verificación queda finalizada en este teléfono, con la hora de ahora, y se envía sola cuando vuelva la conexión. El servidor calcula el resultado al recibirla. Ya no se podrá editar. No equivale a una calibración acreditada ni a una verificación legal.',
           ),
           actions: [
             TextButton(
@@ -392,6 +424,31 @@ class _DraftWizardState extends State<_DraftWizard>
     final result = await capture.finalize();
     confirming = false;
     if (result == null || !mounted) return;
+    if (result['queued'] == true) {
+      await showDialog<void>(
+        context: context,
+        useRootNavigator: false,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Finalizada en el teléfono'),
+          content: const Text(
+            'Se enviará sola cuando vuelva la señal, aunque estés en otra pantalla. El resultado lo calcula el servidor al recibirla. Mientras tanto la ves en Por enviar.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      setState(() => allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop(true);
+      });
+      return;
+    }
     final traceability = result['traceability'] == 'traceable'
         ? 'trazable'
         : 'sin trazabilidad vigente';
@@ -430,8 +487,12 @@ class _DraftWizardState extends State<_DraftWizard>
   }
 
   _SaveState get _saveState {
-    if (capture.localError != null) return _SaveState.error;
-    if (capture.pendingFinalize != null) return _SaveState.waiting;
+    if (capture.localError != null || capture.attention != null) {
+      return _SaveState.error;
+    }
+    if (capture.pendingFinalize != null || capture.queuedFinalize != null) {
+      return _SaveState.waiting;
+    }
     if (capture.syncing) return _SaveState.syncing;
     if (capture.dirty) return _SaveState.local;
     return _SaveState.synced;
@@ -440,8 +501,17 @@ class _DraftWizardState extends State<_DraftWizard>
   String get _saveStatus {
     if (capture.localError != null) return capture.localError!;
     if (!capture.localSaved) return 'Guardando en este dispositivo…';
+    if (capture.attention != null) {
+      return 'El servidor no aceptó el envío: ${capture.attention!['message']}';
+    }
     if (capture.pendingFinalize != null) {
       return 'Finalización pendiente de confirmar. Tus datos están conservados.';
+    }
+    if (capture.queuedFinalize != null) {
+      return 'Finalizada en este dispositivo · se enviará al recuperar la señal';
+    }
+    if (!capture.session.online && capture.dirty) {
+      return 'Sin señal · guardado en este dispositivo; se enviará al recuperar la conexión';
     }
     if (capture.syncing) {
       return 'Guardado en este dispositivo · enviando al servidor…';
@@ -714,6 +784,26 @@ class _DraftWizardState extends State<_DraftWizard>
               ),
               children: [
                 if (capture.error != null) Notice(capture.error!, alert: true),
+                if (capture.queuedFinalize != null) ...[
+                  if (capture.attention case final attention?) ...[
+                    Notice(
+                      'El servidor no aceptó esta verificación: ${attention['message']}',
+                      icon: Icons.error_outline,
+                      alert: true,
+                    ),
+                    OutlinedButton.icon(
+                      key: const ValueKey('reopen-capture'),
+                      onPressed: () => unawaited(capture.reopen()),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Corregir la captura'),
+                    ),
+                  ] else
+                    Notice(
+                      'Finalizada en este teléfono el ${dateTimeLabel(capture.measuredAt)}. '
+                      '${capture.session.online ? 'Se está enviando al servidor.' : 'Se enviará sola cuando vuelva la señal; el servidor calcula el resultado.'}',
+                      icon: Icons.schedule_send_outlined,
+                    ),
+                ],
                 if (capture.conflict) ...[
                   const Notice(
                     'Se conserva tu captura local. El servidor tiene otra versión; no se sobrescribirá automáticamente.',
@@ -747,7 +837,14 @@ class _DraftWizardState extends State<_DraftWizard>
                     label: !last
                         ? 'Siguiente'
                         : capture.finalizing
-                        ? 'Finalizando…'
+                        ? capture.queuedFinalize != null
+                              ? 'Enviando…'
+                              : 'Finalizando…'
+                        : capture.queuedFinalize != null &&
+                              capture.pendingFinalize == null
+                        ? capture.session.online
+                              ? 'Enviar ahora'
+                              : 'Esperando señal'
                         : capture.locked
                         ? 'Confirmar resultado'
                         : 'Finalizar',
@@ -763,7 +860,9 @@ class _DraftWizardState extends State<_DraftWizard>
                               : () => _go(step + 1)
                         : navigating ||
                               capture.finalizing ||
-                              capture.plan['finalizationEnabled'] != true
+                              capture.plan['finalizationEnabled'] != true ||
+                              (capture.queuedFinalize != null &&
+                                  !capture.session.online)
                         ? null
                         : _finalize,
                   ),
@@ -781,6 +880,11 @@ class _DraftWizardState extends State<_DraftWizard>
 }
 
 enum _MenuAction { omission, equipment, server, leave }
+
+/// La captura que se quería abrir ya no está en el teléfono: se envió.
+class _AlreadySent implements Exception {
+  const _AlreadySent();
+}
 
 enum _SaveState { error, waiting, syncing, local, synced }
 

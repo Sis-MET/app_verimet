@@ -321,6 +321,13 @@ String dateLabel(Object? value) {
   return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
+/// Fecha y hora local: «09/10/2026 14:05».
+String dateTimeLabel(Object? value) {
+  final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+  if (date == null) return 'No registrado';
+  return '${dateLabel(value)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+}
+
 /// Ficha de solo lectura: rotulo pequeno arriba, valor debajo.
 ///
 /// El aire de dentro del par y el de fuera estaban casi igualados (3 px contra

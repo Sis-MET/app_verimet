@@ -8,9 +8,15 @@ import 'token_storage.dart';
 
 /// Recovery documents are private to a server, tenant and authenticated user.
 /// They contain unfinished capture only, never finalized evidence or tokens.
+///
+/// The same key/value store keeps the offline copy of what the server
+/// returned (`offline_copy.dart`), under keys with their own prefix.
 abstract interface class DraftRecoveryStore {
   Future<String?> read(String owner);
   Future<void> write(String owner, String document);
+
+  /// Removes every key that starts with [prefix].
+  Future<void> deletePrefix(String prefix);
   Future<void> close();
 }
 
@@ -64,6 +70,12 @@ class SqliteDraftRecoveryStore extends GeneratedDatabase
     'ON CONFLICT(owner) DO UPDATE SET document = excluded.document',
     [owner, document],
   );
+
+  @override
+  Future<void> deletePrefix(String prefix) => customStatement(
+    'DELETE FROM draft_recovery WHERE substr(owner, 1, ?) = ?',
+    [prefix.length, prefix],
+  );
 }
 
 /// Web persistence follows browser storage lifetime. The mobile application
@@ -79,6 +91,16 @@ class BrowserDraftRecoveryStore implements DraftRecoveryStore {
   @override
   Future<void> write(String owner, String document) =>
       _storage.write(key: _key(owner), value: document);
+  @override
+  Future<void> deletePrefix(String prefix) async {
+    final keys = (await _storage.readAll()).keys.where(
+      (key) => key.startsWith(_key(prefix)),
+    );
+    for (final key in keys) {
+      await _storage.delete(key: key);
+    }
+  }
+
   @override
   Future<void> close() async {}
 }

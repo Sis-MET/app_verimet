@@ -45,7 +45,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // borradores que estaban en este mismo dispositivo.
         final local = widget.drafts ? await _localDrafts() : const <Json>[];
         try {
-          final data = await widget.session.api.read(
+          final data = await widget.session.read(
             widget.drafts ? 'drafts' : 'history',
             {'page': page, 'equipmentId': widget.equipmentId},
           );
@@ -171,7 +171,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         context,
         Scaffold(
           body: RemotePanel(
-            load: () => widget.session.api.read('draft', {'id': item['id']}),
+            load: () => widget.session.read('draft', {'id': item['id']}),
             builder: (draft) => DraftScreen(
               session: widget.session,
               bundle: object(draft['context_snapshot']),

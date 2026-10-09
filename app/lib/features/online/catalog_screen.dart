@@ -81,7 +81,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   Widget _equipmentResults({required bool completeList}) => RemotePanel(
     dataKey: '${widget.plantId}|$search|$page|$revision',
-    load: () => widget.session.api.read('instruments', {
+    load: () => widget.session.read('instruments', {
       'plantId': widget.plantId,
       'search': search,
       'page': page,

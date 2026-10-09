@@ -62,7 +62,11 @@ class MobileFailure implements Exception {
   String get message => switch (code) {
     'INVALID_CREDENTIALS' => 'Usuario o contraseña incorrectos.',
     'NETWORK_UNAVAILABLE' =>
-      'No hay conexión con Supabase. IvMET requiere internet; vuelve a intentarlo.',
+      'Sin conexión. Esto necesita internet; las verificaciones que capturas se guardan en el teléfono y se envían solas.',
+    'OFFLINE_NOT_COPIED' =>
+      'Sin conexión, y esto no está en la copia del teléfono. Ábrelo cuando tengas señal; después quedará disponible sin conexión.',
+    'INVALID_CAPTURE_TIME' =>
+      'La fecha y hora del teléfono no son válidas. Corrígelas en los ajustes del teléfono.',
     'ROW_VERSION_CONFLICT' =>
       'El registro cambió en otro dispositivo. Vuelve a abrirlo antes de guardar.',
     'IDEMPOTENCY_CONFLICT' =>

@@ -29,6 +29,11 @@ class DraftRecovery {
   Future<List<Json>> list(String owner) =>
       _run(() async => objects((await _read(owner))['drafts']));
 
+  /// Lo que hay en el disco ahora, sin esperar a las escrituras en curso:
+  /// para mostrar y contar, nunca para modificar.
+  Future<List<Json>> peek(String owner) async =>
+      objects((await _read(owner))['drafts']);
+
   Future<Json?> active(String owner) => _run(() async {
     final document = await _read(owner);
     return objects(
@@ -47,7 +52,10 @@ class DraftRecovery {
   ///
   /// The returned future completes when a write containing this snapshot, or
   /// a newer one of the same draft, is on disk.
-  Future<void> save(String owner, Json snapshot, {required bool active}) {
+  ///
+  /// [active] marks the draft as the one to reopen on the next start; null
+  /// keeps whatever was marked (the background upload does not change it).
+  Future<void> save(String owner, Json snapshot, {required bool? active}) {
     // Detach now: later keystrokes must not mutate an enqueued snapshot.
     final encoded = jsonEncode(snapshot);
     final key = jsonEncode([owner, snapshot['requestId']]);
@@ -67,9 +75,10 @@ class DraftRecovery {
       final drafts = objects(document['drafts']);
       drafts.removeWhere((d) => d['requestId'] == copy['requestId']);
       document['drafts'] = [copy, ...drafts];
-      if (queued.active) {
+      if (queued.active == true) {
         document['active'] = copy['requestId'];
-      } else if (document['active'] == copy['requestId']) {
+      } else if (queued.active == false &&
+          document['active'] == copy['requestId']) {
         document.remove('active');
       }
       await store.write(owner, jsonEncode(document));
@@ -89,6 +98,6 @@ class DraftRecovery {
 class _QueuedSave {
   _QueuedSave(this.encoded, this.active);
   String encoded;
-  bool active;
+  bool? active;
   late Future<void> done;
 }

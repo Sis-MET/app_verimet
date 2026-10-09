@@ -6,6 +6,7 @@ import '../../shared/widgets/wizard_chrome.dart';
 import 'commercial_plan.dart';
 import 'mobile_api.dart';
 import 'mobile_session.dart';
+import 'offline_copy.dart';
 import 'online_widgets.dart';
 import 'plan_screen.dart';
 import 'verification_report.dart';
@@ -123,7 +124,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
   Widget build(BuildContext context) => RemotePage(
     title: 'Verificación privada',
     dataKey: '$revision',
-    load: () => widget.session.api.read('verification', {'id': widget.id}),
+    load: () => widget.session.read('verification', {'id': widget.id}),
     actions: _menu,
     // El informe es lo que se viene a buscar: queda fijo a la vista.
     floating: (data) => WizardNavPill.action(
@@ -178,6 +179,19 @@ class _VerificationScreenState extends State<VerificationScreen> {
           // fecha como la lee quien revisa la verificacion.
           DetailField('Fecha de medición', dateLabel(v['realizado_at'])),
           DetailField('Fecha de recepción', dateLabel(v['recibido_at'])),
+          // Se midió sin señal: la hora la dio el teléfono, corregida con el
+          // desfase de su reloj al enviarla.
+          if (data['offlineCapture'] case final Map offline)
+            DetailField(
+              'Captura sin conexión',
+              'Hora del teléfono: ${dateTimeLabel(offline['deviceMeasuredAt'])} · '
+                  'desfase del reloj: ${offline['clockSkewSeconds']} s',
+            ),
+          if (data[OfflineCopy.savedAtKey] != null)
+            Notice(
+              'Sin conexión: es la copia guardada el ${dateTimeLabel(data[OfflineCopy.savedAtKey])}.',
+              icon: Icons.wifi_off,
+            ),
           DetailField(
             'Alcance',
             v['alcance'] == 'partial' ? 'Parcial' : 'Completa',

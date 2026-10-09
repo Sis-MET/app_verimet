@@ -58,8 +58,9 @@ alto de la sección 4 deben cerrarse antes de ese uso.
 
 ## 2. Resumen
 
-De 38 ítems: **21 cumplen, 9 parciales, 3 no cumplen, 2 sin evidencia y 3 no
-aplican**. Lo fuerte es la integridad del registro: una verificación nace
+De 38 ítems: **20 cumplen, 10 parciales, 3 no cumplen, 2 sin evidencia y 3 no
+aplican** (con el trabajo sin conexión, CR-03 pasó a parcial y RT-02 bajó a
+riesgo bajo). Lo fuerte es la integridad del registro: una verificación nace
 definitiva en el servidor, con quién capturó y finalizó, cuándo, con qué
 equipo, configuración, patrones y versión de la app, y no se edita ni se
 borra. Las brechas de riesgo alto son de operación, no de diseño: no hay
@@ -77,7 +78,7 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 | ID | Requisito | Estado | Evidencia | Brecha | Cierre | Riesgo |
 |---|---|---|---|---|---|---|
 | RT-01 | Identificación única, vinculada a la tarea y al ítem | Cumple | `verificaciones.id` UUID con `request_uuid`, `equipo_id`, `cliente_id`, `planta_id` (`supabase/migrations/202608240003_metrology_online.sql:224`); informe con el identificador | — | — | — |
-| RT-02 | Fecha y hora al capturar | Parcial | `recibido_at` y `realizado_at` los pone el servidor (`202608310001_normative_metrology_engine.sql:513,565`); el borrador guarda `created_at`/`updated_at` | `realizado_at` es la hora de **finalizar**; el inicio de la captura no pasa a la evidencia | S | Medio |
+| RT-02 | Fecha y hora al capturar | Parcial | `recibido_at` es la llegada. En línea, `realizado_at` es la hora del servidor al finalizar (`202608310001_normative_metrology_engine.sql:513,565`); sin señal, la hora del teléfono al finalizar, corregida por el desfase de su reloj, con constancia de lo informado (`private.capturas_sin_conexion`, `202610090002_offline_capture.sql:21,118`) | El inicio de la captura no pasa a la evidencia | S | Bajo |
 | RT-03 | Responsable desde la sesión autenticada | Cumple | `capturado_por` = dueño del borrador y `finalizado_por` = `auth.uid()` (`202608310001…:565`); no hay campo editable | — | — | — |
 | RT-04 | Quién revisa datos y resultados | No cumple | No existe una revisión por otra persona; el jefe de calidad solo puede anular | Para el caso A o B hace falta una revisión registrada | A | Medio |
 | RT-05 | Información para repetir y estimar | Cumple | Copia del equipo y rangos (`equipo_snapshot`) y de la configuración (`plan_snapshot`), patrones con su certificado (`verificacion_patrones.snapshot`), temperatura, humedad, motor y regla de decisión (`202608240003…:233-246`) | — | — | — |
@@ -88,17 +89,17 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 | RT-10 | Sin borrado físico; anulación con motivo | Cumple | Triggers `prevent_evidence_mutation` en pruebas, lecturas y patrones (`202608240003…:491-550`); la eliminación de cuenta conserva la evidencia (`202610090001_account_deletion.sql`) | — | — | — |
 | RT-11 | Registro enviado no modificable sin control | Cumple | La verificación nace definitiva en el servidor; no hay edición posterior | — | — | — |
 | RT-12 | Fotos y evidencias vinculadas | No aplica | IvMET no captura fotografías | — | — | — |
-| RT-13 | Versión de la app en el registro | Cumple | `app_version` con la versión real (`app/lib/core/constants/app_config.dart:20`, `draft_controller.dart:520`); una prueba la ata a `pubspec.yaml`. Hasta esta entrega se enviaba un texto fijo | — | — | — |
+| RT-13 | Versión de la app en el registro | Cumple | `app_version` con la versión real (`app/lib/core/constants/app_config.dart:20`, `draft_controller.dart:622`); una prueba la ata a `pubspec.yaml`. Hasta esta entrega se enviaba un texto fijo | — | — | — |
 
 ### DI: Datos y gestión de la información (7.11)
 
 | ID | Literal | Requisito | Estado | Evidencia | Brecha | Cierre | Riesgo |
 |---|---|---|---|---|---|---|---|
-| DI-01 | 7.11.1 | Acceso a los datos necesarios | Cumple | Todo vive en el servidor; sin señal se recupera la captura local (`docs/draft-recovery.md`) | — | — | — |
+| DI-01 | 7.11.1 | Acceso a los datos necesarios | Cumple | Todo vive en el servidor; sin señal la app consulta la copia descargada y captura y finaliza en el teléfono, y envía al volver la conexión (`docs/offline-mode.md`) | — | — | — |
 | DI-02 | 7.11.2 | Registro de validación por versión | No cumple | Hay pruebas automáticas (base de datos, funciones y app) y casos dorados del cálculo (`scripts/test-mobile-db.mjs:29`) | No hay registro de validación por versión; `pnpm db:test:operations` tiene **dos pruebas fallando** que nadie justificó | A | Alto |
 | DI-03 | 7.11.2 | Cambios autorizados y documentados | Parcial | Cada entrega tiene su documento con despliegue y validación (`docs/*.md`) y su historial en git | Falta quién autorizó cada liberación y cuándo entró en uso | P | Medio |
-| DI-04 | 7.11.2 | Versión identificable y visible | Cumple | Ajustes › Versión de la app (`workspace_screen.dart:591`), informe PDF y cada verificación | — | — | — |
-| DI-05 | 7.11.3 a | Cuentas individuales, sesión con vencimiento, cuentas inactivas bloqueadas | Cumple | Una cuenta por persona; JWT de 15 min con rotación (`supabase/config.toml:35-36`); el servidor revalida perfil y licencia en cada llamada (`private.mobile_require`, `202608280003_mobile_online_contract.sql:14`) | — | — | — |
+| DI-04 | 7.11.2 | Versión identificable y visible | Cumple | Ajustes › Versión de la app (`workspace_screen.dart:597`), informe PDF y cada verificación | — | — | — |
+| DI-05 | 7.11.3 a | Cuentas individuales, sesión con vencimiento, cuentas inactivas bloqueadas | Cumple | Una cuenta por persona; JWT de 15 min con rotación (`supabase/config.toml:35-36`); el servidor revalida perfil y licencia en cada llamada (`private.mobile_require`, `202608280003_mobile_online_contract.sql:14`); sin señal, la app trabaja como mucho 7 días desde la última validación y no se alarga atrasando el reloj (`app/lib/features/online/offline_copy.dart:19,134`) | — | — | — |
 | DI-06 | 7.11.3 a | Contraseñas con hash, nunca en logs | Cumple | Supabase Auth; las funciones no registran contraseñas ni las envían a la base (`scripts/test-self-service-auth.mjs`) | — | — | — |
 | DI-07 | 7.11.3 b | Transporte protegido | Cumple | La app rechaza cualquier URL que no sea HTTPS (`mobile_api.dart:25`); Supabase con TLS | — | — | — |
 | DI-08 | 7.11.3 b | Permisos mínimos; no se altera ni borra | Cumple | RLS por empresa y planta (`202608240005…:164`), escrituras solo por RPC, sin permisos REST de escritura para el móvil | — | — | — |
@@ -118,7 +119,7 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 |---|---|---|---|---|---|---|
 | CR-01 | Legibles y recuperables | Cumple | Historial, detalle con el expediente completo e informe PDF | — | — | — |
 | CR-02 | Archivos identificados | Cumple | `verificacion_<código>_<fecha>.pdf` y pie con identificador y procedencia | — | — | — |
-| CR-03 | Almacenamiento protegido | Cumple | Servidor con RLS; en el teléfono, tokens en almacenamiento seguro y captura local en la carpeta privada de la app | — | — | — |
+| CR-03 | Almacenamiento protegido | Parcial | Servidor con RLS; en el teléfono, tokens en almacenamiento seguro y captura local y copia para trabajar sin señal en la carpeta privada de la app, borrada al cerrar sesión | Una verificación finalizada sin señal depende del teléfono hasta enviarse; la copia no está cifrada aparte | S | Bajo |
 | CR-04 | Respaldo definido | Sin evidencia | — | Ver DI-09 | A | Alto |
 | CR-05 | Retención definida y respetada | Parcial | La evidencia se conserva sin plazo y la eliminación de cuenta no la borra | No hay plazo de conservación definido ni comunicado a los clientes | P | Medio |
 | CR-06 | Disposición controlada y registrada | Cumple | No hay borrado de evidencia; cada eliminación de cuenta o empresa deja constancia (`private.eliminaciones_cuenta`, `202610090001…:17`) | — | — | — |
@@ -129,7 +130,7 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 
 | ID | Requisito | Estado | Evidencia | Brecha | Cierre | Riesgo |
 |---|---|---|---|---|---|---|
-| TX-01 | Solo personal autorizado (6.2.6) | Cumple | Licencias y cupos, roles, plantas y balanzas por operador; desactivar corta el acceso al instante | — | — | — |
+| TX-01 | Solo personal autorizado (6.2.6) | Cumple | Licencias y cupos, roles, plantas y balanzas por operador; desactivar corta el acceso al instante en línea, y el servidor rechaza lo que una cuenta desactivada capturó sin señal | — | — | — |
 | TX-02 | Manual y procedimientos controlados (8.3) | Parcial | Bloque de control y historial de revisiones en el manual | Código y aprobación pendientes | P | Bajo |
 | TX-03 | Falla que afectó resultados → trabajo no conforme (7.10) | No aplica | Lo decide la empresa cliente con su procedimiento; IvMET permite anular con motivo | — | — | — |
 | TX-04 | Informes según 7.8 | No aplica | El informe declara que no es un certificado de calibración ni un informe de laboratorio | — | — | — |
@@ -182,10 +183,23 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 - **Propuesta:** reponer «Registrar certificado» en Plantas › Patrones
   (número, laboratorio, fecha de calibración y vencimiento).
 
-### RT-02 — Hora de inicio de la captura (medio)
+### RT-02 — Hora de inicio de la captura (bajo)
 
-- **Propuesta:** copiar al registro la hora en que se abrió el borrador
-  (`iniciado_at`) junto a `realizado_at`, y mostrarla en el detalle y el informe.
+- **Avance:** una verificación finalizada sin señal ya lleva la hora en que se
+  midió y la de llegada, con constancia de lo que informó el teléfono
+  ([trabajo sin conexión](../offline-mode.md)).
+- **Propuesta:** copiar también al registro la hora en que se abrió la
+  captura (el teléfono ya la envía como `started_at`) y mostrarla en el
+  detalle y el informe.
+
+### CR-03 — Verificaciones finalizadas en el teléfono (bajo)
+
+- **Qué falta:** hasta que vuelve la señal, una verificación finalizada sin
+  conexión solo está en el teléfono: borrar los datos de la app o perderlo la
+  pierde. La franja de conexión y Por enviar la muestran siempre, y no se
+  puede cerrar sesión ni eliminar la cuenta con envíos pendientes.
+- **Propuesta:** instrucción de trabajo: conectarse al terminar la jornada en
+  planta. Si un cliente lo exige, cifrar la copia (SQLCipher).
 
 ### CR-05 — Plazo de conservación (medio)
 

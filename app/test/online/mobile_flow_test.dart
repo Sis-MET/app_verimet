@@ -625,7 +625,7 @@ void main() {
     },
   );
 
-  testWidgets('sin señal, un arranque en frío devuelve la captura sin enviar', (
+  testWidgets('sin señal, la app abre con la copia y retoma la captura', (
     tester,
   ) async {
     final server = FixtureServer()..bundle = fixtureWizardBundle;
@@ -650,15 +650,11 @@ void main() {
     server.online = false;
     await start(tester, server);
 
-    // Antes veia la pantalla de acceso bloqueada, con su trabajo intacto en
-    // el mismo telefono.
+    // La cuenta se validó hace menos de 7 días: la app abre con la copia
+    // del teléfono, avisa que no hay conexión y retoma la captura.
     expect(find.text('Acceso a IvMET'), findsNothing);
-    expect(find.text('Tienes 1 captura sin enviar'), findsOneWidget);
-
-    // Y puede volver a ella y seguir capturando, sin red.
-    await tester.tap(find.text('BAL-014'));
-    await tester.pumpAndSettle();
     expect(find.text('Tienes 1 captura sin enviar'), findsNothing);
+    expect(find.textContaining('Sin conexión · datos del'), findsOneWidget);
     expect(find.textContaining('Paso 1 de 5'), findsOneWidget);
     final temperature = fieldLabeled('Temperatura (°C)');
     expect(

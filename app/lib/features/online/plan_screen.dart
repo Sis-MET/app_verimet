@@ -242,7 +242,7 @@ class _PlanScreenState extends State<PlanScreen> {
   Widget build(BuildContext context) => RemotePage(
     title: 'Mi plan',
     dataKey: '$revision',
-    load: () => session.api.read('plan'),
+    load: () => session.read('plan'),
     actions: (data) {
       final request = CommercialPlan(data).upgradeRequest;
       final menu = pageMenu([
@@ -585,7 +585,7 @@ class UpgradeRequestScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RemotePanel(
     frameTitle: 'Solicitar plan superior',
-    load: () => session.api.read('plan'),
+    load: () => session.read('plan'),
     builder: (data) {
       final plan = CommercialPlan(data);
       final offers = plan.offers.where((offer) => offer.id != plan.id).toList();

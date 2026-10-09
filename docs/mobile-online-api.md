@@ -45,6 +45,7 @@ Los roles internos no pueden consultar evidencia móvil.
   "version_id": "UUID de la versión publicada asignada",
   "expected_version": "0",
   "save_id": "UUID estable de este intento de guardado",
+  "started_at": "2026-10-09T13:05:00Z",
   "content": {
     "temperature": "23.125",
     "humidity": "50",
@@ -72,11 +73,15 @@ las siguientes requieren la versión devuelta. Repetir `save_id` con contenido
 idéntico devuelve el resultado previo; cambiarlo con contenido diferente da
 `IDEMPOTENCY_CONFLICT`. Un guardado desde una versión antigua da
 `ROW_VERSION_CONFLICT`; reabrir el borrador, no sobrescribir a ciegas.
-Cada llamada es una transacción. No hay sincronización offline ni lotes.
+Cada llamada es una transacción; no hay lotes. Lo capturado sin señal se envía
+después con estas mismas llamadas ([trabajo sin conexión](offline-mode.md)).
 
-La versión retirada puede continuar en un borrador creado durante su asignación.
-No se puede iniciar otro con una versión retirada. Los borradores caducan a los
-30 días según el servidor. No se permite ampliarlo mediante REST.
+`started_at` (opcional) es cuándo empezó la captura en el teléfono. Con él, el
+servidor acepta la configuración que la balanza tenía en los 8 días previos,
+aunque ya esté retirada: es la que el operador descargó. Sin él, la versión
+retirada solo continúa en un borrador creado durante su asignación. Más de un
+día en el futuro da `INVALID_CAPTURE_TIME`. Los borradores caducan a los 30
+días según el servidor. No se permite ampliarlo mediante REST.
 
 ## Finalización privada
 
@@ -97,9 +102,21 @@ admitiéndose para compatibilidad; no se cambia el protocolo de un borrador exis
   "expected_version": "1",
   "finalize_id": "UUID estable del intento",
   "app_version_value": "ivmet-flutter-1.0.0+1",
-  "device_id_value": ""
+  "device_id_value": "",
+  "measured_at": "2026-10-09T13:20:00Z",
+  "device_clock": "2026-10-09T15:02:11Z"
 }
 ```
+
+`measured_at` y `device_clock` (opcionales) los manda una verificación
+finalizada sin señal: la hora del teléfono al finalizarla y su hora al
+enviarla. El servidor fecha la verificación (`realizado_at`) con
+`measured_at` corregido por la diferencia entre `device_clock` y su reloj,
+nunca después de su llegada, y evalúa los certificados en esa fecha. Lo que
+mandó el teléfono queda en `private.capturas_sin_conexion`; `verification` lo
+devuelve como `offlineCapture: {deviceMeasuredAt, clockSkewSeconds}` (null si
+se finalizó en línea). `device_clock` no forma parte de la huella de la
+finalización: un reintento lo actualiza.
 
 Solo se habilita cuando el snapshot contiene un perfil controlado y el motor
 `ivmet-internal-1.0.0`, o la capacidad de captura v2 indicada arriba. El servidor exige al menos una prueba completa, ignora
@@ -136,7 +153,9 @@ Las RPC devuelven errores PostgREST con `message`: `MOBILE_ACCESS_DENIED`,
 `INVALID_DECIMAL_STRING`, `OMISSION_REASON_REQUIRED`, `INCOMPLETE_TEST`,
 `ALL_TESTS_OMITTED`, `FINALIZATION_CONFLICT`, `DECISION_RULE_INVALID`, entre otros.
 La app muestra mensajes controlados, no SQL ni cabeceras. Ante 401 intenta
-una renovación; sin conexión protege la pantalla y permite revalidar.
+una renovación. Sin conexión trabaja con la copia del teléfono mientras la
+cuenta se haya validado en los últimos 7 días; si no, protege la pantalla y
+permite revalidar.
 
 No se aceptan campos de veredicto en el payload. `finalizationEnabled` proviene
 del snapshot creado por el servidor; Flutter no puede activarlo.

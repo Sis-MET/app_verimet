@@ -142,21 +142,23 @@ Cada cliente de Metrica es un **tenant** identificado por `empresa_id`.
   unica excepcion, y solo a traves de rutas protegidas con `requireMetricaStaff`
   (feature `dashboard`).
 
-## 6. Offline-first y `sync`
+## 6. Trabajo sin conexion
 
-El operador puede estar en una planta sin cobertura y sin VPN.
+El operador puede estar en una planta sin cobertura. Supabase sigue siendo la
+unica fuente de verdad: calcula cada resultado y decide que ve cada usuario.
+La app no replica sus tablas; guarda en SQLite (Drift, el mismo almacen de los
+borradores) dos cosas:
 
-1. La app guarda la verificacion en la base local (**Drift**) y encola un
-   registro en la cola de sincronizacion con estado `pending`.
-2. Cuando hay conectividad **y** VPN activa, la feature `sync` envia los lotes
-   pendientes a `POST /api/v1/sync/...`.
-3. El servidor responde con los ids definitivos y la app marca los registros
-   como `synced`.
+1. **Una copia de las respuestas** que ya mostraba (Inicio, catalogo, fichas,
+   agenda, historial), para leerlas sin señal, y un permiso de 7 dias que se
+   renueva cada vez que el servidor valida la cuenta.
+2. **Las capturas**, con su diario de envios: cada guardado y cada
+   finalizacion llevan un UUID estable, asi que reenviarlos nunca duplica.
 
-Se eligio **Drift** sobre `sqflite` justamente por la cola de sincronizacion:
-queries tipadas en tiempo de compilacion evitan errores de estado al reintentar
-envios. El id local es un UUID generado en el celular, para que un lote pueda
-reenviarse sin duplicar (idempotencia por `client_uuid`).
+Sin señal, finalizar deja la verificacion cerrada en el telefono con la hora
+en que se midio. Con la app abierta y en linea, `CaptureUploads` la envia en
+segundo plano con las mismas RPC de siempre. Detalle en
+[offline-mode.md](offline-mode.md).
 
 ## 7. Red y VPN
 

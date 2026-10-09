@@ -8,9 +8,12 @@ clientes ejecutar y registrar verificaciones intermedias de
 **excentricidad**, **repetibilidad** y **linealidad** sobre sus balanzas, entre
 calibraciones formales.
 
-- Funciona **online-only**: la app requiere Internet y autoguarda borradores en
-  Supabase. La captura también conserva un borrador local para recuperarse de
-  cierres inesperados, con el paso y las lecturas pendientes.
+- Supabase es la fuente de verdad y calcula cada resultado, pero la app
+  **trabaja sin señal** hasta 7 días desde la última validación de la cuenta:
+  consulta la copia guardada en el teléfono, captura y finaliza verificaciones
+  y las envía sola en segundo plano al volver la conexión. Registrarse, ingresar
+  y administrar (usuarios, plantas, plan) exigen internet. Ver
+  [docs/offline-mode.md](docs/offline-mode.md).
 - Es **multi-tenant**: cada cliente ve solo sus instrumentos y reportes.
 - El personal de Métrica solo recibe las **alertas que el jefe de calidad
   comparte expresamente**, junto con su verificación y PDF.

@@ -49,11 +49,18 @@ píldora. El contenido deja `WizardNavPill.contentPadding` libre al final.
 | Plantas › Plantas y áreas (empresa autoregistrada) | Nueva planta | Editar planta, dentro de cada planta |
 | Recuperar contraseña | Enviar código · Guardar contraseña | — |
 | Eliminar mi cuenta / Eliminar la empresa | Eliminar definitivamente (con contraseña y casilla) | — |
+| Por enviar | Enviar ahora (con señal) | — |
 | Manual de uso | — | Exportar PDF |
 | Sección del manual | Siguiente: _sección_ | — |
 
 El aviso de límite del plan es una hoja inferior con una sola acción
 («Solicitar plan superior»), no un cuadro más en la pantalla.
+
+La conexión se avisa con una franja sobre toda la app, como «Conectando…» en
+WhatsApp, y no con un cuadro: «Sin conexión · datos del 09/10 10:22 · 1 por
+enviar», «Enviando…» o, en rojo, lo que el servidor rechazó. Lleva a Por
+enviar. Sin nada que decir no se ve. En la captura, el icono de guardado
+muestra el reloj de «Finalizada en este dispositivo».
 
 Las pestañas de la barra inferior (Inicio, Verificar, Agenda, Plantas,
 Ajustes) no llevan píldora: la barra flotante ocupa ese lugar. Ajustes sí tiene

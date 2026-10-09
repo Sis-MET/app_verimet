@@ -77,18 +77,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Future<void> _load() async {
     final request = ++_request;
-    final first = DateTime.utc(month.year, month.month);
-    final last = DateTime.utc(month.year, month.month + 1, 0);
     setState(() {
       loading = true;
       error = null;
     });
     try {
-      final result = await widget.session.api.read('agenda', {
+      final result = await widget.session.read('agenda', {
         ...clockFilters(),
-        'from': dayKey(first),
-        'to': dayKey(last),
-        'operatorId': ?operator,
+        ...agendaMonth(month, operator: operator),
       });
       if (!mounted || request != _request) return;
       // Los operadores del filtro salen de lo que ya se vio: un operador sin

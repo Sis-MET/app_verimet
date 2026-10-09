@@ -8,6 +8,7 @@ import 'mobile_api.dart';
 import 'offline_recovery.dart';
 import 'mobile_session.dart';
 import 'online_widgets.dart';
+import 'pending_captures.dart';
 import 'self_service_access.dart';
 import 'user_manual.dart';
 import 'workspace_screen.dart';
@@ -38,8 +39,11 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
     });
     connectivity = Connectivity().onConnectivityChanged.listen((results) {
       if (results.contains(ConnectivityResult.none)) {
-        session.suspend(disconnected: true);
-      } else if (foreground && session.stage == SessionStage.offline) {
+        // Con una copia vigente se sigue trabajando sin señal.
+        session.connectionLost();
+      } else if (foreground &&
+          (session.stage == SessionStage.offline || !session.online)) {
+        // Volvió la señal: se valida la cuenta y se envía lo pendiente.
         unawaited(session.refresh());
       }
     }, onError: (Object _) {});
@@ -119,11 +123,39 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
                 child: AnimatedOpacity(
                   opacity: ready ? 1 : 0,
                   duration: const Duration(milliseconds: 180),
-                  child: Navigator(
-                    key: workspaceNavigator,
-                    onGenerateRoute: (_) => MaterialPageRoute<void>(
-                      builder: (_) => WorkspaceScreen(session: session),
-                    ),
+                  child: Column(
+                    children: [
+                      ConnectionStrip(
+                        session: session,
+                        onTap: () => workspaceNavigator.currentState?.push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                PendingCapturesScreen(session: session),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        // La franja ya ocupa la barra de estado.
+                        child: ListenableBuilder(
+                          listenable: Listenable.merge([
+                            session,
+                            session.uploads,
+                          ]),
+                          builder: (context, navigator) =>
+                              MediaQuery.removePadding(
+                                context: context,
+                                removeTop: ConnectionStrip.visible(session),
+                                child: navigator!,
+                              ),
+                          child: Navigator(
+                            key: workspaceNavigator,
+                            onGenerateRoute: (_) => MaterialPageRoute<void>(
+                              builder: (_) => WorkspaceScreen(session: session),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -218,9 +250,11 @@ class _OnlineEntryState extends ConsumerState<OnlineEntry>
           onPressed: session.refresh,
           child: const Text('Comprobar acceso'),
         ),
-        TextButton(
-          onPressed: session.logout,
-          child: const Text('Cerrar sesión'),
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => confirmLogout(context, session),
+            child: const Text('Cerrar sesión'),
+          ),
         ),
       ],
     ),
