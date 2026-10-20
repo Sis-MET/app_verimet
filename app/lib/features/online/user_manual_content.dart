@@ -13,7 +13,7 @@ const ivmetUserManual = UserManual(
   control: ManualControl(
     code: 'PENDIENTE: código asignado por Calidad',
     title: 'Manual de uso de IvMET',
-    revision: '02 (borrador)',
+    revision: '03 (borrador)',
     issuedOn: '2026-10-09',
     appliesTo: '1.0.x',
     preparedBy: 'Desarrollo IvMET',
@@ -30,6 +30,11 @@ const ivmetUserManual = UserManual(
         '02',
         '2026-10-20',
         'Guía de inicio por rol: se abre al primer ingreso, franja en Inicio y Ajustes › Ayuda.',
+      ),
+      ManualRevision(
+        '03',
+        '2026-10-20',
+        'Pesas patrón: agregar certificados de calibración desde la app.',
       ),
     ],
   ),
@@ -253,7 +258,8 @@ const ivmetUserManual = UserManual(
       title: 'Pesas patrón',
       icon: Icons.straighten_outlined,
       audience: 'Jefe de calidad',
-      summary: 'Registrar las pesas patrón y en qué plantas se usan.',
+      summary:
+          'Registrar las pesas patrón, sus plantas y sus certificados de calibración.',
       blocks: [
         ManualSteps('Registrar un patrón', [
           ManualStep('Ve a Plantas › «Patrones» y toca «Nuevo patrón».'),
@@ -262,11 +268,24 @@ const ivmetUserManual = UserManual(
           ),
           ManualStep('Toca «Guardar».'),
         ]),
+        ManualSteps('Agregar un certificado', [
+          ManualStep(
+            'En la tarjeta del patrón, toca «Agregar certificado».',
+            'Hace falta acceso a todas las plantas del patrón.',
+          ),
+          ManualStep(
+            'Escribe el «Número de certificado» y el «Laboratorio», y elige en el calendario la «Fecha de calibración» y «Vence el».',
+            'El número no puede repetir otro del mismo patrón, aunque esté anulado. La calibración no puede ser futura ni el vencimiento anterior a ella.',
+          ),
+          ManualStep('Toca «Guardar certificado».'),
+        ]),
         ManualParagraph(
-          'Cada patrón muestra sus certificados con fecha de calibración y '
-          'vencimiento. Un certificado se anula con «Anular conservando '
-          'historial»: deja de estar disponible para nuevas verificaciones y '
-          'las anteriores no cambian.',
+          'Cada certificado muestra su fecha de calibración, su vencimiento y '
+          'si está vigente, vencido o anulado. Un patrón sin certificado '
+          'vigente lo avisa en su tarjeta. Al vencer, se agrega el nuevo. Un '
+          'certificado se anula con «Anular conservando historial»: deja de '
+          'estar disponible para nuevas verificaciones y las anteriores no '
+          'cambian.',
         ),
         ManualNote(
           ManualNoteKind.important,

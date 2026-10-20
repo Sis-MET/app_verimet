@@ -418,8 +418,12 @@ List<GuideStep> _qualitySteps({required bool selfService}) => [
       ),
       ManualStep('Elige las «Plantas donde se utilizará» y guarda.'),
       ManualStep(
-        'Revisa sus certificados: cada uno muestra la calibración y el vencimiento.',
-        'Los certificados no se cargan desde la app: pídelos a Métrica.',
+        'En la tarjeta de la pesa, toca «Agregar certificado».',
+        'Número, laboratorio, fecha de calibración y vencimiento, tal como figuran en el certificado. Las fechas se eligen en el calendario.',
+      ),
+      ManualStep(
+        'Cuando un certificado vence, agrega el nuevo.',
+        'Cada certificado dice si está vigente, vencido o anulado. Uno mal cargado se anula con motivo: no se borra.',
       ),
     ],
     notes: [

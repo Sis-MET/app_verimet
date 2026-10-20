@@ -109,11 +109,3 @@ cd app && flutter run -d web-server --profile --web-port 8421 -t test/online/gui
 
 Se ingresa con `operador` / `fixture-password`. `?rol=operador` muestra la
 guía del operador; `?rol=metrica`, la del jefe de una empresa de Métrica.
-
-## Pendiente
-
-- Los certificados de las pesas patrón no se cargan desde la app (el
-  formulario se retiró; ver `PatternsPanel`). La guía lo dice: hay que
-  pedirlos a Métrica. Para una empresa autoregistrada eso significa que,
-  hasta que Métrica cargue el certificado, sus verificaciones salen «No
-  trazable».

@@ -30,6 +30,9 @@ calibraciones formales.
 - Al primer ingreso, una **guía de inicio** por rol muestra paso a paso qué
   configurar (o cómo verificar) y marca sola lo que ya está hecho. Ver
   [docs/setup-guide.md](docs/setup-guide.md).
+- Los certificados de calibración de las pesas patrón se cargan desde la app;
+  sin uno vigente, la verificación sale «No trazable». Ver
+  [docs/pattern-certificates.md](docs/pattern-certificates.md).
 - Cumplimiento NB/ISO/IEC 17025 (7.5, 7.11 y 8.4): análisis y brechas en
   [docs/iso17025/analisis-ivmet.md](docs/iso17025/analisis-ivmet.md).
 

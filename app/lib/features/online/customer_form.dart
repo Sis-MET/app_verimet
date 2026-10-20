@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/utils/calendar_dates.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/month_calendar.dart';
 import '../../shared/widgets/wizard_chrome.dart';
 import 'commercial_plan.dart';
 import 'draft_controller.dart' show normalizedDecimal;
@@ -42,12 +44,18 @@ class CustomerField {
     this.min = 0,
     this.readOnly = false,
     this.hint,
+    this.check,
   });
   final String keyName, label, kind;
   final bool required, readOnly;
   final int max, min;
   final String? hint;
   final Map<String, String> options;
+
+  /// Validación propia, después de las del tipo de campo. Recibe el valor sin
+  /// espacios sobrantes y todos los valores del formulario, para comparar
+  /// con otro campo (el vencimiento contra la calibración).
+  final String? Function(String value, Json values)? check;
 }
 
 /// UUID y payload congelados al perder una respuesta: reintentar no duplica.
@@ -191,6 +199,57 @@ class _CustomerFormState extends State<CustomerForm> {
     }
   }
 
+  /// Fecha elegida en el calendario de la agenda, no tecleada: viaja como
+  /// «2026-10-07» y se ve como «07/10/2026».
+  Widget _dateField(CustomerField field) => LabeledInput(
+    label: field.label,
+    child: FormField<String>(
+      initialValue: values[field.keyName]?.toString() ?? '',
+      validator: (value) {
+        final text = value?.trim() ?? '';
+        if (text.isEmpty) return field.required ? 'Elige una fecha.' : null;
+        if (DateTime.tryParse(text) == null) return 'Elige una fecha.';
+        return field.check?.call(text, values);
+      },
+      builder: (state) {
+        final text = state.value ?? '';
+        final date = DateTime.tryParse(text);
+        final locked = field.readOnly || busy || pending != null;
+        return InkWell(
+          key: ValueKey('date-${field.keyName}'),
+          onTap: locked
+              ? null
+              : () async {
+                  final picked = await showDayPicker(
+                    context,
+                    initial: date ?? today(),
+                    title: field.label,
+                  );
+                  if (picked == null || !mounted) return;
+                  final key = dayKey(picked);
+                  setState(() {
+                    values[field.keyName] = key;
+                    dirty = true;
+                  });
+                  state.didChange(key);
+                  // Corregida, la fecha deja de verse en rojo sin esperar a
+                  // guardar otra vez.
+                  if (state.hasError) state.validate();
+                },
+          child: InputDecorator(
+            isEmpty: date == null,
+            decoration: InputDecoration(
+              hintText: 'Elegir fecha',
+              errorText: state.errorText,
+              suffixIcon: const Icon(Icons.calendar_today_outlined),
+            ),
+            child: Text(date == null ? '' : numericDayLabel(date)),
+          ),
+        );
+      },
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop:
@@ -326,6 +385,8 @@ class _CustomerFormState extends State<CustomerForm> {
                           ],
                         ),
                       )
+                    : field.kind == 'date'
+                    ? _dateField(field)
                     : field.kind == 'select'
                     ? LabeledInput(
                         label: field.label,
@@ -371,11 +432,7 @@ class _CustomerFormState extends State<CustomerForm> {
                                   decimal: true,
                                 )
                               : TextInputType.text,
-                          decoration: InputDecoration(
-                            hintText: field.kind == 'date'
-                                ? 'AAAA-MM-DD'
-                                : field.hint,
-                          ),
+                          decoration: InputDecoration(hintText: field.hint),
                           onChanged: (v) {
                             values[field.keyName] = v;
                             if (!dirty) setState(() => dirty = true);
@@ -395,13 +452,10 @@ class _CustomerFormState extends State<CustomerForm> {
                                 ).hasMatch(normalizedDecimal(v!))) {
                               return 'Usa hasta 9 decimales, sin miles.';
                             }
-                            if (field.kind == 'date' &&
-                                !RegExp(
-                                  r'^\d{4}-\d{2}-\d{2}$',
-                                ).hasMatch(v ?? '')) {
-                              return 'Usa AAAA-MM-DD.';
-                            }
-                            return null;
+                            final text = (v ?? '').trim();
+                            return text.isEmpty
+                                ? null
+                                : field.check?.call(text, values);
                           },
                         ),
                       ),

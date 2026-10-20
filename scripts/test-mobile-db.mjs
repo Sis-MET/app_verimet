@@ -248,8 +248,23 @@ test('contrato móvil online en PostgreSQL desechable, sin conexiones reales', a
       customerPattern=await customer('pattern.save',p);
       await assert.rejects(customer('pattern.save',{...p,code:'MIXTO',plantIds:[plant,hiddenPlant]}),/PLANT_SCOPE_INVALID/);
       await assert.rejects(customer('pattern.save',{...p,code:'NUMERICO',capacity:0.1}),/EXACT_DECIMAL_REQUIRED/);
-      const cert=await customer('certificate.create',{patternId:customerPattern.id,number:'CLIENTE-CERT',lab:'Mi laboratorio',calibratedOn:'2025-01-01',expiresOn:'2025-12-31'});
+      const certificate={patternId:customerPattern.id,number:' CLIENTE-CERT ',lab:' Mi laboratorio ',calibratedOn:'2025-01-01',expiresOn:'2025-12-31'};
+      const certRequest=uuid();
+      const cert=await customer('certificate.create',certificate,certRequest);
+      // Un reintento recupera su recibo; el número ya existe porque lo creó él.
+      assert.deepEqual(await customer('certificate.create',certificate,certRequest),cert);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'cliente-cert'}),/CERTIFICATE_EXISTS/);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'OTRO',expiresOn:'2024-12-31'}),/INVALID_CERTIFICATE_DATES/);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'OTRO',expiresOn:'2025-02-30'}),/INVALID_CERTIFICATE_DATES/);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'OTRO',calibratedOn:'2999-01-01',expiresOn:'2999-12-31'}),
+        /INVALID_CERTIFICATE_DATES/);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'   '}),/INVALID_CERTIFICATE/);
+      await assert.rejects(customer('certificate.create',{...certificate,number:'OTRO',patternId:uuid()}),/PATTERN_NOT_ACCESSIBLE/);
+      const created=(await setup('patterns')).items.find(p=>p.id===customerPattern.id).certificates[0];
+      assert.deepEqual([created.numero,created.laboratorio],['CLIENTE-CERT','Mi laboratorio']);
       await customer('certificate.annul',{id:cert.id,version:'1',reason:'Corrección documental'});
+      // Anulado, su número sigue ocupado: el historial no se reescribe.
+      await assert.rejects(customer('certificate.create',certificate),/CERTIFICATE_EXISTS/);
       const stored=(await setup('patterns')).items.find(p=>p.id===customerPattern.id);
       assert.equal(stored.capacidad,'0.123456789'); assert.equal(stored.certificates[0].estado,'ANNULLED');
       await assert.rejects(customer('certificate.annul',{id:cert.id,version:'1',reason:'Reintento distinto'}),/ROW_VERSION_CONFLICT/);

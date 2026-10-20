@@ -58,9 +58,9 @@ alto de la sección 4 deben cerrarse antes de ese uso.
 
 ## 2. Resumen
 
-De 38 ítems: **20 cumplen, 10 parciales, 3 no cumplen, 2 sin evidencia y 3 no
+De 38 ítems: **21 cumplen, 9 parciales, 3 no cumplen, 2 sin evidencia y 3 no
 aplican** (con el trabajo sin conexión, CR-03 pasó a parcial y RT-02 bajó a
-riesgo bajo). Lo fuerte es la integridad del registro: una verificación nace
+riesgo bajo; con los certificados desde la app, RT-06 pasó a cumple). Lo fuerte es la integridad del registro: una verificación nace
 definitiva en el servidor, con quién capturó y finalizó, cuándo, con qué
 equipo, configuración, patrones y versión de la app, y no se edita ni se
 borra. Las brechas de riesgo alto son de operación, no de diseño: no hay
@@ -82,7 +82,7 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
 | RT-03 | Responsable desde la sesión autenticada | Cumple | `capturado_por` = dueño del borrador y `finalizado_por` = `auth.uid()` (`202608310001…:565`); no hay campo editable | — | — | — |
 | RT-04 | Quién revisa datos y resultados | No cumple | No existe una revisión por otra persona; el jefe de calidad solo puede anular | Para el caso A o B hace falta una revisión registrada | A | Medio |
 | RT-05 | Información para repetir y estimar | Cumple | Copia del equipo y rangos (`equipo_snapshot`) y de la configuración (`plan_snapshot`), patrones con su certificado (`verificacion_patrones.snapshot`), temperatura, humedad, motor y regla de decisión (`202608240003…:233-246`) | — | — | — |
-| RT-06 | Patrones vencidos advertidos o justificados | Parcial | El servidor marca `validAtMeasurement` y la trazabilidad (`202608310001…:572`); la captura avisa «Un certificado vencido no aporta trazabilidad» | La app **no permite registrar certificados** (se retiró el formulario y RimMET tampoco puede): una empresa autoregistrada nunca tendrá verificaciones trazables | S | Medio |
+| RT-06 | Patrones vencidos advertidos o justificados | Cumple | El servidor marca `validAtMeasurement` y la trazabilidad (`202608310001…:572`); la captura avisa «Un certificado vencido no aporta trazabilidad»; Plantas › Patrones registra certificados, marca cada uno vigente, vencido o anulado y avisa del patrón sin certificado vigente (`202610200002_pattern_certificates.sql`, [certificados](../pattern-certificates.md)) | — | — | — |
 | RT-07 | Observaciones originales; sugerencias confirmadas | Cumple | Las sugerencias se aplican solo con «Usar sugerencia» (`app/lib/features/online/flexible_trial_fields.dart:228`); el servidor guarda las lecturas tal como se enviaron | — | — | — |
 | RT-08 | Modificación con anterior, nuevo, fecha, quién y motivo | Cumple | Lo finalizado no se modifica: corregir es anular con motivo (`annul_ivmet_verification`, `202608240005_rls_and_workflows.sql:580`) y registrar otra; las fichas de balanza suben versión y dejan auditoría | — | — | — |
 | RT-09 | Sin sobrescritura silenciosa | Cumple | Guardado con `expected_version` y conflicto explícito; la app no pisa la versión del servidor («Ver datos del servidor») | — | — | — |
@@ -175,13 +175,13 @@ Cierre: **S**oftware, **P**rocedimiento o **A**mbos.
   calidad en la verificación finalizada (quién y cuándo revisó, sin cambiar la
   evidencia). Mientras tanto, el procedimiento del cliente define quién revisa.
 
-### RT-06 — Registrar certificados (medio)
+### RT-06 — Registrar certificados (resuelto)
 
-- **Qué falta:** el servidor admite `certificate.create`, pero la app retiró el
-  formulario y RimMET lo rechaza. Una empresa autoregistrada no puede dejar una
-  verificación trazable.
-- **Propuesta:** reponer «Registrar certificado» en Plantas › Patrones
-  (número, laboratorio, fecha de calibración y vencimiento).
+- **Avance:** Plantas › Patrones vuelve a registrar certificados (número,
+  laboratorio, fecha de calibración y vencimiento) y muestra si cada uno está
+  vigente, vencido o anulado. El servidor rechaza números repetidos y fechas
+  imposibles con motivos claros
+  ([certificados de las pesas patrón](../pattern-certificates.md)).
 
 ### RT-02 — Hora de inicio de la captura (bajo)
 

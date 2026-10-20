@@ -167,34 +167,40 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     session.dispose();
   });
-  testWidgets('los patrones se editan pero no dan de alta certificados', (
-    tester,
-  ) async {
-    final server = CustomerFixtureServer();
-    final session = MobileSession(server.api, recovery: server.recovery);
-    await tester.runAsync(() => session.login('operador', 'fixture-password'));
-    await show(tester, Scaffold(body: PatternsPanel(session: session)));
-    expect(find.text('JP-001 · Juego de pesas patrón'), findsOneWidget);
-    // El servidor envía "20.000000000": en pantalla, sin ceros de relleno.
-    expect(find.text('pesas · 20 kg'), findsOneWidget);
-    expect(find.text('Editar patrón'), findsOneWidget);
-    expect(find.text('Agregar certificado'), findsNothing);
-    // Los certificados que ya existen se siguen viendo y se pueden anular.
-    expect(find.text('CERT-2026-001 · Laboratorio acreditado'), findsOneWidget);
-    expect(find.byTooltip('Anular certificado'), findsOneWidget);
-    // "Nuevo patrón" quedaba apoyado en la primera tarjeta.
-    final button = tester.getRect(
-      find.ancestor(
-        of: find.text('Nuevo patrón'),
-        matching: find.byWidgetPredicate((widget) => widget is FilledButton),
-      ),
-    );
-    final card = tester.getRect(find.byType(Card).first);
-    expect(card.top - button.bottom, greaterThanOrEqualTo(16));
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-    session.dispose();
-  });
+  testWidgets(
+    'los patrones se editan y muestran el estado de sus certificados',
+    (tester) async {
+      final server = CustomerFixtureServer();
+      final session = MobileSession(server.api, recovery: server.recovery);
+      await tester.runAsync(
+        () => session.login('operador', 'fixture-password'),
+      );
+      await show(tester, Scaffold(body: PatternsPanel(session: session)));
+      expect(find.text('JP-001 · Juego de pesas patrón'), findsOneWidget);
+      // El servidor envía "20.000000000": en pantalla, sin ceros de relleno.
+      expect(find.text('pesas · 20 kg'), findsOneWidget);
+      expect(find.text('Editar patrón'), findsOneWidget);
+      expect(find.text('Agregar certificado'), findsOneWidget);
+      // Los certificados que ya existen se siguen viendo y se pueden anular.
+      expect(
+        find.text('CERT-2026-001 · Laboratorio acreditado'),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Anular certificado'), findsOneWidget);
+      // "Nuevo patrón" quedaba apoyado en la primera tarjeta.
+      final button = tester.getRect(
+        find.ancestor(
+          of: find.text('Nuevo patrón'),
+          matching: find.byWidgetPredicate((widget) => widget is FilledButton),
+        ),
+      );
+      final card = tester.getRect(find.byType(Card).first);
+      expect(card.top - button.bottom, greaterThanOrEqualTo(16));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      session.dispose();
+    },
+  );
   testWidgets(
     'la capacidad de un patrón se escribe con coma y viaja con punto',
     (tester) async {

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../core/domain/compliance_status.dart';
+import '../../core/utils/calendar_dates.dart';
 import '../../core/utils/measurement_format.dart';
 import '../../shared/widgets/labeled_field.dart';
+import '../../shared/widgets/status_tag.dart';
 import '../../shared/widgets/wizard_chrome.dart';
 import 'company_plants.dart';
 import 'customer_form.dart';
@@ -249,10 +252,10 @@ class _CustomerSetupScreenState extends State<CustomerSetupScreen> {
 /// aparte a la que se entraba desde un módulo de esa misma pestaña, que además
 /// enseñaba plantas y áreas: todo quedaba mezclado.
 ///
-/// Los certificados ya registrados se listan y se pueden anular, pero no se
-/// dan de alta desde la app: el formulario no recogía nada que se usara y se
-/// retiró hasta que se pida. Ojo: sin un certificado vigente seleccionado, una
-/// verificación queda como no trazable.
+/// Cada patrón lleva sus certificados de calibración: se agregan, se ven con
+/// su estado (vigente, vencido o anulado) y se anulan conservando historial.
+/// Es el único camino para que una verificación sea trazable: RimMET no crea
+/// certificados, porque los patrones los administra la empresa.
 class PatternsPanel extends StatefulWidget {
   const PatternsPanel({required this.session, super.key});
   final MobileSession session;
@@ -316,6 +319,69 @@ class _PatternsPanelState extends State<PatternsPanel> {
       ],
     ),
   );
+
+  /// Un certificado nuevo para [pattern]. Las fechas se eligen en el
+  /// calendario; el número no puede repetir otro del patrón, ni anulado.
+  void certificateForm(Json pattern) {
+    final taken = {
+      for (final cert in objects(pattern['certificates']))
+        _certificateKey(cert['numero']),
+    };
+    edit(
+      CustomerForm(
+        session: widget.session,
+        title: 'Nuevo certificado',
+        action: 'certificate.create',
+        submitLabel: 'Guardar certificado',
+        notice:
+            'Certificado de calibración de ${valueLabel(pattern['codigo'])}. Mientras esté vigente, las verificaciones que usan esta pesa son trazables.',
+        initial: {
+          'patternId': pattern['id'],
+          'number': '',
+          'lab': '',
+          'calibratedOn': '',
+          'expiresOn': '',
+        },
+        fields: [
+          CustomerField(
+            'number',
+            'Número de certificado',
+            check: (value, _) => taken.contains(_certificateKey(value))
+                ? 'Este patrón ya tiene un certificado con ese número.'
+                : null,
+          ),
+          const CustomerField('lab', 'Laboratorio', max: 250),
+          CustomerField(
+            'calibratedOn',
+            'Fecha de calibración',
+            kind: 'date',
+            // Solo la fecha: «hoy» es UTC sin hora y la fecha tecleada,
+            // medianoche local; comparadas tal cual, hoy salía futuro.
+            check: (value, _) =>
+                dateOnly(DateTime.parse(value)).isAfter(today())
+                ? 'La calibración no puede ser una fecha futura.'
+                : null,
+          ),
+          CustomerField(
+            'expiresOn',
+            'Vence el',
+            kind: 'date',
+            check: (value, values) {
+              final calibrated = DateTime.tryParse(
+                values['calibratedOn']?.toString() ?? '',
+              );
+              return calibrated != null &&
+                      dateOnly(
+                        DateTime.parse(value),
+                      ).isBefore(dateOnly(calibrated))
+                  ? 'El vencimiento no puede ser anterior a la calibración.'
+                  : null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -383,17 +449,36 @@ class _PatternsPanelState extends State<PatternsPanel> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(_patternSummary(item)),
+                          if (!objects(item['certificates']).any(
+                            (cert) =>
+                                _CertificateState.of(cert) ==
+                                _CertificateState.valid,
+                          ))
+                            const Notice(
+                              'Sin certificado vigente: las verificaciones con esta pesa salen «No trazable».',
+                              icon: Icons.warning_amber_outlined,
+                            ),
                           if (item['canEdit'] == true)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: () => patternForm(item),
-                                child: const Text('Editar patrón'),
-                              ),
+                            Wrap(
+                              spacing: 4,
+                              children: [
+                                TextButton(
+                                  onPressed: () => patternForm(item),
+                                  child: const Text('Editar patrón'),
+                                ),
+                                TextButton.icon(
+                                  key: ValueKey(
+                                    'pattern-add-certificate-${item['id']}',
+                                  ),
+                                  onPressed: () => certificateForm(item),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Agregar certificado'),
+                                ),
+                              ],
                             )
                           else
                             const Notice(
-                              'Para editar este patrón necesitas acceso a todas sus plantas.',
+                              'Para editar este patrón o agregarle certificados necesitas acceso a todas sus plantas.',
                             ),
                           for (final cert in objects(item['certificates']))
                             ListTile(
@@ -401,8 +486,18 @@ class _PatternsPanelState extends State<PatternsPanel> {
                               title: Text(
                                 '${cert['numero']} · ${cert['laboratorio']}',
                               ),
-                              subtitle: Text(
-                                'Calibrado: ${dateLabel(cert['calibrado_el'])}\nVence: ${dateLabel(cert['vence_el'])} · ${cert['estado'] == 'ANNULLED' ? 'Anulado' : 'Registrado'}',
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Calibrado: ${dateLabel(cert['calibrado_el'])}\nVence: ${dateLabel(cert['vence_el'])}',
+                                    ),
+                                    const SizedBox(height: 4),
+                                    _CertificateState.of(cert).tag,
+                                  ],
+                                ),
                               ),
                               trailing:
                                   cert['estado'] == 'ACTIVE' &&
@@ -449,6 +544,33 @@ class _PatternsPanelState extends State<PatternsPanel> {
       ],
     );
   }
+}
+
+/// Clave para comparar números de certificado como el servidor: sin
+/// mayúsculas ni espacios sobrantes.
+String _certificateKey(Object? number) =>
+    (number?.toString() ?? '').trim().toLowerCase();
+
+/// Cómo está un certificado hoy, en el teléfono. El servidor decide la
+/// trazabilidad al finalizar; esto solo orienta a quien mira la lista.
+enum _CertificateState {
+  valid('Vigente', ComplianceStatus.conforme),
+  expired('Vencido', ComplianceStatus.noConforme),
+  annulled('Anulado', null);
+
+  const _CertificateState(this.label, this.status);
+  final String label;
+  final ComplianceStatus? status;
+
+  static _CertificateState of(Json cert) {
+    if (cert['estado'] == 'ANNULLED') return _CertificateState.annulled;
+    final expires = DateTime.tryParse(cert['vence_el']?.toString() ?? '');
+    return expires != null && !dateOnly(expires).isBefore(today())
+        ? _CertificateState.valid
+        : _CertificateState.expired;
+  }
+
+  Widget get tag => StatusTag(label, status: status);
 }
 
 /// "Pesas · 20 kg". La capacidad llega del servidor con nueve decimales y

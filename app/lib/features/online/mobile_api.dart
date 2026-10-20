@@ -150,6 +150,14 @@ class MobileFailure implements Exception {
       'Esta área tiene balanzas asignadas. Reasígnalas antes de desactivarla.',
     'PATTERN_ALL_PLANTS_REQUIRED' =>
       'Necesitas acceso a todas las plantas del patrón para editarlo.',
+    'PATTERN_NOT_ACCESSIBLE' =>
+      'El patrón ya no está disponible en tus plantas. Actualiza la lista.',
+    'INVALID_CERTIFICATE' =>
+      'Revisa el número, el laboratorio y las fechas del certificado.',
+    'INVALID_CERTIFICATE_DATES' =>
+      'Revisa las fechas: la calibración no puede ser futura y el vencimiento no puede ser anterior a ella.',
+    'CERTIFICATE_EXISTS' =>
+      'Este patrón ya tiene un certificado con ese número, aunque esté anulado.',
     'EXACT_DECIMAL_REQUIRED' =>
       'Usa cadenas decimales con punto y hasta 9 decimales.',
     'INVALID_PLAN_TEST' =>
