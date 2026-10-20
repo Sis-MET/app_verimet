@@ -27,6 +27,9 @@ import 'customer_configuration.dart';
 import 'draft_screen.dart';
 import 'pending_captures.dart';
 import 'plan_screen.dart';
+import 'setup_guide.dart';
+import 'setup_guide_memory.dart';
+import 'setup_guide_screen.dart';
 import 'user_manual.dart';
 import 'team_screen.dart';
 
@@ -46,6 +49,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool recoveryChecked = false;
   bool recovering = false;
   String? recoveryError;
+
+  /// Lo que este teléfono recuerda de la guía de inicio; null hasta leerlo.
+  GuideMemory? guide;
+  bool guideChecked = false;
   @override
   void initState() {
     super.initState();
@@ -64,6 +71,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       return;
     }
     recovering = true;
+    var recovered = false;
     final owner = session.recoveryOwner;
     try {
       final snapshot = await session.recovery.active(owner);
@@ -75,6 +83,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       recoveryChecked = true;
       recoveryError = null;
       if (snapshot != null) {
+        recovered = true;
         await openPage(
           context,
           RecoveredDraftScreen(session: session, snapshot: snapshot),
@@ -88,6 +97,77 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       // Después de reabrir la captura activa: así el envío en segundo plano
       // no la toca mientras está en pantalla.
       if (mounted && recoveryChecked) session.backgroundSync();
+      // Quien vuelve a una captura a medias no es nuevo: no se le abre la
+      // guía encima.
+      if (mounted && recoveryChecked) {
+        unawaited(_loadGuide(open: !recovered));
+      }
+    }
+  }
+
+  /// Lee la guía de esta cuenta y, la primera vez, la abre sola.
+  Future<void> _loadGuide({required bool open}) async {
+    if (guideChecked) return;
+    guideChecked = true;
+    final session = widget.session;
+    final owner = session.recoveryOwner;
+    final memory = await session.guideMemory.read(owner);
+    if (!mounted || session.recoveryOwner != owner) return;
+    setState(() => guide = memory);
+    if (open &&
+        !memory.dismissed &&
+        SetupGuide.measurable(session) &&
+        session.stage == SessionStage.ready &&
+        session.online) {
+      await _openGuide();
+    }
+  }
+
+  Future<void> _openGuide({bool resume = false}) async {
+    final session = widget.session;
+    final destination = await openPage<GuideDestination>(
+      context,
+      SetupGuideScreen(
+        session: session,
+        memory: guide ?? const GuideMemory(),
+        resume: resume,
+      ),
+    );
+    if (!mounted) return;
+    final memory = await session.guideMemory.read(session.recoveryOwner);
+    if (!mounted) return;
+    setState(() => guide = memory);
+    if (destination != null) _go(destination);
+  }
+
+  /// «Ir a…» de la guía: la pestaña y la pastilla de ese paso.
+  void _go(GuideDestination destination) {
+    final session = widget.session;
+    void plants(_PlantsView view) => setState(() {
+      plantsView = view;
+      section = AppSection.areas;
+    });
+    switch (destination) {
+      case GuideDestination.plants:
+        plants(_PlantsView.plantsAndAreas);
+      case GuideDestination.patterns:
+        plants(_PlantsView.patterns);
+      case GuideDestination.operators:
+        plants(_PlantsView.operators);
+      case GuideDestination.verify:
+        setState(() => section = AppSection.verificar);
+      case GuideDestination.agenda:
+        setState(() => section = AppSection.agenda);
+      case GuideDestination.users:
+        unawaited(
+          openPage<void>(context, CompanyUsersScreen(session: session)),
+        );
+      case GuideDestination.history:
+        unawaited(openPage<void>(context, HistoryScreen(session: session)));
+      case GuideDestination.pending:
+        unawaited(
+          openPage<void>(context, PendingCapturesScreen(session: session)),
+        );
     }
   }
 
@@ -143,6 +223,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     child: switch (section) {
                       AppSection.inicio => _Home(
                         session: session,
+                        guide: guide,
+                        onGuide: () => _openGuide(resume: true),
                         onSection: (value) => setState(() => section = value),
                         onPlants: (view) => setState(() {
                           plantsView = view;
@@ -156,7 +238,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                         view: plantsView,
                         onView: (view) => setState(() => plantsView = view),
                       ),
-                      AppSection.ajustes => _Settings(session),
+                      AppSection.ajustes => _Settings(
+                        session,
+                        onGuide: _openGuide,
+                      ),
                     },
                   ),
                 ),
@@ -237,10 +322,16 @@ class ScreenHeader extends StatelessWidget {
 class _Home extends StatelessWidget {
   const _Home({
     required this.session,
+    required this.guide,
+    required this.onGuide,
     required this.onSection,
     required this.onPlants,
   });
   final MobileSession session;
+
+  /// Lo que se recuerda de la guía; la franja se ve mientras no se termine.
+  final GuideMemory? guide;
+  final VoidCallback onGuide;
   final ValueChanged<AppSection> onSection;
 
   /// Lleva a la pestaña Plantas con una pastilla ya elegida.
@@ -288,6 +379,11 @@ class _Home extends StatelessWidget {
               label: const Text('Asignar operadores'),
             ),
           ),
+        ],
+        if (guide case final memory?
+            when !memory.finished && SetupGuide.measurable(session)) ...[
+          const SizedBox(height: 14),
+          GuideStrip(guide: SetupGuide.of(session, memory), onTap: onGuide),
         ],
         const SizedBox(height: 18),
         TileGrid(
@@ -548,8 +644,9 @@ class _PlantList extends StatelessWidget {
 }
 
 class _Settings extends ConsumerWidget {
-  const _Settings(this.session);
+  const _Settings(this.session, {required this.onGuide});
   final MobileSession session;
+  final VoidCallback onGuide;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
@@ -645,7 +742,16 @@ class _Settings extends ConsumerWidget {
         TileGrid(
           minTileHeight: 110,
           cells: [
-            TileCell.wide(
+            TileCell(
+              ActionTile(
+                key: const ValueKey('settings-guide'),
+                icon: Icons.flag_outlined,
+                label: 'Guía de inicio',
+                caption: 'Los pasos para empezar, según tu rol',
+                onTap: onGuide,
+              ),
+            ),
+            TileCell(
               ActionTile(
                 key: const ValueKey('settings-manual'),
                 icon: Icons.menu_book_outlined,

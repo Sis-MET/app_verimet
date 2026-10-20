@@ -13,7 +13,7 @@ const ivmetUserManual = UserManual(
   control: ManualControl(
     code: 'PENDIENTE: código asignado por Calidad',
     title: 'Manual de uso de IvMET',
-    revision: '01 (borrador)',
+    revision: '02 (borrador)',
     issuedOn: '2026-10-09',
     appliesTo: '1.0.x',
     preparedBy: 'Desarrollo IvMET',
@@ -25,6 +25,11 @@ const ivmetUserManual = UserManual(
         '01',
         '2026-10-09',
         'Trabajo sin conexión: copia del teléfono, finalizar sin señal y Por enviar.',
+      ),
+      ManualRevision(
+        '02',
+        '2026-10-20',
+        'Guía de inicio por rol: se abre al primer ingreso, franja en Inicio y Ajustes › Ayuda.',
       ),
     ],
   ),
@@ -175,9 +180,37 @@ const ivmetUserManual = UserManual(
           '«Historial» y «Borradores»: verificaciones finalizadas y capturas sin finalizar.',
           '«Gestionar plantas» y «Gestionar patrones»: áreas y pesas patrón de cada planta.',
           'Para el jefe de calidad, una franja con el plan y el recurso más usado (por ejemplo «4 de 5 balanzas»).',
+          '«Guía de inicio», mientras no la termines: cuántos pasos están listos y cuál sigue.',
         ]),
         ManualList('Barra inferior', [
           'Inicio · Verificar · Agenda · Plantas · Ajustes.',
+        ]),
+      ],
+    ),
+    ManualSection(
+      id: 'guia',
+      group: ManualGroup.start,
+      title: 'Guía de inicio',
+      icon: Icons.flag_outlined,
+      summary: 'Los pasos para empezar, según tu rol.',
+      blocks: [
+        ManualParagraph(
+          'La primera vez que ingresas, IvMET abre una guía con lo que te '
+          'toca hacer, en orden. Al jefe de calidad le muestra cómo dejar la '
+          'empresa lista: plantas y áreas, pesas patrón, balanzas, pruebas y '
+          'periodicidad, errores permisibles, su equipo y la asignación de '
+          'balanzas. Al operador, cómo verificar: sus balanzas, la agenda y '
+          'cada paso de la captura.',
+        ),
+        ManualList('Cómo se usa', [
+          'Cada paso dice qué hacer y dónde, con los nombres de los botones, y una animación lo muestra.',
+          'Los pasos que el servidor puede comprobar se marcan solos: «1 de 3 configuradas», «Listo · 2 plantas · 4 áreas». Los demás se marcan al leerlos.',
+          '«Ir a…» cierra la guía y abre la pantalla de ese paso; «Ver en el manual» abre su sección.',
+          'Se desliza de un paso a otro, o se elige uno en el panel de pasos.',
+        ]),
+        ManualList('Volver a la guía', [
+          'Inicio › «Guía de inicio», hasta que toques «Terminar» en el último paso.',
+          'Ajustes › Ayuda › «Guía de inicio», siempre.',
         ]),
       ],
     ),

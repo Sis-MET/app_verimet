@@ -12,6 +12,7 @@ import 'commercial_plan.dart';
 import 'draft_recovery.dart';
 import 'mobile_api.dart';
 import 'offline_copy.dart';
+import 'setup_guide_memory.dart';
 
 final draftRecoveryProvider = Provider<DraftRecovery>((ref) {
   final store = createDraftRecoveryStore();
@@ -62,6 +63,9 @@ class MobileSession extends ChangeNotifier {
 
   /// Lo que el teléfono guarda para trabajar sin señal.
   late final OfflineCopy copy = OfflineCopy(recovery.store);
+
+  /// Lo que el teléfono recuerda de la guía de inicio de cada cuenta.
+  late final GuideMemoryStore guideMemory = GuideMemoryStore(recovery.store);
 
   /// Lo capturado aquí que espera llegar al servidor.
   late final CaptureUploads uploads = CaptureUploads(this);
@@ -215,6 +219,7 @@ class MobileSession extends ChangeNotifier {
         await recovery.remove(owner, draft['requestId'].toString());
       }
       await copy.forget(owner);
+      await guideMemory.forget(owner);
     } catch (_) {
       // Sin borradores ni copia que descartar.
     }

@@ -27,6 +27,9 @@ calibraciones formales.
   desde una página web; la evidencia se conserva sin datos personales. La app
   trae un manual de uso controlado. Ver
   [docs/account-deletion-and-manual.md](docs/account-deletion-and-manual.md).
+- Al primer ingreso, una **guía de inicio** por rol muestra paso a paso qué
+  configurar (o cómo verificar) y marca sola lo que ya está hecho. Ver
+  [docs/setup-guide.md](docs/setup-guide.md).
 - Cumplimiento NB/ISO/IEC 17025 (7.5, 7.11 y 8.4): análisis y brechas en
   [docs/iso17025/analisis-ivmet.md](docs/iso17025/analisis-ivmet.md).
 

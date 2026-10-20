@@ -27,6 +27,7 @@ una línea de 3 px con un tramo por paso; abajo a la derecha, la píldora
 | Configurar verificaciones | Pruebas y periodicidad · Errores permisibles | Salir (sin guardar) |
 | Registrar o editar balanza | Área · Identificación · Datos técnicos | Salir (sin guardar) |
 | Crear cuenta de empresa | Tu empresa · Tu cuenta · Código | — |
+| Guía de inicio | Los de cada rol ([guía de inicio](setup-guide.md)); se desliza entre ellos | ✕ cierra; «Ir a…» y «Ver en el manual» van al pie de cada paso |
 
 ## Páginas de una sola vista
 

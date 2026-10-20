@@ -125,6 +125,26 @@ test('agenda, periodicidad y balanzas por operador en PostgreSQL desechable', as
     const lateStart = await shift(-3);
     const lateRule = { mode: 'fixed', unit: 'week', every: 1, warningDays: 1, startsOn: lateStart, weekdays: [await isoDay(lateStart)] };
 
+    await t.test('la guía de inicio cuenta lo que falta configurar', async () => {
+      const [traced, expired] = [uuid(), uuid()];
+      await q("insert into public.areas(cliente_id,planta_id,nombre) values($1,$2,'Producción')", [client, plant]);
+      await q(`insert into public.patrones(id,cliente_id,codigo,descripcion,tipo) values
+        ($1,$3,'P-1','Juego de pesas','pesas'),($2,$3,'P-2','Pesa de 20 kg','pesas')`, [traced, expired, client]);
+      await q('insert into public.patron_plantas(patron_id,planta_id) values($1,$3),($2,$3)', [traced, expired, plant]);
+      await q(`insert into public.patron_certificados(patron_id,numero,laboratorio,calibrado_el,vence_el) values
+        ($1,'C-1','Lab',current_date-30,current_date+300),($2,'C-2','Lab',current_date-400,current_date-35)`, [traced, expired]);
+      await identity(quality);
+      assert.deepEqual((await read('bootstrap')).setup, {
+        plants: 2, areas: 1, patterns: 2, tracedPatterns: 1, equipment: 4, validated: 0,
+        configured: 0, assigned: 0, operators: 3, verifications: 0 });
+      // El operador cuenta solo lo suyo y no ve al resto del equipo.
+      await identity(ana);
+      assert.deepEqual((await read('bootstrap')).setup, {
+        plants: 1, areas: 1, patterns: 2, tracedPatterns: 1, equipment: 0, validated: 0,
+        configured: 0, assigned: 0, operators: null, verifications: 0 });
+      await identity('', 'service_role');
+    });
+
     await t.test('el jefe guarda la periodicidad; los clientes anteriores siguen enviando días', async () => {
       await identity(quality);
       for (const id of [weekly, overdue, legacy, other]) {
@@ -201,6 +221,8 @@ test('agenda, periodicidad y balanzas por operador en PostgreSQL desechable', as
       await identity(ana);
       const boot = await read('bootstrap');
       assert.equal(boot.equipmentCount, 2);
+      const { setup } = boot;
+      assert.deepEqual([setup.equipment, setup.validated, setup.configured, setup.assigned, setup.verifications], [2, 2, 2, 2, 0]);
       assert.deepEqual((await read('instruments')).items.map(i => i.cod_interno).sort(), ['ATRASADA', 'SEMANAL']);
       await assert.rejects(read('equipment', { equipmentId: legacy }), /EQUIPMENT_NOT_ACCESSIBLE/);
       draftBundle = await read('equipment', { equipmentId: weekly });
@@ -255,12 +277,16 @@ test('agenda, periodicidad y balanzas por operador en PostgreSQL desechable', as
       assert.deepEqual(byBeto.items[0].equipment.assignees.map(a => a.name), ['Ana', 'Beto']);
       // A Ana se le retira SEMANAL: conserva su verificación, no la balanza.
       await assign({ equipmentId: weekly, userIds: [beto] });
+      const { setup } = await read('bootstrap');
+      assert.deepEqual([setup.equipment, setup.validated, setup.configured, setup.assigned, setup.verifications], [4, 4, 4, 2, 1]);
       await identity(ana);
       assert.equal((await read('history')).total, 1);
+      assert.equal((await read('bootstrap')).setup.verifications, 1, 'la capturó ella');
       await assert.rejects(read('equipment', { equipmentId: weekly }), /EQUIPMENT_NOT_ACCESSIBLE/);
       await identity(beto);
       assert.equal((await read('history')).total, 1);
       assert.equal((await read('instruments')).total, 1);
+      assert.equal((await read('bootstrap')).setup.verifications, 0);
     });
   } finally {
     await db.close();
